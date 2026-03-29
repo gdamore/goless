@@ -263,6 +263,25 @@ func TestApplyMatchCellStyleUsesUnderlineAccents(t *testing.T) {
 	}
 }
 
+func TestRefreshPicksUpAppendedDocumentContent(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	if err := doc.Append([]byte("hello\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	doc.Flush()
+	v.Refresh()
+
+	if got, want := len(v.lines), 1; got != want {
+		t.Fatalf("line count after refresh = %d, want %d", got, want)
+	}
+	if got, want := v.lines[0].Text, "hello"; got != want {
+		t.Fatalf("line text after refresh = %q, want %q", got, want)
+	}
+}
+
 func keyRune(s string) *tcell.EventKey {
 	return tcell.NewEventKey(tcell.KeyRune, s, tcell.ModNone)
 }
