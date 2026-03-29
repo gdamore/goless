@@ -49,3 +49,62 @@ func TestDocumentTracksStyleRuns(t *testing.T) {
 		t.Fatalf("style 1 fg = %+v, want %+v", got, want)
 	}
 }
+
+func TestDocumentIndexesCombiningGraphemes(t *testing.T) {
+	doc := NewDocument(4)
+
+	if err := doc.Append([]byte("e\u0301x")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	lines := doc.Lines()
+	if got, want := len(lines), 1; got != want {
+		t.Fatalf("line count = %d, want %d", got, want)
+	}
+	if got, want := len(lines[0].Graphemes), 2; got != want {
+		t.Fatalf("grapheme count = %d, want %d", got, want)
+	}
+
+	first := lines[0].Graphemes[0]
+	if got, want := first.Text, "e\u0301"; got != want {
+		t.Fatalf("first grapheme = %q, want %q", got, want)
+	}
+	if got, want := first.RuneStart, 0; got != want {
+		t.Fatalf("first rune start = %d, want %d", got, want)
+	}
+	if got, want := first.RuneEnd, 2; got != want {
+		t.Fatalf("first rune end = %d, want %d", got, want)
+	}
+	if got, want := first.CellWidth, 1; got != want {
+		t.Fatalf("first width = %d, want %d", got, want)
+	}
+}
+
+func TestDocumentIndexesEmojiZWJGraphemes(t *testing.T) {
+	doc := NewDocument(4)
+
+	if err := doc.Append([]byte("👨‍👩‍👧‍👦!")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	lines := doc.Lines()
+	if got, want := len(lines), 1; got != want {
+		t.Fatalf("line count = %d, want %d", got, want)
+	}
+	if got, want := len(lines[0].Graphemes), 2; got != want {
+		t.Fatalf("grapheme count = %d, want %d", got, want)
+	}
+
+	first := lines[0].Graphemes[0]
+	if got, want := first.Text, "👨‍👩‍👧‍👦"; got != want {
+		t.Fatalf("first grapheme = %q, want %q", got, want)
+	}
+	if got, want := first.CellWidth, 2; got != want {
+		t.Fatalf("first width = %d, want %d", got, want)
+	}
+
+	second := lines[0].Graphemes[1]
+	if got, want := second.Text, "!"; got != want {
+		t.Fatalf("second grapheme = %q, want %q", got, want)
+	}
+}

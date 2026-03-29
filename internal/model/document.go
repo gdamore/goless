@@ -2,8 +2,10 @@ package model
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gdamore/goless/internal/ansi"
+	"github.com/rivo/uniseg"
 )
 
 // StyleRun applies a style to a half-open rune range within a line.
@@ -19,6 +21,7 @@ type Line struct {
 	ByteEnd   int64
 	Text      string
 	Styles    []StyleRun
+	Graphemes []Grapheme
 }
 
 // Document incrementally builds logical lines from appended bytes.
@@ -28,6 +31,16 @@ type Document struct {
 	lines     []Line
 	lineStart int64
 	current   lineBuilder
+}
+
+// Grapheme describes a single visible grapheme cluster within a line.
+type Grapheme struct {
+	Text      string
+	ByteStart int
+	ByteEnd   int
+	RuneStart int
+	RuneEnd   int
+	CellWidth int
 }
 
 type lineBuilder struct {
@@ -105,10 +118,43 @@ func (d *Document) Newline(_ ansi.Style, offset int64) {
 
 func (d *Document) currentLine() Line {
 	styles := append([]StyleRun(nil), d.current.styles...)
+	text := d.current.text.String()
 	return Line{
 		ByteStart: d.lineStart,
 		ByteEnd:   d.current.byteEnd,
-		Text:      d.current.text.String(),
+		Text:      text,
 		Styles:    styles,
+		Graphemes: segmentGraphemes(text),
 	}
+}
+
+func segmentGraphemes(text string) []Grapheme {
+	if text == "" {
+		return nil
+	}
+
+	var graphemes []Grapheme
+	byteStart := 0
+	runeStart := 0
+	state := -1
+	rest := text
+
+	for rest != "" {
+		cluster, next, width, newState := uniseg.FirstGraphemeClusterInString(rest, state)
+		runes := utf8.RuneCountInString(cluster)
+		graphemes = append(graphemes, Grapheme{
+			Text:      cluster,
+			ByteStart: byteStart,
+			ByteEnd:   byteStart + len(cluster),
+			RuneStart: runeStart,
+			RuneEnd:   runeStart + runes,
+			CellWidth: width,
+		})
+		byteStart += len(cluster)
+		runeStart += runes
+		rest = next
+		state = newState
+	}
+
+	return graphemes
 }
