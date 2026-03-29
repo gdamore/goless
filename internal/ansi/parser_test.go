@@ -1,0 +1,111 @@
+package ansi
+
+import (
+	"strings"
+	"testing"
+)
+
+type recordEvent struct {
+	kind   string
+	r      rune
+	style  Style
+	offset int64
+}
+
+type recordReceiver struct {
+	events []recordEvent
+}
+
+func (r *recordReceiver) Print(ch rune, style Style, offset int64) {
+	r.events = append(r.events, recordEvent{kind: "print", r: ch, style: style, offset: offset})
+}
+
+func (r *recordReceiver) Newline(style Style, offset int64) {
+	r.events = append(r.events, recordEvent{kind: "newline", style: style, offset: offset})
+}
+
+func TestParserCarriesUTF8AcrossWrites(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParser(recv)
+
+	if _, err := p.Write([]byte{0xf0, 0x9f}); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	if len(recv.events) != 0 {
+		t.Fatalf("unexpected events before UTF-8 sequence completed: %+v", recv.events)
+	}
+
+	if _, err := p.Write([]byte{0x98, 0x80}); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	if got, want := len(recv.events), 1; got != want {
+		t.Fatalf("event count = %d, want %d", got, want)
+	}
+	if got, want := recv.events[0].r, '😀'; got != want {
+		t.Fatalf("rune = %q, want %q", got, want)
+	}
+}
+
+func TestParserAppliesSGRAndFiltersOSC(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParser(recv)
+
+	input := "a\x1b[31mB\x1b[0m\x1b]0;title\aC"
+	if _, err := p.Write([]byte(input)); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+	if got, want := text.String(), "aBC"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+
+	if got := recv.events[1].style.Fg; got != IndexedColor(1) {
+		t.Fatalf("foreground = %+v, want %+v", got, IndexedColor(1))
+	}
+	if got := recv.events[2].style.Fg; got != DefaultColor() {
+		t.Fatalf("reset foreground = %+v, want %+v", got, DefaultColor())
+	}
+}
+
+func TestParserFlushesIncompleteEscapeVisibly(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParser(recv)
+
+	if _, err := p.Write([]byte("x\x1b[31")); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	p.Flush()
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+
+	if got, want := text.String(), "x␛[31"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+}
+
+func TestParserNormalizesCRLF(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParser(recv)
+
+	if _, err := p.Write([]byte("a\r\nb")); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	if got, want := len(recv.events), 3; got != want {
+		t.Fatalf("event count = %d, want %d", got, want)
+	}
+	if recv.events[1].kind != "newline" {
+		t.Fatalf("second event = %q, want newline", recv.events[1].kind)
+	}
+}
