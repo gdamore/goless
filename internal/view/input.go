@@ -10,6 +10,7 @@ type viewerMode int
 const (
 	modeNormal viewerMode = iota
 	modePrompt
+	modeHelp
 )
 
 type promptKind int
@@ -52,6 +53,7 @@ const (
 	actionPromptCommand
 	actionSearchNext
 	actionSearchPrev
+	actionToggleHelp
 )
 
 func actionForKey(ev *tcell.EventKey) action {
@@ -74,6 +76,8 @@ func actionForKey(ev *tcell.EventKey) action {
 		return actionGoTop
 	case tcell.KeyEnd:
 		return actionGoBottom
+	case tcell.KeyF1:
+		return actionToggleHelp
 	case tcell.KeyRune:
 		switch ev.Str() {
 		case "q":
@@ -106,6 +110,8 @@ func actionForKey(ev *tcell.EventKey) action {
 			return actionSearchNext
 		case "N":
 			return actionSearchPrev
+		case "H":
+			return actionToggleHelp
 		}
 	}
 	return actionNone

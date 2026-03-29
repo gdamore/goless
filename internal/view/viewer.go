@@ -4,7 +4,6 @@
 package view
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/gdamore/goless/internal/ansi"
@@ -12,6 +11,7 @@ import (
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/tcell/v3"
 	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 // Config controls viewer behavior.
@@ -19,22 +19,25 @@ type Config struct {
 	TabWidth   int
 	WrapMode   layout.WrapMode
 	ShowStatus bool
+	Localizer  *i18n.Localizer
 }
 
 // Viewer is a minimal document viewer built on the model and layout packages.
 type Viewer struct {
-	doc       *model.Document
-	cfg       Config
-	mode      viewerMode
-	prompt    *promptState
-	message   string
-	search    searchState
-	lines     []model.Line
-	layout    layout.Result
-	width     int
-	height    int
-	rowOffset int
-	colOffset int
+	doc        *model.Document
+	cfg        Config
+	mode       viewerMode
+	prompt     *promptState
+	message    string
+	search     searchState
+	localizer  *i18n.Localizer
+	lines      []model.Line
+	layout     layout.Result
+	width      int
+	height     int
+	rowOffset  int
+	colOffset  int
+	helpOffset int
 }
 
 // New constructs a viewer for the given document.
@@ -42,9 +45,14 @@ func New(doc *model.Document, cfg Config) *Viewer {
 	if cfg.TabWidth <= 0 {
 		cfg.TabWidth = 8
 	}
+	localizer := cfg.Localizer
+	if localizer == nil {
+		localizer = defaultLocalizer()
+	}
 	return &Viewer{
-		doc: doc,
-		cfg: cfg,
+		doc:       doc,
+		cfg:       cfg,
+		localizer: localizer,
 	}
 }
 
@@ -59,6 +67,7 @@ func (v *Viewer) SetSize(width, height int) {
 	v.width = width
 	v.height = height
 	v.relayout()
+	v.clampHelpOffset()
 }
 
 // Refresh rebuilds the derived layout using the current document contents.
@@ -70,6 +79,12 @@ func (v *Viewer) Refresh() {
 func (v *Viewer) Draw(screen tcell.Screen) {
 	v.ensureLayout()
 	screen.Clear()
+
+	if v.mode == modeHelp {
+		v.drawHelp(screen)
+		screen.Sync()
+		return
+	}
 
 	bodyHeight := v.bodyHeight()
 	for y := 0; y < bodyHeight; y++ {
@@ -97,6 +112,9 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 
 // HandleKey applies minimal navigation and returns true when the viewer should exit.
 func (v *Viewer) HandleKey(ev *tcell.EventKey) bool {
+	if v.mode == modeHelp {
+		return v.handleHelpKey(ev)
+	}
 	if v.mode == modePrompt {
 		return v.handlePromptKey(ev)
 	}
@@ -132,6 +150,8 @@ func (v *Viewer) HandleKey(ev *tcell.EventKey) bool {
 		v.repeatSearch(v.search.Forward)
 	case actionSearchPrev:
 		v.repeatSearch(!v.search.Forward)
+	case actionToggleHelp:
+		v.toggleHelp()
 	}
 
 	return false
@@ -353,9 +373,9 @@ func (v *Viewer) drawRow(screen tcell.Screen, y int, row layout.VisualRow) {
 
 func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 	style := tcell.StyleDefault.Reverse(true)
-	mode := "SCROLL"
+	mode := v.text(msgModeScroll, nil)
 	if v.cfg.WrapMode == layout.SoftWrap {
-		mode = "WRAP"
+		mode = v.text(msgModeWrap, nil)
 	}
 
 	current := 0
@@ -368,10 +388,20 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 		if len(v.search.Matches) > 0 && v.search.Current >= 0 {
 			position = v.search.Current + 1
 		}
-		searchInfo = fmt.Sprintf("  /%s %d/%d", v.search.Query, position, len(v.search.Matches))
+		searchInfo = v.text(msgStatusSearchInfo, map[string]any{
+			"Query":   v.search.Query,
+			"Current": position,
+			"Total":   len(v.search.Matches),
+		})
 	}
-	status := fmt.Sprintf(" %s  row %d/%d  col %d  bytes %d%s  q quit  / ? search  w wrap ",
-		mode, current, len(v.layout.Rows), v.colOffset, v.doc.Len(), searchInfo)
+	status := v.text(msgStatusLine, map[string]any{
+		"Mode":       mode,
+		"Current":    current,
+		"Total":      len(v.layout.Rows),
+		"Column":     v.colOffset,
+		"Bytes":      v.doc.Len(),
+		"SearchInfo": searchInfo,
+	})
 	if v.message != "" {
 		status += "  " + v.message
 	}
@@ -391,6 +421,37 @@ func (v *Viewer) drawPrompt(screen tcell.Screen, y int) {
 		prompt += strings.Repeat(" ", v.width-len(prompt))
 	}
 	screen.PutStrStyled(0, y, truncateToWidth(prompt, v.width), style)
+}
+
+func (v *Viewer) handleHelpKey(ev *tcell.EventKey) bool {
+	switch ev.Key() {
+	case tcell.KeyEscape:
+		v.toggleHelp()
+		return false
+	case tcell.KeyCtrlC:
+		return true
+	case tcell.KeyUp:
+		v.helpOffset--
+	case tcell.KeyDown:
+		v.helpOffset++
+	case tcell.KeyPgUp:
+		v.helpOffset -= max(v.height-2, 1)
+	case tcell.KeyPgDn:
+		v.helpOffset += max(v.height-2, 1)
+	case tcell.KeyHome:
+		v.helpOffset = 0
+	case tcell.KeyEnd:
+		v.helpOffset = v.maxHelpOffset()
+	case tcell.KeyF1:
+		v.toggleHelp()
+	case tcell.KeyRune:
+		switch ev.Str() {
+		case "q", "H":
+			v.toggleHelp()
+		}
+	}
+	v.clampHelpOffset()
+	return false
 }
 
 func (v *Viewer) handlePromptKey(ev *tcell.EventKey) bool {
@@ -422,8 +483,29 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) bool {
 	return false
 }
 
-func (v *Viewer) setMessage(msg string) {
-	v.message = msg
+func (v *Viewer) setMessage(msg *i18n.Message, data map[string]any) {
+	v.message = v.text(msg, data)
+}
+
+func (v *Viewer) text(msg *i18n.Message, data map[string]any) string {
+	if v.localizer == nil {
+		return msg.Other
+	}
+	cfg := &i18n.LocalizeConfig{DefaultMessage: msg, TemplateData: data}
+	text, err := v.localizer.Localize(cfg)
+	if err != nil {
+		return msg.Other
+	}
+	return text
+}
+
+func (v *Viewer) toggleHelp() {
+	if v.mode == modeHelp {
+		v.mode = modeNormal
+		return
+	}
+	v.mode = modeHelp
+	v.helpOffset = 0
 }
 
 func styleForGrapheme(line model.Line, runeIndex int) ansi.Style {
