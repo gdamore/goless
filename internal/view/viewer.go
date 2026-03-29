@@ -295,6 +295,11 @@ func (v *Viewer) drawRow(screen tcell.Screen, y int, row layout.VisualRow) {
 			break
 		}
 
+		if segment.Display != "" {
+			screen.PutStrStyled(x, y, segment.Display, cellStyle)
+			continue
+		}
+
 		if grapheme.Text == "\t" {
 			screen.PutStrStyled(x, y, strings.Repeat(" ", segment.RenderedCellTo-segment.RenderedCellFrom), cellStyle)
 			continue

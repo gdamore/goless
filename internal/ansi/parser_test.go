@@ -46,7 +46,7 @@ func TestParserCarriesUTF8AcrossWrites(t *testing.T) {
 	}
 }
 
-func TestParserAppliesSGRAndFiltersOSC(t *testing.T) {
+func TestParserAppliesSGRAndShowsOSC(t *testing.T) {
 	recv := &recordReceiver{}
 	p := NewParser(recv)
 
@@ -61,15 +61,35 @@ func TestParserAppliesSGRAndFiltersOSC(t *testing.T) {
 			text.WriteRune(ev.r)
 		}
 	}
-	if got, want := text.String(), "aBC"; got != want {
+	if got, want := text.String(), "aB␛]0;title␇C"; got != want {
 		t.Fatalf("text = %q, want %q", got, want)
 	}
 
 	if got := recv.events[1].style.Fg; got != IndexedColor(1) {
 		t.Fatalf("foreground = %+v, want %+v", got, IndexedColor(1))
 	}
-	if got := recv.events[2].style.Fg; got != DefaultColor() {
+	if got := recv.events[len(recv.events)-1].style.Fg; got != DefaultColor() {
 		t.Fatalf("reset foreground = %+v, want %+v", got, DefaultColor())
+	}
+}
+
+func TestParserShowsOSCTerminatedByST(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParser(recv)
+
+	input := "x\x1b]8;;https://example.com\x1b\\y"
+	if _, err := p.Write([]byte(input)); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+	if got, want := text.String(), "x␛]8;;https://example.com␛\\y"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
 	}
 }
 
