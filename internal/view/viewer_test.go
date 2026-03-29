@@ -126,6 +126,35 @@ func TestPromptSearchFindsAndRepeatsForward(t *testing.T) {
 	}
 }
 
+func TestEmptySearchClearsExistingMatches(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nbeta\nalpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune("/"))
+	for _, s := range []string{"a", "l", "p", "h", "a"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	v.HandleKey(keyRune("/"))
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.search.Query, ""; got != want {
+		t.Fatalf("search query after empty submit = %q, want %q", got, want)
+	}
+	if got, want := len(v.search.Matches), 0; got != want {
+		t.Fatalf("match count after empty submit = %d, want %d", got, want)
+	}
+	if got, want := v.search.Current, 0; got != want {
+		t.Fatalf("current match after empty submit = %d, want %d", got, want)
+	}
+}
+
 func TestPromptCommandJumpsToLine(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\nfour\n")); err != nil {
