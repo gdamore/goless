@@ -95,7 +95,7 @@ func (v *Viewer) commitPrompt() {
 func (v *Viewer) startSearch(query string, forward bool) {
 	query = strings.TrimSpace(query)
 	if query == "" {
-		v.setMessage(msgPromptEmptySearch, nil)
+		v.clearSearch()
 		return
 	}
 
@@ -112,6 +112,11 @@ func (v *Viewer) startSearch(query string, forward bool) {
 	v.search.Current = v.pickInitialMatch(forward)
 	v.goToMatch(v.search.Current)
 	v.setMessage(msgPromptMatchCount, map[string]any{"Query": query, "Count": len(v.search.Matches)})
+}
+
+func (v *Viewer) clearSearch() {
+	v.search = searchState{}
+	v.setMessage(msgPromptEmptySearch, nil)
 }
 
 func (v *Viewer) repeatSearch(forward bool) {
