@@ -17,6 +17,7 @@ type searchMatch struct {
 	StartRune  int
 	EndRune    int
 	StartGraph int
+	EndGraph   int
 }
 
 type searchState struct {
@@ -43,6 +44,7 @@ func (v *Viewer) rebuildSearch() {
 				StartRune:  start,
 				EndRune:    start + len(pattern),
 				StartGraph: graphemeIndexForRune(line, start),
+				EndGraph:   graphemeIndexForRuneEnd(line, start+len(pattern)),
 			})
 		}
 	}
@@ -163,15 +165,45 @@ func (v *Viewer) goToMatch(index int) {
 		return
 	}
 	match := v.search.Matches[index]
-	if v.cfg.WrapMode == layout.NoWrap && match.LineIndex >= 0 && match.LineIndex < len(v.layout.Lines) {
-		starts := v.layout.Lines[match.LineIndex].GraphemeCellStarts
-		if match.StartGraph >= 0 && match.StartGraph < len(starts) {
-			v.colOffset = starts[match.StartGraph]
-			v.relayout()
-		}
+	if v.cfg.WrapMode == layout.NoWrap {
+		v.revealMatchHorizontally(match)
 	}
 	anchor := layout.Anchor{LineIndex: match.LineIndex, GraphemeIndex: match.StartGraph}
-	v.restoreAnchor(anchor)
+	v.revealAnchor(anchor)
+}
+
+func (v *Viewer) revealMatchHorizontally(match searchMatch) {
+	if match.LineIndex < 0 || match.LineIndex >= len(v.layout.Lines) {
+		return
+	}
+	info := v.layout.Lines[match.LineIndex]
+	if match.StartGraph < 0 || match.StartGraph >= len(info.GraphemeCellStarts) {
+		return
+	}
+
+	matchStart := info.GraphemeCellStarts[match.StartGraph]
+	matchEnd := info.GraphemeCellEnds[match.StartGraph]
+	if match.EndGraph >= 0 && match.EndGraph < len(info.GraphemeCellEnds) {
+		matchEnd = info.GraphemeCellEnds[match.EndGraph]
+	}
+
+	width := max(v.width, 1)
+	windowStart := v.colOffset
+	windowEnd := windowStart + width
+	if matchStart >= windowStart && matchEnd <= windowEnd {
+		return
+	}
+
+	switch {
+	case matchEnd-matchStart >= width:
+		v.colOffset = matchStart
+	case matchStart < windowStart:
+		v.colOffset = matchStart
+	case matchEnd > windowEnd:
+		v.colOffset = matchEnd - width
+	}
+
+	v.relayout()
 }
 
 func (v *Viewer) runCommand(text string) {
@@ -256,6 +288,21 @@ func graphemeIndexForRune(line model.Line, runeIndex int) int {
 	}
 	if len(line.Graphemes) == 0 {
 		return 0
+	}
+	return len(line.Graphemes) - 1
+}
+
+func graphemeIndexForRuneEnd(line model.Line, runeIndex int) int {
+	if len(line.Graphemes) == 0 {
+		return 0
+	}
+	if runeIndex <= 0 {
+		return 0
+	}
+	for i, grapheme := range line.Graphemes {
+		if runeIndex <= grapheme.RuneEnd {
+			return i
+		}
 	}
 	return len(line.Graphemes) - 1
 }
