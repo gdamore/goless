@@ -372,16 +372,33 @@ func (v *Viewer) drawRow(screen tcell.Screen, y int, row layout.VisualRow) {
 }
 
 func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
-	style := tcell.StyleDefault.Reverse(true)
-	mode := v.text(msgModeScroll, nil)
-	if v.cfg.WrapMode == layout.SoftWrap {
-		mode = v.text(msgModeWrap, nil)
+	style := statusBarStyle
+	screen.PutStrStyled(0, y, strings.Repeat(" ", max(v.width, 0)), style)
+
+	left, right := v.statusOverflow()
+	if left && v.width > 1 {
+		screen.PutStrStyled(1, y, leftOverflowIndicator, style)
+	}
+	if right && v.width > 2 {
+		screen.PutStrStyled(v.width-2, y, rightOverflowIndicator, style)
 	}
 
-	current := 0
-	if len(v.layout.Rows) > 0 {
-		current = min(v.rowOffset+1, len(v.layout.Rows))
+	leftText, rightText := v.statusText()
+	leftStart := 2
+	rightStart := v.width - 3 - len(rightText)
+	if rightStart < leftStart {
+		rightStart = leftStart
 	}
+	leftWidth := max(rightStart-leftStart-1, 0)
+	if leftWidth > 0 {
+		screen.PutStrStyled(leftStart, y, truncateToWidth(leftText, leftWidth), style)
+	}
+	if rightText != "" && rightStart < v.width-2 {
+		screen.PutStrStyled(rightStart, y, truncateToWidth(rightText, v.width-2-rightStart), style)
+	}
+}
+
+func (v *Viewer) statusText() (left, right string) {
 	searchInfo := ""
 	if v.search.Query != "" {
 		position := 0
@@ -394,21 +411,34 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 			"Total":   len(v.search.Matches),
 		})
 	}
-	status := v.text(msgStatusLine, map[string]any{
-		"Mode":       mode,
-		"Current":    current,
-		"Total":      len(v.layout.Rows),
-		"Column":     v.colOffset,
-		"Bytes":      v.doc.Len(),
+	left = v.text(msgStatusLine, map[string]any{
 		"SearchInfo": searchInfo,
 	})
 	if v.message != "" {
-		status += "  " + v.message
+		if left != "" {
+			left += "  "
+		}
+		left += v.message
 	}
-	if len(status) < v.width {
-		status += strings.Repeat(" ", v.width-len(status))
+
+	current := 0
+	if len(v.layout.Rows) > 0 {
+		current = min(v.rowOffset+1, len(v.layout.Rows))
 	}
-	screen.PutStrStyled(0, y, truncateToWidth(status, v.width), style)
+	right = v.text(msgStatusPosition, map[string]any{
+		"Current": current,
+		"Total":   len(v.layout.Rows),
+		"Column":  v.colOffset,
+	})
+	return left, right
+}
+
+func (v *Viewer) statusOverflow() (left, right bool) {
+	if v.cfg.WrapMode != layout.NoWrap {
+		return false, false
+	}
+
+	return v.colOffset > 0, v.colOffset < v.maxColOffset()
 }
 
 func (v *Viewer) drawPrompt(screen tcell.Screen, y int) {
@@ -568,6 +598,10 @@ var (
 		UnderlineColor: tcolor.PaletteColor(5),
 		Bold:           true,
 	}
+
+	leftOverflowIndicator  = "◀"
+	rightOverflowIndicator = "▶"
+	statusBarStyle         = tcell.StyleDefault.Foreground(tcolor.PaletteColor(15)).Background(tcolor.PaletteColor(2))
 )
 
 func toTCellColor(c ansi.Color) tcolor.Color {
