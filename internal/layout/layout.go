@@ -32,6 +32,7 @@ type VisualSegment struct {
 	SourceCellEnd        int
 	RenderedCellFrom     int
 	RenderedCellTo       int
+	Display              string
 }
 
 // VisualRow is a derived row suitable for rendering.
@@ -220,30 +221,72 @@ func buildScrolledRow(lineIndex int, line model.Line, info LineLayout, width int
 		return VisualRow{LineIndex: lineIndex}
 	}
 
-	startCell, startIndex := snappedStart(info, horizontalOffset)
-	endLimit := startCell + width
-	endIndex := startIndex
-	for endIndex < len(line.Graphemes) && info.GraphemeCellStarts[endIndex] < endLimit {
-		endIndex++
+	row := VisualRow{
+		LineIndex:       lineIndex,
+		SourceCellStart: horizontalOffset,
+		SourceCellEnd:   horizontalOffset,
 	}
-	if endIndex == startIndex {
-		endIndex = startIndex + 1
-	}
-
-	return makeRow(lineIndex, info, startIndex, endIndex, startCell)
-}
-
-func snappedStart(info LineLayout, horizontalOffset int) (int, int) {
-	if horizontalOffset <= 0 || len(info.GraphemeCellStarts) == 0 {
-		return 0, 0
+	if width <= 0 {
+		return row
 	}
 
-	for i := len(info.GraphemeCellStarts) - 1; i >= 0; i-- {
-		if info.GraphemeCellStarts[i] <= horizontalOffset {
-			return info.GraphemeCellStarts[i], i
+	windowStart := horizontalOffset
+	windowEnd := horizontalOffset + width
+	renderX := 0
+
+	for i := range line.Graphemes {
+		sourceStart := info.GraphemeCellStarts[i]
+		sourceEnd := info.GraphemeCellEnds[i]
+		if sourceEnd <= windowStart || sourceStart >= windowEnd {
+			continue
+		}
+
+		leftClipped := sourceStart < windowStart
+		rightClipped := sourceEnd > windowEnd
+
+		switch {
+		case leftClipped && rightClipped:
+			if renderX < width {
+				row.Segments = append(row.Segments, markerSegment(i, sourceStart, sourceEnd, renderX, leftClipMarker))
+				renderX++
+			}
+			if renderX < width {
+				row.Segments = append(row.Segments, markerSegment(i, sourceStart, sourceEnd, renderX, rightClipMarker))
+				renderX++
+			}
+			row.SourceCellEnd = min(sourceEnd, windowEnd)
+			return finalizeScrolledRow(row, renderX)
+		case leftClipped:
+			row.Segments = append(row.Segments, markerSegment(i, sourceStart, sourceEnd, renderX, leftClipMarker))
+			renderX++
+			row.SourceCellEnd = min(sourceEnd, windowEnd)
+			if renderX >= width {
+				return finalizeScrolledRow(row, renderX)
+			}
+			continue
+		case rightClipped:
+			row.Segments = append(row.Segments, markerSegment(i, sourceStart, sourceEnd, renderX, rightClipMarker))
+			renderX++
+			row.SourceCellEnd = windowEnd
+			return finalizeScrolledRow(row, renderX)
+		default:
+			segWidth := sourceEnd - sourceStart
+			row.Segments = append(row.Segments, VisualSegment{
+				LogicalGraphemeIndex: i,
+				SourceCellStart:      sourceStart,
+				SourceCellEnd:        sourceEnd,
+				RenderedCellFrom:     renderX,
+				RenderedCellTo:       renderX + segWidth,
+			})
+			renderX += segWidth
+			row.SourceCellEnd = sourceEnd
+			if renderX >= width {
+				return finalizeScrolledRow(row, renderX)
+			}
 		}
 	}
-	return 0, 0
+
+	return finalizeScrolledRow(row, renderX)
 }
 
 func makeRow(lineIndex int, info LineLayout, start, end, sourceCellStart int) VisualRow {
@@ -282,3 +325,27 @@ func graphemeWidth(grapheme model.Grapheme, currentCell, tabWidth int) int {
 	}
 	return 0
 }
+
+func markerSegment(index, sourceStart, sourceEnd, renderX int, marker string) VisualSegment {
+	return VisualSegment{
+		LogicalGraphemeIndex: index,
+		SourceCellStart:      sourceStart,
+		SourceCellEnd:        sourceEnd,
+		RenderedCellFrom:     renderX,
+		RenderedCellTo:       renderX + 1,
+		Display:              marker,
+	}
+}
+
+func finalizeScrolledRow(row VisualRow, renderWidth int) VisualRow {
+	row.RenderedCellWidth = renderWidth
+	if row.SourceCellEnd < row.SourceCellStart {
+		row.SourceCellEnd = row.SourceCellStart
+	}
+	return row
+}
+
+const (
+	leftClipMarker  = "<"
+	rightClipMarker = ">"
+)

@@ -185,14 +185,12 @@ func (p *Parser) stateCSI(b byte) {
 func (p *Parser) stateOSC(b byte) {
 	switch b {
 	case 0x07, 0x9c:
-		p.buf.Reset()
-		p.setStep(modeInit, p.stateInit)
+		p.emitOSCVisible(true, false)
 	case '\\':
 		buf := p.buf.Bytes()
 		if len(buf) > 0 && buf[len(buf)-1] == 0x1b {
 			p.buf.Truncate(p.buf.Len() - 1)
-			p.buf.Reset()
-			p.setStep(modeInit, p.stateInit)
+			p.emitOSCVisible(false, true)
 			return
 		}
 		p.buf.WriteByte(b)
@@ -269,6 +267,22 @@ func (p *Parser) emitControl(b byte, offset int64) {
 		return
 	}
 	p.emitRune(utf8.RuneError, offset)
+}
+
+func (p *Parser) emitOSCVisible(showBEL bool, showST bool) {
+	p.emitControl(0x1b, p.offset)
+	for _, b := range p.buf.Bytes() {
+		p.emitLiteralByte(b, p.offset)
+	}
+	if showBEL {
+		p.emitControl(0x07, p.offset)
+	}
+	if showST {
+		p.emitControl(0x1b, p.offset)
+		p.emitLiteralByte('\\', p.offset)
+	}
+	p.buf.Reset()
+	p.setStep(modeInit, p.stateInit)
 }
 
 func controlPicture(b byte) (rune, bool) {

@@ -74,14 +74,20 @@ func TestNoWrapSnapsHorizontalOffsetToGraphemeBoundary(t *testing.T) {
 	}
 
 	row := result.Rows[0]
-	if got, want := row.SourceCellStart, 0; got != want {
+	if got, want := row.SourceCellStart, 1; got != want {
 		t.Fatalf("source cell start = %d, want %d", got, want)
 	}
 	if got, want := row.FirstLogicalGrapheme(), 0; got != want {
 		t.Fatalf("grapheme start = %d, want %d", got, want)
 	}
-	if got, want := row.LastLogicalGrapheme(), 2; got != want {
-		t.Fatalf("grapheme end = %d, want %d", got, want)
+	if got, want := len(row.Segments), 3; got != want {
+		t.Fatalf("segment count = %d, want %d", got, want)
+	}
+	if got, want := row.Segments[0].Display, "<"; got != want {
+		t.Fatalf("left clip marker = %q, want %q", got, want)
+	}
+	if got, want := row.LastLogicalGrapheme(), 3; got != want {
+		t.Fatalf("logical end = %d, want %d", got, want)
 	}
 }
 
@@ -163,5 +169,28 @@ func TestVisualRowStoresSegmentsInVisualOrder(t *testing.T) {
 		if got, want := segment.LogicalGraphemeIndex, i; got != want {
 			t.Fatalf("segment %d logical index = %d, want %d", i, got, want)
 		}
+	}
+}
+
+func TestNoWrapUsesRightClipMarkerForPartialWideGrapheme(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("a界b")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	result := Build(doc.Lines(), Config{Width: 2, TabWidth: 4, WrapMode: NoWrap})
+	if got, want := len(result.Rows), 1; got != want {
+		t.Fatalf("row count = %d, want %d", got, want)
+	}
+
+	row := result.Rows[0]
+	if got, want := len(row.Segments), 2; got != want {
+		t.Fatalf("segment count = %d, want %d", got, want)
+	}
+	if got, want := row.Segments[1].Display, ">"; got != want {
+		t.Fatalf("right clip marker = %q, want %q", got, want)
+	}
+	if got, want := row.Segments[1].LogicalGraphemeIndex, 1; got != want {
+		t.Fatalf("marker grapheme index = %d, want %d", got, want)
 	}
 }
