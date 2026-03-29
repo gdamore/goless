@@ -59,6 +59,7 @@ This means:
 ### Correctness Before Optimization
 
 - Prioritize correctness for Unicode, grapheme segmentation, cell width, and escape parsing.
+- Do not bake left-to-right display assumptions into core data structures when logical order can be preserved instead.
 - Do not introduce performance shortcuts that break rendering or navigation semantics.
 - Optimize after measurement, not by guesswork.
 

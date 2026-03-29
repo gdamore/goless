@@ -24,24 +24,23 @@ type Anchor struct {
 	GraphemeIndex int
 }
 
-// GraphemeCell maps one grapheme cluster into source and row cell coordinates.
-type GraphemeCell struct {
-	GraphemeIndex    int
-	SourceCellStart  int
-	SourceCellEnd    int
-	RenderedCellFrom int
-	RenderedCellTo   int
+// VisualSegment maps one logical grapheme cluster into row cell coordinates.
+// Segments are ordered by visual presentation, not by logical grapheme index.
+type VisualSegment struct {
+	LogicalGraphemeIndex int
+	SourceCellStart      int
+	SourceCellEnd        int
+	RenderedCellFrom     int
+	RenderedCellTo       int
 }
 
 // VisualRow is a derived row suitable for rendering.
 type VisualRow struct {
 	LineIndex         int
-	GraphemeStart     int
-	GraphemeEnd       int
 	SourceCellStart   int
 	SourceCellEnd     int
 	RenderedCellWidth int
-	Cells             []GraphemeCell
+	Segments          []VisualSegment
 }
 
 // LineLayout stores per-line cell metrics.
@@ -84,11 +83,7 @@ func (r Result) AnchorForRow(rowIndex int) Anchor {
 	if rowIndex < 0 || rowIndex >= len(r.Rows) {
 		return Anchor{}
 	}
-	row := r.Rows[rowIndex]
-	return Anchor{
-		LineIndex:     row.LineIndex,
-		GraphemeIndex: row.GraphemeStart,
-	}
+	return r.Rows[rowIndex].Anchor()
 }
 
 // RowIndexForAnchor returns the first row that contains the given anchor.
@@ -97,14 +92,60 @@ func (r Result) RowIndexForAnchor(anchor Anchor) int {
 		if row.LineIndex != anchor.LineIndex {
 			continue
 		}
-		if row.GraphemeStart == row.GraphemeEnd && anchor.GraphemeIndex == 0 {
-			return i
-		}
-		if anchor.GraphemeIndex >= row.GraphemeStart && anchor.GraphemeIndex < row.GraphemeEnd {
+		if row.ContainsLogicalGrapheme(anchor.GraphemeIndex) {
 			return i
 		}
 	}
 	return -1
+}
+
+// Anchor returns the leading logical grapheme represented by the row.
+func (r VisualRow) Anchor() Anchor {
+	return Anchor{
+		LineIndex:     r.LineIndex,
+		GraphemeIndex: r.FirstLogicalGrapheme(),
+	}
+}
+
+// FirstLogicalGrapheme returns the logical grapheme index anchoring this row.
+func (r VisualRow) FirstLogicalGrapheme() int {
+	if len(r.Segments) == 0 {
+		return 0
+	}
+	first := r.Segments[0].LogicalGraphemeIndex
+	for _, segment := range r.Segments[1:] {
+		if segment.LogicalGraphemeIndex < first {
+			first = segment.LogicalGraphemeIndex
+		}
+	}
+	return first
+}
+
+// LastLogicalGrapheme returns the exclusive logical grapheme end for the row.
+func (r VisualRow) LastLogicalGrapheme() int {
+	if len(r.Segments) == 0 {
+		return 0
+	}
+	last := r.Segments[0].LogicalGraphemeIndex + 1
+	for _, segment := range r.Segments[1:] {
+		if end := segment.LogicalGraphemeIndex + 1; end > last {
+			last = end
+		}
+	}
+	return last
+}
+
+// ContainsLogicalGrapheme reports whether the row contains the given logical grapheme index.
+func (r VisualRow) ContainsLogicalGrapheme(index int) bool {
+	if len(r.Segments) == 0 {
+		return index == 0
+	}
+	for _, segment := range r.Segments {
+		if segment.LogicalGraphemeIndex == index {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeConfig(cfg Config) Config {
@@ -208,23 +249,21 @@ func snappedStart(info LineLayout, horizontalOffset int) (int, int) {
 func makeRow(lineIndex int, info LineLayout, start, end, sourceCellStart int) VisualRow {
 	row := VisualRow{
 		LineIndex:       lineIndex,
-		GraphemeStart:   start,
-		GraphemeEnd:     end,
 		SourceCellStart: sourceCellStart,
 		SourceCellEnd:   sourceCellStart,
-		Cells:           make([]GraphemeCell, 0, max(end-start, 0)),
+		Segments:        make([]VisualSegment, 0, max(end-start, 0)),
 	}
 
 	rowCell := 0
 	for i := start; i < end; i++ {
 		sourceStart := info.GraphemeCellStarts[i]
 		sourceEnd := info.GraphemeCellEnds[i]
-		row.Cells = append(row.Cells, GraphemeCell{
-			GraphemeIndex:    i,
-			SourceCellStart:  sourceStart,
-			SourceCellEnd:    sourceEnd,
-			RenderedCellFrom: rowCell,
-			RenderedCellTo:   rowCell + (sourceEnd - sourceStart),
+		row.Segments = append(row.Segments, VisualSegment{
+			LogicalGraphemeIndex: i,
+			SourceCellStart:      sourceStart,
+			SourceCellEnd:        sourceEnd,
+			RenderedCellFrom:     rowCell,
+			RenderedCellTo:       rowCell + (sourceEnd - sourceStart),
 		})
 		rowCell += sourceEnd - sourceStart
 		row.SourceCellEnd = sourceEnd

@@ -18,18 +18,21 @@ func TestSoftWrapBuildsVisualRows(t *testing.T) {
 	}
 
 	row0 := result.Rows[0]
-	if got, want := row0.GraphemeStart, 0; got != want {
+	if got, want := row0.FirstLogicalGrapheme(), 0; got != want {
 		t.Fatalf("row0 grapheme start = %d, want %d", got, want)
 	}
-	if got, want := row0.GraphemeEnd, 3; got != want {
+	if got, want := row0.LastLogicalGrapheme(), 3; got != want {
 		t.Fatalf("row0 grapheme end = %d, want %d", got, want)
+	}
+	if got, want := len(row0.Segments), 3; got != want {
+		t.Fatalf("row0 segment count = %d, want %d", got, want)
 	}
 
 	row1 := result.Rows[1]
-	if got, want := row1.GraphemeStart, 3; got != want {
+	if got, want := row1.FirstLogicalGrapheme(), 3; got != want {
 		t.Fatalf("row1 grapheme start = %d, want %d", got, want)
 	}
-	if got, want := row1.GraphemeEnd, 6; got != want {
+	if got, want := row1.LastLogicalGrapheme(), 6; got != want {
 		t.Fatalf("row1 grapheme end = %d, want %d", got, want)
 	}
 }
@@ -46,7 +49,7 @@ func TestSoftWrapUsesTabExpansion(t *testing.T) {
 	}
 
 	row0 := result.Rows[0]
-	if got, want := row0.GraphemeEnd, 2; got != want {
+	if got, want := row0.LastLogicalGrapheme(), 2; got != want {
 		t.Fatalf("row0 grapheme end = %d, want %d", got, want)
 	}
 	if got, want := row0.RenderedCellWidth, 4; got != want {
@@ -54,7 +57,7 @@ func TestSoftWrapUsesTabExpansion(t *testing.T) {
 	}
 
 	row1 := result.Rows[1]
-	if got, want := row1.GraphemeStart, 2; got != want {
+	if got, want := row1.FirstLogicalGrapheme(), 2; got != want {
 		t.Fatalf("row1 grapheme start = %d, want %d", got, want)
 	}
 }
@@ -74,10 +77,10 @@ func TestNoWrapSnapsHorizontalOffsetToGraphemeBoundary(t *testing.T) {
 	if got, want := row.SourceCellStart, 0; got != want {
 		t.Fatalf("source cell start = %d, want %d", got, want)
 	}
-	if got, want := row.GraphemeStart, 0; got != want {
+	if got, want := row.FirstLogicalGrapheme(), 0; got != want {
 		t.Fatalf("grapheme start = %d, want %d", got, want)
 	}
-	if got, want := row.GraphemeEnd, 2; got != want {
+	if got, want := row.LastLogicalGrapheme(), 2; got != want {
 		t.Fatalf("grapheme end = %d, want %d", got, want)
 	}
 }
@@ -92,7 +95,7 @@ func TestWideGraphemeWrapsAsSingleUnit(t *testing.T) {
 	if got, want := len(result.Rows), 2; got != want {
 		t.Fatalf("row count = %d, want %d", got, want)
 	}
-	if got, want := result.Rows[0].GraphemeEnd, 1; got != want {
+	if got, want := result.Rows[0].LastLogicalGrapheme(), 1; got != want {
 		t.Fatalf("first row grapheme end = %d, want %d", got, want)
 	}
 	if got, want := result.Rows[0].RenderedCellWidth, 2; got != want {
@@ -136,11 +139,29 @@ func TestEmptyLineProducesRenderableRow(t *testing.T) {
 		t.Fatalf("row count = %d, want %d", got, want)
 	}
 	for i, row := range result.Rows {
-		if got, want := row.GraphemeStart, 0; got != want {
+		if got, want := row.FirstLogicalGrapheme(), 0; got != want {
 			t.Fatalf("row %d grapheme start = %d, want %d", i, got, want)
 		}
-		if got, want := row.GraphemeEnd, 0; got != want {
+		if got, want := row.LastLogicalGrapheme(), 0; got != want {
 			t.Fatalf("row %d grapheme end = %d, want %d", i, got, want)
+		}
+	}
+}
+
+func TestVisualRowStoresSegmentsInVisualOrder(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abc")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	result := Build(doc.Lines(), Config{Width: 3, TabWidth: 4, WrapMode: SoftWrap})
+	row := result.Rows[0]
+	if got, want := len(row.Segments), 3; got != want {
+		t.Fatalf("segment count = %d, want %d", got, want)
+	}
+	for i, segment := range row.Segments {
+		if got, want := segment.LogicalGraphemeIndex, i; got != want {
+			t.Fatalf("segment %d logical index = %d, want %d", i, got, want)
 		}
 	}
 }

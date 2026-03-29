@@ -32,6 +32,7 @@ The library should:
 5. Measure viewport layout in screen cells, not bytes or runes.
 6. Keep the library embeddable: avoid a monolithic blocking API where possible.
 7. Prefer explicit internal abstractions over guessing behavior from concrete source types.
+8. Keep logical text order separate from visual display order so future bidi support remains feasible.
 
 ## Functional Requirements
 
@@ -61,6 +62,8 @@ The library should:
 - Preserve combining marks and zero-width joiner sequences as single grapheme clusters.
 - Handle wide-cell graphemes correctly when computing screen positions.
 - Never split a grapheme cluster during wrapping, highlighting, or horizontal scrolling.
+- Keep text, style ranges, and search state in logical order rather than baking in left-to-right display assumptions.
+- Treat visual reordering as a layout concern so future Hebrew/Arabic bidi support can be added without rewriting the document model.
 
 ### Content Sources
 
