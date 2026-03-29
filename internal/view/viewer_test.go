@@ -8,6 +8,7 @@ import (
 
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
+	"github.com/gdamore/tcell/v3"
 )
 
 func TestToggleWrapPreservesAnchor(t *testing.T) {
@@ -79,4 +80,69 @@ func TestScrollRightClampsToContent(t *testing.T) {
 	if got, want := v.colOffset, 3; got != want {
 		t.Fatalf("col offset = %d, want %d", got, want)
 	}
+}
+
+func TestPromptSearchFindsAndRepeatsForward(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nbeta\nalpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune("/"))
+	for _, s := range []string{"a", "l", "p", "h", "a"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.search.Query, "alpha"; got != want {
+		t.Fatalf("search query = %q, want %q", got, want)
+	}
+	if got, want := len(v.search.Matches), 2; got != want {
+		t.Fatalf("match count = %d, want %d", got, want)
+	}
+	if got, want := v.search.Current, 0; got != want {
+		t.Fatalf("current match = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("n"))
+	if got, want := v.search.Current, 1; got != want {
+		t.Fatalf("current match after n = %d, want %d", got, want)
+	}
+	if got, want := v.firstVisibleAnchor().LineIndex, 2; got != want {
+		t.Fatalf("visible line after n = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("N"))
+	if got, want := v.search.Current, 0; got != want {
+		t.Fatalf("current match after N = %d, want %d", got, want)
+	}
+}
+
+func TestPromptCommandJumpsToLine(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune(":"))
+	v.HandleKey(keyRune("3"))
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.firstVisibleAnchor().LineIndex, 2; got != want {
+		t.Fatalf("visible line after :3 = %d, want %d", got, want)
+	}
+}
+
+func keyRune(s string) *tcell.EventKey {
+	return tcell.NewEventKey(tcell.KeyRune, s, tcell.ModNone)
+}
+
+func keyKey(k tcell.Key) *tcell.EventKey {
+	return tcell.NewEventKey(k, "", tcell.ModNone)
 }
