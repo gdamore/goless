@@ -36,6 +36,36 @@ func TestToggleWrapPreservesAnchor(t *testing.T) {
 	}
 }
 
+func TestToggleWrapToNoWrapRestoresHorizontalAnchor(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("ab界cd")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.SoftWrap})
+	v.SetSize(3, 2)
+	v.rowOffset = 1
+	v.relayout()
+
+	before := v.firstVisibleAnchor()
+	if got, want := before.GraphemeIndex, 2; got != want {
+		t.Fatalf("anchor grapheme = %d, want %d", got, want)
+	}
+
+	v.ToggleWrap()
+
+	if got, want := v.cfg.WrapMode, layout.NoWrap; got != want {
+		t.Fatalf("wrap mode = %v, want %v", got, want)
+	}
+	if got, want := v.colOffset, 2; got != want {
+		t.Fatalf("col offset = %d, want %d", got, want)
+	}
+	after := v.firstVisibleAnchor()
+	if got, want := after, before; got != want {
+		t.Fatalf("anchor after toggle = %+v, want %+v", got, want)
+	}
+}
+
 func TestScrollRightClampsToContent(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("abcdef")); err != nil {

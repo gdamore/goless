@@ -135,6 +135,14 @@ func (v *Viewer) ToggleWrap() {
 		v.cfg.WrapMode = layout.SoftWrap
 	} else {
 		v.cfg.WrapMode = layout.NoWrap
+		if anchor.LineIndex >= 0 && anchor.LineIndex < len(v.layout.Lines) {
+			starts := v.layout.Lines[anchor.LineIndex].GraphemeCellStarts
+			if anchor.GraphemeIndex >= 0 && anchor.GraphemeIndex < len(starts) {
+				v.colOffset = starts[anchor.GraphemeIndex]
+			} else {
+				v.colOffset = 0
+			}
+		}
 	}
 	v.relayout()
 	v.restoreAnchor(anchor)

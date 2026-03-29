@@ -96,6 +96,26 @@ func TestParserShowsOSCTerminatedByST(t *testing.T) {
 	}
 }
 
+func TestParserShowsOSCTerminatedByC1ST(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParser(recv)
+
+	input := []byte{'x', 0x1b, ']', '0', ';', 't', 'i', 't', 'l', 'e', 0x9c, 'y'}
+	if _, err := p.Write(input); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+	if got, want := text.String(), "x␛]0;title␛\\y"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+}
+
 func TestParserFlushesIncompleteEscapeVisibly(t *testing.T) {
 	recv := &recordReceiver{}
 	p := NewParser(recv)

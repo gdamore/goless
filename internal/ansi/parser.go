@@ -187,8 +187,10 @@ func (p *Parser) stateCSI(b byte) {
 
 func (p *Parser) stateOSC(b byte) {
 	switch b {
-	case 0x07, 0x9c:
+	case 0x07:
 		p.emitOSCVisible(true, false)
+	case 0x9c:
+		p.emitOSCVisible(false, true)
 	case '\\':
 		buf := p.buf.Bytes()
 		if len(buf) > 0 && buf[len(buf)-1] == 0x1b {
