@@ -9,6 +9,7 @@ import (
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/tcell/v3"
+	tcolor "github.com/gdamore/tcell/v3/color"
 )
 
 func TestToggleWrapPreservesAnchor(t *testing.T) {
@@ -224,6 +225,41 @@ func TestSearchRevealOnlyScrollsEnoughVertically(t *testing.T) {
 
 	if got, want := v.rowOffset, 1; got != want {
 		t.Fatalf("row offset after reveal = %d, want %d", got, want)
+	}
+}
+
+func TestApplyMatchCellStyleUsesUnderlineAccents(t *testing.T) {
+	base := tcell.StyleDefault.Foreground(tcolor.White)
+
+	inactive := applyMatchCellStyle(base, false)
+	if got, want := inactive.GetUnderlineStyle(), tcell.UnderlineStyleNone; got != want {
+		t.Fatalf("inactive underline style = %v, want %v", got, want)
+	}
+	if got, want := inactive.GetBackground(), inactiveMatchStyle.Bg; got != want {
+		t.Fatalf("inactive background = %v, want %v", got, want)
+	}
+	if got, want := inactive.GetForeground(), inactiveMatchStyle.Fg; got != want {
+		t.Fatalf("inactive foreground = %v, want %v", got, want)
+	}
+	if inactive.HasBold() {
+		t.Fatalf("inactive match should not force bold")
+	}
+
+	current := applyMatchCellStyle(base, true)
+	if got, want := current.GetUnderlineStyle(), currentMatchStyle.UnderlineStyle; got != want {
+		t.Fatalf("current underline style = %v, want %v", got, want)
+	}
+	if got, want := current.GetUnderlineColor(), currentMatchStyle.UnderlineColor; got != want {
+		t.Fatalf("current underline color = %v, want %v", got, want)
+	}
+	if got, want := current.GetBackground(), currentMatchStyle.Bg; got != want {
+		t.Fatalf("current background = %v, want %v", got, want)
+	}
+	if got, want := current.GetForeground(), currentMatchStyle.Fg; got != want {
+		t.Fatalf("current foreground = %v, want %v", got, want)
+	}
+	if !current.HasBold() {
+		t.Fatalf("current match should be bold")
 	}
 }
 
