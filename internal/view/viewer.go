@@ -61,6 +61,11 @@ func (v *Viewer) SetSize(width, height int) {
 	v.relayout()
 }
 
+// Refresh rebuilds the derived layout using the current document contents.
+func (v *Viewer) Refresh() {
+	v.relayout()
+}
+
 // Draw renders the current viewport.
 func (v *Viewer) Draw(screen tcell.Screen) {
 	v.ensureLayout()

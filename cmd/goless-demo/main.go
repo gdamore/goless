@@ -66,6 +66,10 @@ func run() error {
 	})
 
 	width, height := screen.Size()
+	if width <= 0 || height <= 0 {
+		screen.Sync()
+		width, height = screen.Size()
+	}
 	viewer.SetSize(width, height)
 	viewer.Draw(screen)
 
@@ -84,6 +88,7 @@ func run() error {
 				return nil
 			}
 		case *tcell.EventInterrupt:
+			viewer.Refresh()
 			select {
 			case err := <-readResult:
 				if err != nil {
