@@ -10,7 +10,6 @@ require (
 require (
 	github.com/gdamore/encoding v1.0.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
-	github.com/nicksnyder/go-i18n/v2 v2.6.1 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
 	golang.org/x/text v0.33.0 // indirect

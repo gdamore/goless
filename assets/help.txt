@@ -1,0 +1,18 @@
+Navigation
+Up/Down, j/k: move
+Left/Right, h/l: scroll horizontally
+PgUp/PgDn, b/f, Space: page
+g/G: top/bottom
+w: toggle wrap
+
+Search
+/: search forward
+?: search backward
+n/N: next/previous match
+
+Commands
+:123: jump to line 123
+
+General
+H or F1: help
+q or Esc: quit

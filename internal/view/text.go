@@ -1,0 +1,143 @@
+// Copyright 2026 Garrett D'Amore
+// SPDX-License-Identifier: Apache-2.0
+
+package view
+
+import (
+	"fmt"
+	"strings"
+)
+
+// Text controls user-facing text and indicators inside the viewer.
+// The public pager API maps its text bundle onto this type.
+type Text struct {
+	HelpTitle string
+	HelpClose string
+	HelpBody  string
+
+	StatusSearchInfo func(query string, current, total int) string
+	StatusPosition   func(current, total, column int) string
+
+	SearchEmpty      string
+	SearchNotFound   func(query string) string
+	SearchMatchCount func(query string, count int) string
+	SearchNone       string
+
+	CommandUnknown    func(command string) string
+	CommandLineStart  string
+	CommandOutOfRange func(line int) string
+	CommandLine       func(line int) string
+
+	LeftOverflowIndicator  string
+	RightOverflowIndicator string
+}
+
+func (t Text) helpLines() []string {
+	if t.HelpBody == "" {
+		return nil
+	}
+	return strings.Split(t.HelpBody, "\n")
+}
+
+func (t Text) withDefaults() Text {
+	defaults := defaultText()
+
+	if t.HelpTitle == "" {
+		t.HelpTitle = defaults.HelpTitle
+	}
+	if t.HelpClose == "" {
+		t.HelpClose = defaults.HelpClose
+	}
+	if t.HelpBody == "" {
+		t.HelpBody = defaults.HelpBody
+	}
+	if t.StatusSearchInfo == nil {
+		t.StatusSearchInfo = defaults.StatusSearchInfo
+	}
+	if t.StatusPosition == nil {
+		t.StatusPosition = defaults.StatusPosition
+	}
+	if t.SearchEmpty == "" {
+		t.SearchEmpty = defaults.SearchEmpty
+	}
+	if t.SearchNotFound == nil {
+		t.SearchNotFound = defaults.SearchNotFound
+	}
+	if t.SearchMatchCount == nil {
+		t.SearchMatchCount = defaults.SearchMatchCount
+	}
+	if t.SearchNone == "" {
+		t.SearchNone = defaults.SearchNone
+	}
+	if t.CommandUnknown == nil {
+		t.CommandUnknown = defaults.CommandUnknown
+	}
+	if t.CommandLineStart == "" {
+		t.CommandLineStart = defaults.CommandLineStart
+	}
+	if t.CommandOutOfRange == nil {
+		t.CommandOutOfRange = defaults.CommandOutOfRange
+	}
+	if t.CommandLine == nil {
+		t.CommandLine = defaults.CommandLine
+	}
+	if t.LeftOverflowIndicator == "" {
+		t.LeftOverflowIndicator = defaults.LeftOverflowIndicator
+	}
+	if t.RightOverflowIndicator == "" {
+		t.RightOverflowIndicator = defaults.RightOverflowIndicator
+	}
+
+	return t
+}
+
+func defaultText() Text {
+	return Text{
+		HelpTitle: "Help",
+		HelpClose: "Esc/q/H/F1 close",
+		HelpBody: `Navigation
+Up/Down, j/k: move
+Left/Right, h/l: scroll horizontally
+PgUp/PgDn, b/f, Space: page
+g/G: top/bottom
+w: toggle wrap
+
+Search
+/: search forward
+?: search backward
+n/N: next/previous match
+
+Commands
+:123: jump to line 123
+
+General
+H or F1: help
+q or Esc: quit`,
+		StatusSearchInfo: func(query string, current, total int) string {
+			return fmt.Sprintf("/%s %d/%d", query, current, total)
+		},
+		StatusPosition: func(current, total, column int) string {
+			return fmt.Sprintf("row %d/%d  col %d", current, total, column)
+		},
+		SearchEmpty: "empty search",
+		SearchNotFound: func(query string) string {
+			return fmt.Sprintf("%s not found", query)
+		},
+		SearchMatchCount: func(query string, count int) string {
+			return fmt.Sprintf("%s: %d matches", query, count)
+		},
+		SearchNone: "no active search",
+		CommandUnknown: func(command string) string {
+			return fmt.Sprintf("unknown command: %s", command)
+		},
+		CommandLineStart: "line numbers start at 1",
+		CommandOutOfRange: func(line int) string {
+			return fmt.Sprintf("line %d out of range", line)
+		},
+		CommandLine: func(line int) string {
+			return fmt.Sprintf("line %d", line)
+		},
+		LeftOverflowIndicator:  "◀",
+		RightOverflowIndicator: "▶",
+	}
+}
