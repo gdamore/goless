@@ -25,6 +25,10 @@ type Config struct {
 type Viewer struct {
 	doc       *model.Document
 	cfg       Config
+	mode      viewerMode
+	prompt    *promptState
+	message   string
+	search    searchState
 	lines     []model.Line
 	layout    layout.Result
 	width     int
@@ -71,8 +75,13 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 		v.drawRow(screen, y, v.layout.Rows[rowIndex])
 	}
 
-	if v.cfg.ShowStatus && v.height > 0 {
-		v.drawStatus(screen, v.height-1)
+	if v.height > 0 {
+		switch {
+		case v.mode == modePrompt:
+			v.drawPrompt(screen, v.height-1)
+		case v.cfg.ShowStatus:
+			v.drawStatus(screen, v.height-1)
+		}
 	}
 
 	// Be conservative for now. Some terminals mishandle incremental redraws
@@ -83,48 +92,41 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 
 // HandleKey applies minimal navigation and returns true when the viewer should exit.
 func (v *Viewer) HandleKey(ev *tcell.EventKey) bool {
-	switch ev.Key() {
-	case tcell.KeyEscape, tcell.KeyCtrlC:
+	if v.mode == modePrompt {
+		return v.handlePromptKey(ev)
+	}
+
+	switch actionForKey(ev) {
+	case actionQuit:
 		return true
-	case tcell.KeyUp:
+	case actionScrollUp:
 		v.ScrollUp(1)
-	case tcell.KeyDown:
+	case actionScrollDown:
 		v.ScrollDown(1)
-	case tcell.KeyLeft:
+	case actionScrollLeft:
 		v.ScrollLeft(1)
-	case tcell.KeyRight:
+	case actionScrollRight:
 		v.ScrollRight(1)
-	case tcell.KeyPgUp:
+	case actionPageUp:
 		v.PageUp()
-	case tcell.KeyPgDn:
+	case actionPageDown:
 		v.PageDown()
-	case tcell.KeyHome:
+	case actionGoTop:
 		v.GoTop()
-	case tcell.KeyEnd:
+	case actionGoBottom:
 		v.GoBottom()
-	case tcell.KeyRune:
-		switch ev.Str() {
-		case "q":
-			return true
-		case "j":
-			v.ScrollDown(1)
-		case "k":
-			v.ScrollUp(1)
-		case "h":
-			v.ScrollLeft(1)
-		case "l":
-			v.ScrollRight(1)
-		case " ", "f":
-			v.PageDown()
-		case "b":
-			v.PageUp()
-		case "g":
-			v.GoTop()
-		case "G":
-			v.GoBottom()
-		case "w":
-			v.ToggleWrap()
-		}
+	case actionToggleWrap:
+		v.ToggleWrap()
+	case actionPromptSearchForward:
+		v.beginPrompt(promptSearchForward)
+	case actionPromptSearchBackward:
+		v.beginPrompt(promptSearchBackward)
+	case actionPromptCommand:
+		v.beginPrompt(promptCommand)
+	case actionSearchNext:
+		v.repeatSearch(v.search.Forward)
+	case actionSearchPrev:
+		v.repeatSearch(!v.search.Forward)
 	}
 
 	return false
@@ -222,6 +224,7 @@ func (v *Viewer) relayout() {
 		WrapMode:         v.cfg.WrapMode,
 		HorizontalOffset: v.horizontalOffset(),
 	})
+	v.rebuildSearch()
 	v.clampOffsets()
 }
 
@@ -269,7 +272,7 @@ func (v *Viewer) bodyHeight() int {
 	if v.height <= 0 {
 		return 0
 	}
-	if v.cfg.ShowStatus && v.height > 1 {
+	if (v.cfg.ShowStatus || v.mode == modePrompt) && v.height > 1 {
 		return v.height - 1
 	}
 	return v.height
@@ -303,6 +306,13 @@ func (v *Viewer) drawRow(screen tcell.Screen, y int, row layout.VisualRow) {
 		}
 		grapheme := line.Graphemes[segment.LogicalGraphemeIndex]
 		ansiStyle := styleForGrapheme(line, grapheme.RuneStart)
+		matched, current := v.graphemeMatched(line, row.LineIndex, grapheme)
+		if matched {
+			ansiStyle.Reverse = !ansiStyle.Reverse
+			if current {
+				ansiStyle.Bold = true
+			}
+		}
 		cellStyle := toTCellStyle(ansiStyle)
 		x := segment.RenderedCellFrom
 		if x >= v.width {
@@ -334,12 +344,68 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 	if len(v.layout.Rows) > 0 {
 		current = min(v.rowOffset+1, len(v.layout.Rows))
 	}
-	status := fmt.Sprintf(" %s  row %d/%d  col %d  bytes %d  q quit  w wrap ",
-		mode, current, len(v.layout.Rows), v.colOffset, v.doc.Len())
+	searchInfo := ""
+	if v.search.Query != "" {
+		position := 0
+		if len(v.search.Matches) > 0 && v.search.Current >= 0 {
+			position = v.search.Current + 1
+		}
+		searchInfo = fmt.Sprintf("  /%s %d/%d", v.search.Query, position, len(v.search.Matches))
+	}
+	status := fmt.Sprintf(" %s  row %d/%d  col %d  bytes %d%s  q quit  / ? search  w wrap ",
+		mode, current, len(v.layout.Rows), v.colOffset, v.doc.Len(), searchInfo)
+	if v.message != "" {
+		status += "  " + v.message
+	}
 	if len(status) < v.width {
 		status += strings.Repeat(" ", v.width-len(status))
 	}
 	screen.PutStrStyled(0, y, truncateToWidth(status, v.width), style)
+}
+
+func (v *Viewer) drawPrompt(screen tcell.Screen, y int) {
+	style := tcell.StyleDefault.Reverse(true)
+	prompt := ""
+	if v.prompt != nil {
+		prompt = " " + v.prompt.String()
+	}
+	if len(prompt) < v.width {
+		prompt += strings.Repeat(" ", v.width-len(prompt))
+	}
+	screen.PutStrStyled(0, y, truncateToWidth(prompt, v.width), style)
+}
+
+func (v *Viewer) handlePromptKey(ev *tcell.EventKey) bool {
+	switch ev.Key() {
+	case tcell.KeyEscape:
+		v.cancelPrompt()
+		return false
+	case tcell.KeyCtrlC:
+		return true
+	case tcell.KeyEnter:
+		v.commitPrompt()
+		return false
+	case tcell.KeyBackspace, tcell.KeyBackspace2:
+		if v.prompt != nil && len(v.prompt.buffer) > 0 {
+			v.prompt.buffer = v.prompt.buffer[:len(v.prompt.buffer)-1]
+		}
+		return false
+	case tcell.KeyCtrlU:
+		if v.prompt != nil {
+			v.prompt.buffer = v.prompt.buffer[:0]
+		}
+		return false
+	case tcell.KeyRune:
+		if v.prompt != nil {
+			v.prompt.buffer = append(v.prompt.buffer, []rune(ev.Str())...)
+		}
+		return false
+	}
+	return false
+}
+
+func (v *Viewer) setMessage(msg string) {
+	v.message = msg
 }
 
 func styleForGrapheme(line model.Line, runeIndex int) ansi.Style {
