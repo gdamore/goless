@@ -10,6 +10,7 @@ import (
 	"github.com/gdamore/goless/internal/model"
 	iview "github.com/gdamore/goless/internal/view"
 	"github.com/gdamore/tcell/v3"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 const defaultChunkSize = 32 * 1024
@@ -32,6 +33,8 @@ type Config struct {
 	WrapMode WrapMode
 	// ShowStatus enables the status bar on the last screen row.
 	ShowStatus bool
+	// Localizer controls localization of pager UI strings. Nil uses the built-in English catalog.
+	Localizer *i18n.Localizer
 }
 
 // Pager is an embeddable document pager backed by an appendable document model.
@@ -49,6 +52,7 @@ func New(cfg Config) *Pager {
 			TabWidth:   cfg.TabWidth,
 			WrapMode:   toInternalWrapMode(cfg.WrapMode),
 			ShowStatus: cfg.ShowStatus,
+			Localizer:  cfg.Localizer,
 		}),
 	}
 }

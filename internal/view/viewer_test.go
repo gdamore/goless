@@ -6,10 +6,13 @@ package view
 import (
 	"testing"
 
+	"github.com/gdamore/goless/catalog"
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/tcell/v3"
 	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
+	"golang.org/x/text/language"
 )
 
 func TestToggleWrapPreservesAnchor(t *testing.T) {
@@ -279,6 +282,44 @@ func TestRefreshPicksUpAppendedDocumentContent(t *testing.T) {
 	}
 	if got, want := v.lines[0].Text, "hello"; got != want {
 		t.Fatalf("line text after refresh = %q, want %q", got, want)
+	}
+}
+
+func TestToggleHelpMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+
+	if got, want := v.mode, modeNormal; got != want {
+		t.Fatalf("initial mode = %v, want %v", got, want)
+	}
+	v.HandleKey(keyRune("H"))
+	if got, want := v.mode, modeHelp; got != want {
+		t.Fatalf("mode after H = %v, want %v", got, want)
+	}
+	v.HandleKey(keyKey(tcell.KeyEscape))
+	if got, want := v.mode, modeNormal; got != want {
+		t.Fatalf("mode after Esc = %v, want %v", got, want)
+	}
+}
+
+func TestViewerUsesCustomLocalizer(t *testing.T) {
+	bundle := catalog.NewBundle()
+	spanish := language.Spanish
+	bundle.AddMessages(spanish, &i18n.Message{
+		ID:    catalog.HelpTitle.ID,
+		Other: "Ayuda",
+	})
+
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		Localizer:  i18n.NewLocalizer(bundle, spanish.String()),
+	})
+
+	if got, want := v.text(msgHelpTitle, nil), "Ayuda"; got != want {
+		t.Fatalf("localized help title = %q, want %q", got, want)
 	}
 }
 

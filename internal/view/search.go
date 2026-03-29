@@ -4,7 +4,6 @@
 package view
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -96,7 +95,7 @@ func (v *Viewer) commitPrompt() {
 func (v *Viewer) startSearch(query string, forward bool) {
 	query = strings.TrimSpace(query)
 	if query == "" {
-		v.setMessage("empty search")
+		v.setMessage(msgPromptEmptySearch, nil)
 		return
 	}
 
@@ -106,18 +105,18 @@ func (v *Viewer) startSearch(query string, forward bool) {
 	v.search.Current = -1
 	v.rebuildSearch()
 	if len(v.search.Matches) == 0 {
-		v.setMessage(fmt.Sprintf("%q not found", query))
+		v.setMessage(msgPromptNotFound, map[string]any{"Query": query})
 		return
 	}
 
 	v.search.Current = v.pickInitialMatch(forward)
 	v.goToMatch(v.search.Current)
-	v.setMessage(fmt.Sprintf("%q: %d matches", query, len(v.search.Matches)))
+	v.setMessage(msgPromptMatchCount, map[string]any{"Query": query, "Count": len(v.search.Matches)})
 }
 
 func (v *Viewer) repeatSearch(forward bool) {
 	if len(v.search.Matches) == 0 {
-		v.setMessage("no active search")
+		v.setMessage(msgPromptNoSearch, nil)
 		return
 	}
 	step := 1
@@ -214,7 +213,7 @@ func (v *Viewer) runCommand(text string) {
 
 	lineNumber, err := strconv.Atoi(text)
 	if err != nil {
-		v.setMessage(fmt.Sprintf("unknown command: %s", text))
+		v.setMessage(msgCommandUnknown, map[string]any{"Command": text})
 		return
 	}
 	v.goToLine(lineNumber)
@@ -222,13 +221,13 @@ func (v *Viewer) runCommand(text string) {
 
 func (v *Viewer) goToLine(lineNumber int) {
 	if lineNumber <= 0 {
-		v.setMessage("line numbers start at 1")
+		v.setMessage(msgCommandLineStart, nil)
 		return
 	}
 	v.ensureLayout()
 	lineIndex := lineNumber - 1
 	if lineIndex >= len(v.lines) {
-		v.setMessage(fmt.Sprintf("line %d out of range", lineNumber))
+		v.setMessage(msgCommandOutOfRange, map[string]any{"Line": lineNumber})
 		return
 	}
 	if v.cfg.WrapMode == layout.NoWrap {
@@ -236,7 +235,7 @@ func (v *Viewer) goToLine(lineNumber int) {
 		v.relayout()
 	}
 	v.restoreAnchor(layout.Anchor{LineIndex: lineIndex, GraphemeIndex: 0})
-	v.setMessage(fmt.Sprintf("line %d", lineNumber))
+	v.setMessage(msgCommandLine, map[string]any{"Line": lineNumber})
 }
 
 func (v *Viewer) graphemeMatched(line model.Line, lineIndex int, grapheme model.Grapheme) (bool, bool) {
