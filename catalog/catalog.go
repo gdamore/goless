@@ -31,7 +31,8 @@ var (
 	HelpGeneralHelp      = &i18n.Message{ID: "help.general.help", Other: "H or F1: help"}
 	HelpGeneralQuit      = &i18n.Message{ID: "help.general.quit", Other: "q or Esc: quit"}
 
-	StatusLine       = &i18n.Message{ID: "status.line", Other: " {{.Mode}}  row {{.Current}}/{{.Total}}  col {{.Column}}  bytes {{.Bytes}}{{.SearchInfo}}  q quit  / ? search  H help  w wrap "}
+	StatusLine       = &i18n.Message{ID: "status.line", Other: "{{.SearchInfo}}"}
+	StatusPosition   = &i18n.Message{ID: "status.position", Other: "row {{.Current}}/{{.Total}}  col {{.Column}}"}
 	StatusSearchInfo = &i18n.Message{ID: "status.search_info", Other: "  /{{.Query}} {{.Current}}/{{.Total}}"}
 	ModeScroll       = &i18n.Message{ID: "status.mode.scroll", Other: "SCROLL"}
 	ModeWrap         = &i18n.Message{ID: "status.mode.wrap", Other: "WRAP"}
@@ -65,6 +66,7 @@ var allMessages = []*i18n.Message{
 	HelpGeneralHelp,
 	HelpGeneralQuit,
 	StatusLine,
+	StatusPosition,
 	StatusSearchInfo,
 	ModeScroll,
 	ModeWrap,

@@ -28,6 +28,7 @@ var (
 	msgHelpGeneralHelp      = catalog.HelpGeneralHelp
 	msgHelpGeneralQuit      = catalog.HelpGeneralQuit
 	msgStatusLine           = catalog.StatusLine
+	msgStatusPosition       = catalog.StatusPosition
 	msgStatusSearchInfo     = catalog.StatusSearchInfo
 	msgModeScroll           = catalog.ModeScroll
 	msgModeWrap             = catalog.ModeWrap

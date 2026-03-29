@@ -4,6 +4,7 @@
 package view
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gdamore/goless/catalog"
@@ -320,6 +321,65 @@ func TestViewerUsesCustomLocalizer(t *testing.T) {
 
 	if got, want := v.text(msgHelpTitle, nil), "Ayuda"; got != want {
 		t.Fatalf("localized help title = %q, want %q", got, want)
+	}
+}
+
+func TestStatusShowsRightOverflowIndicator(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyz")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(10, 2)
+	v.relayout()
+
+	left, right := v.statusOverflow()
+	if left {
+		t.Fatalf("left overflow = true, want false")
+	}
+	if !right {
+		t.Fatalf("right overflow = false, want true")
+	}
+	leftText, rightText := v.statusText()
+	if strings.Contains(leftText, "▶") || strings.Contains(rightText, "▶") {
+		t.Fatalf("status text (%q, %q) should not embed right overflow indicator", leftText, rightText)
+	}
+}
+
+func TestStatusShowsBothOverflowIndicatorsWhenScrolledMidway(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyz")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(10, 2)
+	v.colOffset = 5
+	v.relayout()
+
+	left, right := v.statusOverflow()
+	if !left || !right {
+		t.Fatalf("overflow = (%v, %v), want (true, true)", left, right)
+	}
+}
+
+func TestStatusTextPlacesPositionOnRight(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nbeta\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.relayout()
+
+	leftText, rightText := v.statusText()
+	if leftText != "" {
+		t.Fatalf("left status text = %q, want empty", leftText)
+	}
+	if !strings.Contains(rightText, "row 1/2") {
+		t.Fatalf("right status text = %q, want row indicator", rightText)
 	}
 }
 
