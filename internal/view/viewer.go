@@ -295,6 +295,22 @@ func (v *Viewer) restoreAnchor(anchor layout.Anchor) {
 	v.clampOffsets()
 }
 
+func (v *Viewer) revealAnchor(anchor layout.Anchor) {
+	rowIndex := v.layout.RowIndexForAnchor(anchor)
+	if rowIndex < 0 {
+		return
+	}
+
+	bodyHeight := max(v.bodyHeight(), 1)
+	switch {
+	case rowIndex < v.rowOffset:
+		v.rowOffset = rowIndex
+	case rowIndex >= v.rowOffset+bodyHeight:
+		v.rowOffset = rowIndex - bodyHeight + 1
+	}
+	v.clampOffsets()
+}
+
 func (v *Viewer) drawRow(screen tcell.Screen, y int, row layout.VisualRow) {
 	if row.LineIndex < 0 || row.LineIndex >= len(v.lines) {
 		return
@@ -308,10 +324,7 @@ func (v *Viewer) drawRow(screen tcell.Screen, y int, row layout.VisualRow) {
 		ansiStyle := styleForGrapheme(line, grapheme.RuneStart)
 		matched, current := v.graphemeMatched(line, row.LineIndex, grapheme)
 		if matched {
-			ansiStyle.Reverse = !ansiStyle.Reverse
-			if current {
-				ansiStyle.Bold = true
-			}
+			ansiStyle = applyMatchHighlight(ansiStyle, current)
 		}
 		cellStyle := toTCellStyle(ansiStyle)
 		x := segment.RenderedCellFrom
@@ -417,6 +430,26 @@ func styleForGrapheme(line model.Line, runeIndex int) ansi.Style {
 	return ansi.DefaultStyle()
 }
 
+func applyMatchHighlight(style ansi.Style, current bool) ansi.Style {
+	// Preserve existing color-heavy styling where possible. If the content
+	// already owns the background or is using reverse video, prefer emphasis
+	// attributes over repainting the cell background.
+	if style.Bg.Kind != ansi.ColorDefault || style.Reverse {
+		style.Underline = true
+		if current {
+			style.Bold = true
+		}
+		return style
+	}
+
+	style.Bg = matchBackgroundColor
+	if current {
+		style.Bg = currentMatchBackgroundColor
+		style.Bold = true
+	}
+	return style
+}
+
 func toTCellStyle(style ansi.Style) tcell.Style {
 	tstyle := tcell.StyleDefault
 	tstyle = tstyle.Foreground(toTCellColor(style.Fg))
@@ -429,6 +462,11 @@ func toTCellStyle(style ansi.Style) tcell.Style {
 	tstyle = tstyle.Reverse(style.Reverse)
 	return tstyle
 }
+
+var (
+	matchBackgroundColor        = ansi.RGBColor(0x36, 0x4f, 0x6b)
+	currentMatchBackgroundColor = ansi.RGBColor(0x8a, 0x58, 0x00)
+)
 
 func toTCellColor(c ansi.Color) tcolor.Color {
 	switch c.Kind {

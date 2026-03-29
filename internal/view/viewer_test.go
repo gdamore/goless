@@ -139,6 +139,94 @@ func TestPromptCommandJumpsToLine(t *testing.T) {
 	}
 }
 
+func TestSearchRevealKeepsVisibleHorizontalContext(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("0123456789 target suffix")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(10, 2)
+	v.colOffset = 8
+	v.relayout()
+
+	v.HandleKey(keyRune("/"))
+	for _, s := range []string{"t", "a", "r", "g", "e", "t"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.colOffset, 8; got != want {
+		t.Fatalf("col offset after visible search = %d, want %d", got, want)
+	}
+}
+
+func TestSearchRevealOnlyScrollsEnoughToShowMatch(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("0123456789 target suffix")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(10, 2)
+	v.colOffset = 0
+	v.relayout()
+
+	v.HandleKey(keyRune("/"))
+	for _, s := range []string{"t", "a", "r", "g", "e", "t"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.colOffset, 7; got != want {
+		t.Fatalf("col offset after reveal = %d, want %d", got, want)
+	}
+}
+
+func TestSearchRevealKeepsVisibleVerticalContext(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+	v.rowOffset = 1
+	v.relayout()
+
+	v.HandleKey(keyRune("/"))
+	for _, s := range []string{"f", "o", "u", "r"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.rowOffset, 1; got != want {
+		t.Fatalf("row offset after visible search = %d, want %d", got, want)
+	}
+}
+
+func TestSearchRevealOnlyScrollsEnoughVertically(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+	v.rowOffset = 0
+	v.relayout()
+
+	v.HandleKey(keyRune("/"))
+	for _, s := range []string{"f", "o", "u", "r"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.rowOffset, 1; got != want {
+		t.Fatalf("row offset after reveal = %d, want %d", got, want)
+	}
+}
+
 func keyRune(s string) *tcell.EventKey {
 	return tcell.NewEventKey(tcell.KeyRune, s, tcell.ModNone)
 }
