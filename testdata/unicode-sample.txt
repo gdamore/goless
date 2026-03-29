@@ -1,0 +1,48 @@
+goless unicode sample
+=====================
+
+ASCII:
+The quick brown fox jumps over the lazy dog.
+
+Combining marks:
+Café
+naïve
+Ångström
+Zalgo-lite: H̵e̷l̴l̸o̶
+
+Emoji and ZWJ sequences:
+😀 😁 😂 🤦🏽‍♂️ 👩🏽‍💻 🧑‍🔬 🏳️‍🌈 👨‍👩‍👧‍👦
+
+Wide characters:
+日本語の文章
+漢字かな交じり文
+界 界界 界界界
+
+Bidirectional scripts:
+שלום עולם
+עברית mixed with English 123
+Arabic is not a current priority, but: مرحبا بالعالم
+
+Tabs:
+name	value	status
+alpha	1	ok
+beta	22	wrapped
+gamma	333	scroll
+
+Visible control fallback:
+beforeafter
+
+ANSI styles:
+[1mBold[0m
+[4mUnderline[0m
+[7mReverse[0m
+[31mRed[0m [32mGreen[0m [34mBlue[0m
+[38;5;208mPalette orange[0m
+[38;2;255;105;180m24-bit pink[0m
+[44;38;2;255;255;255mRGB foreground on blue background[0m
+
+OSC should be ignored:
+]0;this title should not appearvisible text after OSC
+
+Long line for wrap/scroll testing:
+0123456789 abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 😀界שלום tabs->	end
