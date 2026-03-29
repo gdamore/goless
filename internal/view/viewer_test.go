@@ -7,13 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gdamore/goless/catalog"
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/tcell/v3"
 	tcolor "github.com/gdamore/tcell/v3/color"
-	"github.com/nicksnyder/go-i18n/v2/i18n"
-	"golang.org/x/text/language"
 )
 
 func TestToggleWrapPreservesAnchor(t *testing.T) {
@@ -332,24 +329,19 @@ func TestToggleHelpMode(t *testing.T) {
 	}
 }
 
-func TestViewerUsesCustomLocalizer(t *testing.T) {
-	bundle := catalog.NewBundle()
-	spanish := language.Spanish
-	bundle.AddMessages(spanish, &i18n.Message{
-		ID:    catalog.HelpTitle.ID,
-		Other: "Ayuda",
-	})
-
+func TestViewerUsesCustomTextBundle(t *testing.T) {
 	doc := model.NewDocument(4)
 	v := New(doc, Config{
 		TabWidth:   4,
 		WrapMode:   layout.NoWrap,
 		ShowStatus: true,
-		Localizer:  i18n.NewLocalizer(bundle, spanish.String()),
+		Text: Text{
+			HelpTitle: "Ayuda",
+		},
 	})
 
-	if got, want := v.text(msgHelpTitle, nil), "Ayuda"; got != want {
-		t.Fatalf("localized help title = %q, want %q", got, want)
+	if got, want := v.text.HelpTitle, "Ayuda"; got != want {
+		t.Fatalf("help title = %q, want %q", got, want)
 	}
 }
 

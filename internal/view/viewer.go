@@ -11,7 +11,6 @@ import (
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/tcell/v3"
 	tcolor "github.com/gdamore/tcell/v3/color"
-	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 // Config controls viewer behavior.
@@ -19,7 +18,7 @@ type Config struct {
 	TabWidth   int
 	WrapMode   layout.WrapMode
 	ShowStatus bool
-	Localizer  *i18n.Localizer
+	Text       Text
 }
 
 // Viewer is a minimal document viewer built on the model and layout packages.
@@ -30,7 +29,7 @@ type Viewer struct {
 	prompt     *promptState
 	message    string
 	search     searchState
-	localizer  *i18n.Localizer
+	text       Text
 	lines      []model.Line
 	layout     layout.Result
 	width      int
@@ -45,14 +44,11 @@ func New(doc *model.Document, cfg Config) *Viewer {
 	if cfg.TabWidth <= 0 {
 		cfg.TabWidth = 8
 	}
-	localizer := cfg.Localizer
-	if localizer == nil {
-		localizer = defaultLocalizer()
-	}
+	cfg.Text = cfg.Text.withDefaults()
 	return &Viewer{
-		doc:       doc,
-		cfg:       cfg,
-		localizer: localizer,
+		doc:  doc,
+		cfg:  cfg,
+		text: cfg.Text,
 	}
 }
 
@@ -377,10 +373,10 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 
 	left, right := v.statusOverflow()
 	if left && v.width > 1 {
-		screen.PutStrStyled(1, y, leftOverflowIndicator, style)
+		screen.PutStrStyled(1, y, v.text.LeftOverflowIndicator, style)
 	}
 	if right && v.width > 2 {
-		screen.PutStrStyled(v.width-2, y, rightOverflowIndicator, style)
+		screen.PutStrStyled(v.width-2, y, v.text.RightOverflowIndicator, style)
 	}
 
 	leftText, rightText := v.statusText()
@@ -405,15 +401,9 @@ func (v *Viewer) statusText() (left, right string) {
 		if len(v.search.Matches) > 0 && v.search.Current >= 0 {
 			position = v.search.Current + 1
 		}
-		searchInfo = v.text(msgStatusSearchInfo, map[string]any{
-			"Query":   v.search.Query,
-			"Current": position,
-			"Total":   len(v.search.Matches),
-		})
+		searchInfo = v.text.StatusSearchInfo(v.search.Query, position, len(v.search.Matches))
 	}
-	left = v.text(msgStatusLine, map[string]any{
-		"SearchInfo": searchInfo,
-	})
+	left = searchInfo
 	if v.message != "" {
 		if left != "" {
 			left += "  "
@@ -425,11 +415,7 @@ func (v *Viewer) statusText() (left, right string) {
 	if len(v.layout.Rows) > 0 {
 		current = min(v.rowOffset+1, len(v.layout.Rows))
 	}
-	right = v.text(msgStatusPosition, map[string]any{
-		"Current": current,
-		"Total":   len(v.layout.Rows),
-		"Column":  v.colOffset,
-	})
+	right = v.text.StatusPosition(current, len(v.layout.Rows), v.colOffset)
 	return left, right
 }
 
@@ -513,22 +499,6 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) bool {
 	return false
 }
 
-func (v *Viewer) setMessage(msg *i18n.Message, data map[string]any) {
-	v.message = v.text(msg, data)
-}
-
-func (v *Viewer) text(msg *i18n.Message, data map[string]any) string {
-	if v.localizer == nil {
-		return msg.Other
-	}
-	cfg := &i18n.LocalizeConfig{DefaultMessage: msg, TemplateData: data}
-	text, err := v.localizer.Localize(cfg)
-	if err != nil {
-		return msg.Other
-	}
-	return text
-}
-
 func (v *Viewer) toggleHelp() {
 	if v.mode == modeHelp {
 		v.mode = modeNormal
@@ -599,9 +569,7 @@ var (
 		Bold:           true,
 	}
 
-	leftOverflowIndicator  = "◀"
-	rightOverflowIndicator = "▶"
-	statusBarStyle         = tcell.StyleDefault.Foreground(tcolor.PaletteColor(15)).Background(tcolor.PaletteColor(2))
+	statusBarStyle = tcell.StyleDefault.Foreground(tcolor.PaletteColor(15)).Background(tcolor.PaletteColor(2))
 )
 
 func toTCellColor(c ansi.Color) tcolor.Color {

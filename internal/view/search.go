@@ -105,23 +105,23 @@ func (v *Viewer) startSearch(query string, forward bool) {
 	v.search.Current = -1
 	v.rebuildSearch()
 	if len(v.search.Matches) == 0 {
-		v.setMessage(msgPromptNotFound, map[string]any{"Query": query})
+		v.message = v.text.SearchNotFound(query)
 		return
 	}
 
 	v.search.Current = v.pickInitialMatch(forward)
 	v.goToMatch(v.search.Current)
-	v.setMessage(msgPromptMatchCount, map[string]any{"Query": query, "Count": len(v.search.Matches)})
+	v.message = v.text.SearchMatchCount(query, len(v.search.Matches))
 }
 
 func (v *Viewer) clearSearch() {
 	v.search = searchState{}
-	v.setMessage(msgPromptEmptySearch, nil)
+	v.message = v.text.SearchEmpty
 }
 
 func (v *Viewer) repeatSearch(forward bool) {
 	if len(v.search.Matches) == 0 {
-		v.setMessage(msgPromptNoSearch, nil)
+		v.message = v.text.SearchNone
 		return
 	}
 	step := 1
@@ -218,7 +218,7 @@ func (v *Viewer) runCommand(text string) {
 
 	lineNumber, err := strconv.Atoi(text)
 	if err != nil {
-		v.setMessage(msgCommandUnknown, map[string]any{"Command": text})
+		v.message = v.text.CommandUnknown(text)
 		return
 	}
 	v.goToLine(lineNumber)
@@ -226,13 +226,13 @@ func (v *Viewer) runCommand(text string) {
 
 func (v *Viewer) goToLine(lineNumber int) {
 	if lineNumber <= 0 {
-		v.setMessage(msgCommandLineStart, nil)
+		v.message = v.text.CommandLineStart
 		return
 	}
 	v.ensureLayout()
 	lineIndex := lineNumber - 1
 	if lineIndex >= len(v.lines) {
-		v.setMessage(msgCommandOutOfRange, map[string]any{"Line": lineNumber})
+		v.message = v.text.CommandOutOfRange(lineNumber)
 		return
 	}
 	if v.cfg.WrapMode == layout.NoWrap {
@@ -240,7 +240,7 @@ func (v *Viewer) goToLine(lineNumber int) {
 		v.relayout()
 	}
 	v.restoreAnchor(layout.Anchor{LineIndex: lineIndex, GraphemeIndex: 0})
-	v.setMessage(msgCommandLine, map[string]any{"Line": lineNumber})
+	v.message = v.text.CommandLine(lineNumber)
 }
 
 func (v *Viewer) graphemeMatched(line model.Line, lineIndex int, grapheme model.Grapheme) (bool, bool) {

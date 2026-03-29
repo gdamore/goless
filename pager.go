@@ -10,7 +10,6 @@ import (
 	"github.com/gdamore/goless/internal/model"
 	iview "github.com/gdamore/goless/internal/view"
 	"github.com/gdamore/tcell/v3"
-	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 const defaultChunkSize = 32 * 1024
@@ -33,8 +32,9 @@ type Config struct {
 	WrapMode WrapMode
 	// ShowStatus enables the status bar on the last screen row.
 	ShowStatus bool
-	// Localizer controls localization of pager UI strings. Nil uses the built-in English catalog.
-	Localizer *i18n.Localizer
+	// Text controls user-facing text, help content, and UI indicators.
+	// Zero values are filled from DefaultText.
+	Text Text
 }
 
 // Pager is an embeddable document pager backed by an appendable document model.
@@ -52,7 +52,7 @@ func New(cfg Config) *Pager {
 			TabWidth:   cfg.TabWidth,
 			WrapMode:   toInternalWrapMode(cfg.WrapMode),
 			ShowStatus: cfg.ShowStatus,
-			Localizer:  cfg.Localizer,
+			Text:       toInternalText(cfg.Text),
 		}),
 	}
 }
@@ -175,5 +175,73 @@ func toInternalWrapMode(mode WrapMode) layout.WrapMode {
 		return layout.SoftWrap
 	default:
 		return layout.NoWrap
+	}
+}
+
+func toInternalText(text Text) iview.Text {
+	defaults := DefaultText()
+
+	if text.HelpTitle == "" {
+		text.HelpTitle = defaults.HelpTitle
+	}
+	if text.HelpClose == "" {
+		text.HelpClose = defaults.HelpClose
+	}
+	if text.HelpBody == "" {
+		text.HelpBody = defaults.HelpBody
+	}
+	if text.StatusSearchInfo == nil {
+		text.StatusSearchInfo = defaults.StatusSearchInfo
+	}
+	if text.StatusPosition == nil {
+		text.StatusPosition = defaults.StatusPosition
+	}
+	if text.SearchEmpty == "" {
+		text.SearchEmpty = defaults.SearchEmpty
+	}
+	if text.SearchNotFound == nil {
+		text.SearchNotFound = defaults.SearchNotFound
+	}
+	if text.SearchMatchCount == nil {
+		text.SearchMatchCount = defaults.SearchMatchCount
+	}
+	if text.SearchNone == "" {
+		text.SearchNone = defaults.SearchNone
+	}
+	if text.CommandUnknown == nil {
+		text.CommandUnknown = defaults.CommandUnknown
+	}
+	if text.CommandLineStart == "" {
+		text.CommandLineStart = defaults.CommandLineStart
+	}
+	if text.CommandOutOfRange == nil {
+		text.CommandOutOfRange = defaults.CommandOutOfRange
+	}
+	if text.CommandLine == nil {
+		text.CommandLine = defaults.CommandLine
+	}
+	if text.LeftOverflowIndicator == "" {
+		text.LeftOverflowIndicator = defaults.LeftOverflowIndicator
+	}
+	if text.RightOverflowIndicator == "" {
+		text.RightOverflowIndicator = defaults.RightOverflowIndicator
+	}
+
+	return iview.Text{
+		HelpTitle:              text.HelpTitle,
+		HelpClose:              text.HelpClose,
+		HelpBody:               text.HelpBody,
+		StatusSearchInfo:       text.StatusSearchInfo,
+		StatusPosition:         text.StatusPosition,
+		SearchEmpty:            text.SearchEmpty,
+		SearchNotFound:         text.SearchNotFound,
+		SearchMatchCount:       text.SearchMatchCount,
+		SearchNone:             text.SearchNone,
+		CommandUnknown:         text.CommandUnknown,
+		CommandLineStart:       text.CommandLineStart,
+		CommandOutOfRange:      text.CommandOutOfRange,
+		CommandLine:            text.CommandLine,
+		LeftOverflowIndicator:  text.LeftOverflowIndicator,
+		RightOverflowIndicator: text.RightOverflowIndicator,
 	}
 }
