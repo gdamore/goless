@@ -5,6 +5,7 @@ package model
 
 import (
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/gdamore/goless/internal/ansi"
@@ -29,6 +30,7 @@ type Line struct {
 
 // Document incrementally builds logical lines from appended bytes.
 type Document struct {
+	mu        sync.RWMutex
 	store     *ChunkStore
 	parser    *ansi.Parser
 	lines     []Line
@@ -64,6 +66,8 @@ func NewDocument(chunkSize int) *Document {
 
 // Append appends raw bytes to the document and updates parsed state incrementally.
 func (d *Document) Append(data []byte) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.store.Append(data)
 	_, err := d.parser.Write(data)
 	return err
@@ -71,16 +75,22 @@ func (d *Document) Append(data []byte) error {
 
 // Flush finalizes any incomplete parser state.
 func (d *Document) Flush() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	d.parser.Flush()
 }
 
 // Len returns the number of raw bytes appended to the document.
 func (d *Document) Len() int64 {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return d.store.Len()
 }
 
 // Lines returns the logical lines known so far.
 func (d *Document) Lines() []Line {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	lines := append([]Line(nil), d.lines...)
 	if d.current.runes > 0 || len(d.lines) == 0 {
 		lines = append(lines, d.currentLine())
