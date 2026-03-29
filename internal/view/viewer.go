@@ -322,11 +322,11 @@ func (v *Viewer) drawRow(screen tcell.Screen, y int, row layout.VisualRow) {
 		}
 		grapheme := line.Graphemes[segment.LogicalGraphemeIndex]
 		ansiStyle := styleForGrapheme(line, grapheme.RuneStart)
+		cellStyle := toTCellStyle(ansiStyle)
 		matched, current := v.graphemeMatched(line, row.LineIndex, grapheme)
 		if matched {
-			ansiStyle = applyMatchHighlight(ansiStyle, current)
+			cellStyle = applyMatchCellStyle(cellStyle, current)
 		}
-		cellStyle := toTCellStyle(ansiStyle)
 		x := segment.RenderedCellFrom
 		if x >= v.width {
 			break
@@ -430,23 +430,18 @@ func styleForGrapheme(line model.Line, runeIndex int) ansi.Style {
 	return ansi.DefaultStyle()
 }
 
-func applyMatchHighlight(style ansi.Style, current bool) ansi.Style {
-	// Preserve existing color-heavy styling where possible. If the content
-	// already owns the background or is using reverse video, prefer emphasis
-	// attributes over repainting the cell background.
-	if style.Bg.Kind != ansi.ColorDefault || style.Reverse {
-		style.Underline = true
-		if current {
-			style.Bold = true
-		}
-		return style
+func applyMatchCellStyle(style tcell.Style, current bool) tcell.Style {
+	preset := inactiveMatchStyle
+	if current {
+		preset = currentMatchStyle
 	}
 
-	style.Bg = matchBackgroundColor
-	if current {
-		style.Bg = currentMatchBackgroundColor
-		style.Bold = true
+	style = style.Foreground(preset.Fg)
+	style = style.Background(preset.Bg)
+	if preset.UnderlineStyle != tcell.UnderlineStyleNone {
+		style = style.Underline(preset.UnderlineStyle, preset.UnderlineColor)
 	}
+	style = style.Bold(preset.Bold)
 	return style
 }
 
@@ -463,9 +458,29 @@ func toTCellStyle(style ansi.Style) tcell.Style {
 	return tstyle
 }
 
+type matchStylePreset struct {
+	Fg             tcolor.Color
+	Bg             tcolor.Color
+	UnderlineStyle tcell.UnderlineStyle
+	UnderlineColor tcolor.Color
+	Bold           bool
+}
+
 var (
-	matchBackgroundColor        = ansi.RGBColor(0x36, 0x4f, 0x6b)
-	currentMatchBackgroundColor = ansi.RGBColor(0x8a, 0x58, 0x00)
+	// These defaults use ANSI palette colors so they remain predictable on
+	// terminals without reliable RGB support. They are kept as style pairs so
+	// background changes always come with an explicit contrasting foreground.
+	inactiveMatchStyle = matchStylePreset{
+		Fg: tcolor.PaletteColor(0),
+		Bg: tcolor.PaletteColor(6),
+	}
+	currentMatchStyle = matchStylePreset{
+		Fg:             tcolor.PaletteColor(7),
+		Bg:             tcolor.PaletteColor(4),
+		UnderlineStyle: tcell.UnderlineStyleDouble,
+		UnderlineColor: tcolor.PaletteColor(5),
+		Bold:           true,
+	}
 )
 
 func toTCellColor(c ansi.Color) tcolor.Color {
