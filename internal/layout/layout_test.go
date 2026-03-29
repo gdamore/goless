@@ -197,3 +197,29 @@ func TestNoWrapUsesRightClipMarkerForPartialWideGrapheme(t *testing.T) {
 		t.Fatalf("marker grapheme index = %d, want %d", got, want)
 	}
 }
+
+func TestNoWrapPreservesVisibleTabSpacesWhenClipped(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("a\tb")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	result := Build(doc.Lines(), Config{Width: 3, TabWidth: 4, WrapMode: NoWrap, HorizontalOffset: 2})
+	if got, want := len(result.Rows), 1; got != want {
+		t.Fatalf("row count = %d, want %d", got, want)
+	}
+
+	row := result.Rows[0]
+	if got, want := len(row.Segments), 2; got != want {
+		t.Fatalf("segment count = %d, want %d", got, want)
+	}
+	if got, want := row.Segments[0].Display, "  "; got != want {
+		t.Fatalf("tab display = %q, want %q", got, want)
+	}
+	if got, want := row.Segments[0].RenderedCellTo-row.Segments[0].RenderedCellFrom, 2; got != want {
+		t.Fatalf("tab rendered width = %d, want %d", got, want)
+	}
+	if got, want := row.Segments[1].LogicalGraphemeIndex, 2; got != want {
+		t.Fatalf("next grapheme index = %d, want %d", got, want)
+	}
+}

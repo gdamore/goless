@@ -75,7 +75,10 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 		v.drawStatus(screen, v.height-1)
 	}
 
-	screen.Show()
+	// Be conservative for now. Some terminals mishandle incremental redraws
+	// involving grapheme clusters or fallback-rendered cells, especially after
+	// vertical motion. Sync avoids leaving stale display artifacts behind.
+	screen.Sync()
 }
 
 // HandleKey applies minimal navigation and returns true when the viewer should exit.
