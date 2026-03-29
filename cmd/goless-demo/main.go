@@ -30,23 +30,25 @@ func run() error {
 	}
 	flag.Parse()
 
-	var input io.Reader = os.Stdin
+	var (
+		input io.Reader = os.Stdin
+		file  *os.File
+	)
 	if flag.NArg() > 1 {
 		return fmt.Errorf("usage: goless-demo [file]")
 	}
 	if flag.NArg() == 1 {
-		file, err := os.Open(flag.Arg(0))
+		var err error
+		file, err = os.Open(flag.Arg(0))
 		if err != nil {
 			return err
 		}
 		defer file.Close()
 		input = file
 	}
-
-	if err := appendFromReader(doc, input); err != nil {
-		return err
+	if flag.NArg() == 0 && stdinIsTerminal() {
+		return fmt.Errorf("stdin is a terminal; specify a file or pipe input")
 	}
-	doc.Flush()
 
 	screen, err := tcell.NewScreen()
 	if err != nil {
@@ -67,6 +69,9 @@ func run() error {
 	viewer.SetSize(width, height)
 	viewer.Draw(screen)
 
+	readResult := make(chan error, 1)
+	go readIntoDocument(doc, input, screen.EventQ(), readResult)
+
 	for {
 		ev := <-screen.EventQ()
 		switch event := ev.(type) {
@@ -78,18 +83,29 @@ func run() error {
 			if viewer.HandleKey(event) {
 				return nil
 			}
+		case *tcell.EventInterrupt:
+			select {
+			case err := <-readResult:
+				if err != nil {
+					return err
+				}
+			default:
+			}
 		}
 		viewer.Draw(screen)
 	}
 }
 
-func appendFromReader(doc *model.Document, r io.Reader) error {
+func appendFromReader(doc *model.Document, r io.Reader, onChunk func()) error {
 	buf := make([]byte, 32*1024)
 	for {
 		n, err := r.Read(buf)
 		if n > 0 {
 			if appendErr := doc.Append(buf[:n]); appendErr != nil {
 				return appendErr
+			}
+			if onChunk != nil {
+				onChunk()
 			}
 		}
 		if err == io.EOF {
@@ -99,4 +115,21 @@ func appendFromReader(doc *model.Document, r io.Reader) error {
 			return err
 		}
 	}
+}
+
+func readIntoDocument(doc *model.Document, r io.Reader, eventQ chan tcell.Event, result chan<- error) {
+	err := appendFromReader(doc, r, func() {
+		eventQ <- tcell.NewEventInterrupt(nil)
+	})
+	doc.Flush()
+	result <- err
+	eventQ <- tcell.NewEventInterrupt(nil)
+}
+
+func stdinIsTerminal() bool {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
 }
