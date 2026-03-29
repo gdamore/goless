@@ -105,9 +105,13 @@ func (r Result) RowIndexForAnchor(anchor Anchor) int {
 
 // Anchor returns the leading logical grapheme represented by the row.
 func (r VisualRow) Anchor() Anchor {
+	leading := 0
+	if len(r.Segments) > 0 {
+		leading = r.Segments[0].LogicalGraphemeIndex
+	}
 	return Anchor{
 		LineIndex:     r.LineIndex,
-		GraphemeIndex: r.FirstLogicalGrapheme(),
+		GraphemeIndex: leading,
 	}
 }
 
