@@ -1,3 +1,6 @@
+// Copyright 2026 Garrett D'Amore
+// SPDX-License-Identifier: Apache-2.0
+
 package layout
 
 import (
