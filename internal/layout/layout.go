@@ -3,7 +3,11 @@
 
 package layout
 
-import "github.com/gdamore/goless/internal/model"
+import (
+	"strings"
+
+	"github.com/gdamore/goless/internal/model"
+)
 
 // WrapMode controls whether logical lines wrap into visual rows.
 type WrapMode int
@@ -242,6 +246,7 @@ func buildScrolledRow(lineIndex int, line model.Line, info LineLayout, width int
 	renderX := 0
 
 	for i := range line.Graphemes {
+		grapheme := line.Graphemes[i]
 		sourceStart := info.GraphemeCellStarts[i]
 		sourceEnd := info.GraphemeCellEnds[i]
 		if sourceEnd <= windowStart || sourceStart >= windowEnd {
@@ -250,6 +255,28 @@ func buildScrolledRow(lineIndex int, line model.Line, info LineLayout, width int
 
 		leftClipped := sourceStart < windowStart
 		rightClipped := sourceEnd > windowEnd
+
+		if grapheme.Text == "\t" && (leftClipped || rightClipped) {
+			visibleStart := max(sourceStart, windowStart)
+			visibleEnd := min(sourceEnd, windowEnd)
+			visibleWidth := max(visibleEnd-visibleStart, 0)
+			if visibleWidth > 0 {
+				row.Segments = append(row.Segments, VisualSegment{
+					LogicalGraphemeIndex: i,
+					SourceCellStart:      sourceStart,
+					SourceCellEnd:        sourceEnd,
+					RenderedCellFrom:     renderX,
+					RenderedCellTo:       renderX + visibleWidth,
+					Display:              spaces(visibleWidth),
+				})
+				renderX += visibleWidth
+				row.SourceCellEnd = visibleEnd
+			}
+			if renderX >= width {
+				return finalizeScrolledRow(row, renderX)
+			}
+			continue
+		}
 
 		switch {
 		case leftClipped && rightClipped:
@@ -356,3 +383,10 @@ const (
 	leftClipMarker  = "<"
 	rightClipMarker = ">"
 )
+
+func spaces(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return strings.Repeat(" ", n)
+}
