@@ -315,6 +315,106 @@ func TestRefreshPicksUpAppendedDocumentContent(t *testing.T) {
 	}
 }
 
+func TestRefreshInFollowModeStaysAtBottomAfterAppend(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.Follow()
+
+	if err := doc.Append([]byte("three\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	doc.Flush()
+	v.Refresh()
+
+	if !v.Following() {
+		t.Fatalf("follow mode = false, want true")
+	}
+	if got, want := v.rowOffset, v.maxRowOffset(); got != want {
+		t.Fatalf("row offset after append = %d, want %d", got, want)
+	}
+}
+
+func TestScrollUpExitsFollowMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.Follow()
+	v.HandleKey(keyRune("k"))
+
+	if v.Following() {
+		t.Fatalf("follow mode = true, want false")
+	}
+}
+
+func TestRefreshWithoutFollowKeepsViewportWhenAppended(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.rowOffset = 0
+	v.relayout()
+
+	if err := doc.Append([]byte("four\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	doc.Flush()
+	v.Refresh()
+
+	if v.Following() {
+		t.Fatalf("follow mode = true, want false")
+	}
+	if got, want := v.rowOffset, 0; got != want {
+		t.Fatalf("row offset after append = %d, want %d", got, want)
+	}
+}
+
+func TestFollowKeyEnablesFollowMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.HandleKey(keyRune("F"))
+
+	if !v.Following() {
+		t.Fatalf("follow mode = false, want true")
+	}
+	if got, want := v.rowOffset, v.maxRowOffset(); got != want {
+		t.Fatalf("row offset after F = %d, want %d", got, want)
+	}
+}
+
+func TestCancelPromptPreservesFollowMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.Follow()
+	v.HandleKey(keyRune("/"))
+	v.HandleKey(keyKey(tcell.KeyEscape))
+
+	if !v.Following() {
+		t.Fatalf("follow mode = false, want true")
+	}
+}
+
 func TestToggleHelpMode(t *testing.T) {
 	doc := model.NewDocument(4)
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})

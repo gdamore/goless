@@ -99,6 +99,7 @@ func (v *Viewer) startSearch(query string, forward bool) {
 		return
 	}
 
+	v.follow = false
 	v.ensureLayout()
 	v.search.Query = query
 	v.search.Forward = forward
@@ -124,6 +125,7 @@ func (v *Viewer) repeatSearch(forward bool) {
 		v.message = v.text.SearchNone
 		return
 	}
+	v.follow = false
 	step := 1
 	if !forward {
 		step = -1
@@ -229,6 +231,7 @@ func (v *Viewer) goToLine(lineNumber int) {
 		v.message = v.text.CommandLineStart
 		return
 	}
+	v.follow = false
 	v.ensureLayout()
 	lineIndex := lineNumber - 1
 	if lineIndex >= len(v.lines) {

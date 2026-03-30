@@ -19,6 +19,7 @@ type Text struct {
 
 	StatusSearchInfo func(query string, current, total int) string
 	StatusPosition   func(current, total, column int) string
+	FollowMode       string
 
 	SearchEmpty      string
 	SearchNotFound   func(query string) string
@@ -58,6 +59,9 @@ func (t Text) withDefaults() Text {
 	}
 	if t.StatusPosition == nil {
 		t.StatusPosition = defaults.StatusPosition
+	}
+	if t.FollowMode == "" {
+		t.FollowMode = defaults.FollowMode
 	}
 	if t.SearchEmpty == "" {
 		t.SearchEmpty = defaults.SearchEmpty
@@ -104,6 +108,7 @@ func defaultText() Text {
 		StatusPosition: func(current, total, column int) string {
 			return fmt.Sprintf("row %d/%d  col %d", current, total, column)
 		},
+		FollowMode:  "follow",
 		SearchEmpty: "empty search",
 		SearchNotFound: func(query string) string {
 			return fmt.Sprintf("%s not found", query)

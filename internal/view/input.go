@@ -54,6 +54,7 @@ const (
 	actionSearchNext
 	actionSearchPrev
 	actionToggleHelp
+	actionFollow
 )
 
 func actionForKey(ev *tcell.EventKey) action {
@@ -112,6 +113,8 @@ func actionForKey(ev *tcell.EventKey) action {
 			return actionSearchPrev
 		case "H":
 			return actionToggleHelp
+		case "F":
+			return actionFollow
 		}
 	}
 	return actionNone
