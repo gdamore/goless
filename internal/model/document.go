@@ -57,10 +57,15 @@ type lineBuilder struct {
 
 // NewDocument constructs a new logical document.
 func NewDocument(chunkSize int) *Document {
+	return NewDocumentWithMode(chunkSize, ansi.RenderHybrid)
+}
+
+// NewDocumentWithMode constructs a new logical document using the supplied render mode.
+func NewDocumentWithMode(chunkSize int, mode ansi.RenderMode) *Document {
 	d := &Document{
 		store: NewChunkStore(chunkSize),
 	}
-	d.parser = ansi.NewParser(d)
+	d.parser = ansi.NewParserWithMode(d, mode)
 	return d
 }
 

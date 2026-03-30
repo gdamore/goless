@@ -76,6 +76,61 @@ func TestParserAppliesSGRAndShowsOSC(t *testing.T) {
 	}
 }
 
+func TestParserLiteralShowsSGRWithoutStyling(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParserWithMode(recv, RenderLiteral)
+
+	input := "a\x1b[31mB\x1b[0mC"
+	if _, err := p.Write([]byte(input)); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+	if got, want := text.String(), "a␛[31mB␛[0mC"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+
+	for _, ev := range recv.events {
+		if ev.kind == "print" && ev.r == 'B' {
+			if got, want := ev.style, DefaultStyle(); got != want {
+				t.Fatalf("style = %+v, want %+v", got, want)
+			}
+		}
+	}
+}
+
+func TestParserPresentationHidesOSC(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParserWithMode(recv, RenderPresentation)
+
+	input := "a\x1b[31mB\x1b[0m\x1b]0;title\aC"
+	if _, err := p.Write([]byte(input)); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+	if got, want := text.String(), "aBC"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+
+	if got := recv.events[1].style.Fg; got != IndexedColor(1) {
+		t.Fatalf("foreground = %+v, want %+v", got, IndexedColor(1))
+	}
+	if got := recv.events[len(recv.events)-1].style.Fg; got != DefaultColor() {
+		t.Fatalf("reset foreground = %+v, want %+v", got, DefaultColor())
+	}
+}
+
 func TestParserShowsOSCTerminatedByST(t *testing.T) {
 	recv := &recordReceiver{}
 	p := NewParser(recv)

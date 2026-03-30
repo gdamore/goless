@@ -6,6 +6,7 @@ package goless
 import (
 	"io"
 
+	"github.com/gdamore/goless/internal/ansi"
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
 	iview "github.com/gdamore/goless/internal/view"
@@ -30,6 +31,8 @@ type Config struct {
 	TabWidth int
 	// WrapMode selects horizontal scrolling or soft wrapping.
 	WrapMode WrapMode
+	// RenderMode controls how escapes and control sequences are presented.
+	RenderMode RenderMode
 	// Chrome configures optional body framing and title display.
 	Chrome Chrome
 	// ShowStatus enables the status bar on the last screen row.
@@ -47,7 +50,7 @@ type Pager struct {
 
 // New constructs a Pager with the supplied configuration.
 func New(cfg Config) *Pager {
-	doc := model.NewDocument(defaultChunkSize)
+	doc := model.NewDocumentWithMode(defaultChunkSize, toInternalRenderMode(cfg.RenderMode))
 	return &Pager{
 		doc: doc,
 		viewer: iview.New(doc, iview.Config{
@@ -188,6 +191,17 @@ func toInternalWrapMode(mode WrapMode) layout.WrapMode {
 		return layout.SoftWrap
 	default:
 		return layout.NoWrap
+	}
+}
+
+func toInternalRenderMode(mode RenderMode) ansi.RenderMode {
+	switch mode {
+	case RenderLiteral:
+		return ansi.RenderLiteral
+	case RenderPresentation:
+		return ansi.RenderPresentation
+	default:
+		return ansi.RenderHybrid
 	}
 }
 
