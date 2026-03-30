@@ -95,12 +95,17 @@ func TestParserLiteralShowsSGRWithoutStyling(t *testing.T) {
 		t.Fatalf("text = %q, want %q", got, want)
 	}
 
+	foundB := false
 	for _, ev := range recv.events {
 		if ev.kind == "print" && ev.r == 'B' {
+			foundB = true
 			if got, want := ev.style, DefaultStyle(); got != want {
 				t.Fatalf("style = %+v, want %+v", got, want)
 			}
 		}
+	}
+	if !foundB {
+		t.Fatalf("did not observe print event for B")
 	}
 }
 

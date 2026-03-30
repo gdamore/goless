@@ -37,7 +37,11 @@ func run() error {
 	flag.StringVar(&title, "title", "", "frame title")
 	flag.Parse()
 
-	doc := model.NewDocumentWithMode(32*1024, demoRenderMode(renderName))
+	renderMode, err := demoRenderMode(renderName)
+	if err != nil {
+		return err
+	}
+	doc := model.NewDocumentWithMode(32*1024, renderMode)
 
 	var (
 		input io.Reader = os.Stdin
@@ -175,13 +179,15 @@ func demoChrome(name, title string) view.Chrome {
 	return chrome
 }
 
-func demoRenderMode(name string) ansi.RenderMode {
+func demoRenderMode(name string) (ansi.RenderMode, error) {
 	switch name {
 	case "literal":
-		return ansi.RenderLiteral
+		return ansi.RenderLiteral, nil
 	case "presentation":
-		return ansi.RenderPresentation
+		return ansi.RenderPresentation, nil
+	case "hybrid", "":
+		return ansi.RenderHybrid, nil
 	default:
-		return ansi.RenderHybrid
+		return ansi.RenderHybrid, fmt.Errorf("unknown render mode %q; expected hybrid, literal, or presentation", name)
 	}
 }
