@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/gdamore/goless"
+	"github.com/gdamore/goless/internal/ansi"
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/goless/internal/view"
@@ -24,16 +25,19 @@ func main() {
 }
 
 func run() error {
-	doc := model.NewDocument(32 * 1024)
 	var chromeName string
+	var renderName string
 	var title string
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-chrome none|single|rounded] [-title text] [file]\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-chrome none|single|rounded] [-render hybrid|literal|presentation] [-title text] [file]\n")
 	}
 	flag.StringVar(&chromeName, "chrome", "none", "chrome style: none, single, rounded")
+	flag.StringVar(&renderName, "render", "hybrid", "render mode: hybrid, literal, presentation")
 	flag.StringVar(&title, "title", "", "frame title")
 	flag.Parse()
+
+	doc := model.NewDocumentWithMode(32*1024, demoRenderMode(renderName))
 
 	var (
 		input io.Reader = os.Stdin
@@ -169,4 +173,15 @@ func demoChrome(name, title string) view.Chrome {
 		BottomRight: frame.BottomRight,
 	}
 	return chrome
+}
+
+func demoRenderMode(name string) ansi.RenderMode {
+	switch name {
+	case "literal":
+		return ansi.RenderLiteral
+	case "presentation":
+		return ansi.RenderPresentation
+	default:
+		return ansi.RenderHybrid
+	}
 }

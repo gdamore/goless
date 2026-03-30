@@ -21,6 +21,18 @@ const (
 	modeUTF
 )
 
+// RenderMode controls how escape and control sequences are presented.
+type RenderMode uint8
+
+const (
+	// RenderHybrid applies supported styling and shows unsupported sequences visibly.
+	RenderHybrid RenderMode = iota
+	// RenderLiteral shows escape and control sequences literally and does not apply styling.
+	RenderLiteral
+	// RenderPresentation applies supported styling and hides unsupported sequences.
+	RenderPresentation
+)
+
 // Receiver consumes visible output emitted by the parser.
 type Receiver interface {
 	Print(r rune, style Style, offset int64)
@@ -38,13 +50,20 @@ type Parser struct {
 	style           Style
 	pendingCR       bool
 	pendingCROffset int64
+	renderMode      RenderMode
 }
 
 // NewParser constructs a parser that sends visible output to the receiver.
 func NewParser(receiver Receiver) *Parser {
+	return NewParserWithMode(receiver, RenderHybrid)
+}
+
+// NewParserWithMode constructs a parser with the supplied render mode.
+func NewParserWithMode(receiver Receiver, mode RenderMode) *Parser {
 	p := &Parser{
-		receiver: receiver,
-		style:    DefaultStyle(),
+		receiver:   receiver,
+		style:      DefaultStyle(),
+		renderMode: mode,
 	}
 	p.setStep(modeInit, p.stateInit)
 	return p
@@ -75,9 +94,8 @@ func (p *Parser) Flush() {
 	case modeUTF:
 		p.emitRune(utf8.RuneError, p.offset)
 	case modeEsc, modeCSI, modeOSC, modeStr:
-		p.emitControl(0x1b, p.offset)
-		for _, b := range p.buf.Bytes() {
-			p.emitLiteralByte(b, p.offset)
+		if p.showsUnsupportedSequences() {
+			p.emitEscapeVisible(nil)
 		}
 	}
 
@@ -156,6 +174,10 @@ func (p *Parser) stateEsc(b byte) {
 	case 'P', '^', '_', 'X':
 		p.setStep(modeStr, p.stateStr)
 	default:
+		if p.showsUnsupportedSequences() {
+			p.emitEscapeVisible([]byte{b})
+			return
+		}
 		p.buf.Reset()
 		p.setStep(modeInit, p.stateInit)
 	}
@@ -172,30 +194,51 @@ func (p *Parser) stateCSI(b byte) {
 	}
 	if b >= 0x40 && b <= 0x7e {
 		body := p.buf.Bytes()
-		if len(body) > 0 && body[0] == '[' && b == 'm' {
+		if len(body) > 0 && body[0] == '[' && b == 'm' && p.renderMode != RenderLiteral {
 			p.processSGR(string(body[1:]))
+		} else if p.showsUnsupportedSequences() {
+			p.emitEscapeVisible([]byte{b})
+			return
 		}
 		p.buf.Reset()
 		p.setStep(modeInit, p.stateInit)
 		return
 	}
 
+	if p.showsUnsupportedSequences() {
+		p.emitEscapeVisible([]byte{b})
+		return
+	}
 	p.buf.Reset()
 	p.setStep(modeInit, p.stateInit)
-	p.emitControl(b, p.offset)
 }
 
 func (p *Parser) stateOSC(b byte) {
 	switch b {
 	case 0x07:
-		p.emitOSCVisible(true, false)
+		if p.showsUnsupportedSequences() {
+			p.emitEscapeVisible([]byte{0x07})
+			return
+		}
+		p.buf.Reset()
+		p.setStep(modeInit, p.stateInit)
 	case 0x9c:
-		p.emitOSCVisible(false, true)
+		if p.showsUnsupportedSequences() {
+			p.emitEscapeVisible([]byte{0x1b, '\\'})
+			return
+		}
+		p.buf.Reset()
+		p.setStep(modeInit, p.stateInit)
 	case '\\':
 		buf := p.buf.Bytes()
 		if len(buf) > 0 && buf[len(buf)-1] == 0x1b {
 			p.buf.Truncate(p.buf.Len() - 1)
-			p.emitOSCVisible(false, true)
+			if p.showsUnsupportedSequences() {
+				p.emitEscapeVisible([]byte{0x1b, '\\'})
+				return
+			}
+			p.buf.Reset()
+			p.setStep(modeInit, p.stateInit)
 			return
 		}
 		p.buf.WriteByte(b)
@@ -207,12 +250,24 @@ func (p *Parser) stateOSC(b byte) {
 func (p *Parser) stateStr(b byte) {
 	switch b {
 	case 0x07, 0x9c:
+		if p.showsUnsupportedSequences() {
+			final := []byte{b}
+			if b == 0x9c {
+				final = []byte{0x1b, '\\'}
+			}
+			p.emitEscapeVisible(final)
+			return
+		}
 		p.buf.Reset()
 		p.setStep(modeInit, p.stateInit)
 	case '\\':
 		buf := p.buf.Bytes()
 		if len(buf) > 0 && buf[len(buf)-1] == 0x1b {
 			p.buf.Truncate(p.buf.Len() - 1)
+			if p.showsUnsupportedSequences() {
+				p.emitEscapeVisible([]byte{0x1b, '\\'})
+				return
+			}
 			p.buf.Reset()
 			p.setStep(modeInit, p.stateInit)
 			return
@@ -267,6 +322,9 @@ func (p *Parser) emitLiteralByte(b byte, offset int64) {
 }
 
 func (p *Parser) emitControl(b byte, offset int64) {
+	if p.renderMode == RenderPresentation {
+		return
+	}
 	if r, ok := controlPicture(b); ok {
 		p.emitRune(r, offset)
 		return
@@ -274,20 +332,20 @@ func (p *Parser) emitControl(b byte, offset int64) {
 	p.emitRune(utf8.RuneError, offset)
 }
 
-func (p *Parser) emitOSCVisible(showBEL bool, showST bool) {
+func (p *Parser) emitEscapeVisible(final []byte) {
 	p.emitControl(0x1b, p.offset)
 	for _, b := range p.buf.Bytes() {
 		p.emitLiteralByte(b, p.offset)
 	}
-	if showBEL {
-		p.emitControl(0x07, p.offset)
-	}
-	if showST {
-		p.emitControl(0x1b, p.offset)
-		p.emitLiteralByte('\\', p.offset)
+	for _, b := range final {
+		p.emitLiteralByte(b, p.offset)
 	}
 	p.buf.Reset()
 	p.setStep(modeInit, p.stateInit)
+}
+
+func (p *Parser) showsUnsupportedSequences() bool {
+	return p.renderMode != RenderPresentation
 }
 
 func controlPicture(b byte) (rune, bool) {
