@@ -4,12 +4,10 @@
 package goless
 
 import (
-	_ "embed"
 	"fmt"
-)
 
-//go:embed assets/help.txt
-var defaultHelpBody string
+	"github.com/gdamore/goless/internal/defaults"
+)
 
 // Text controls the user-facing text and indicators used by the pager UI.
 // Embedders can replace any of these values, including the help content.
@@ -40,7 +38,7 @@ func DefaultText() Text {
 	return Text{
 		HelpTitle: "Help",
 		HelpClose: "Esc/q/H/F1 close",
-		HelpBody:  defaultHelpBody,
+		HelpBody:  defaults.HelpBody,
 		StatusSearchInfo: func(query string, current, total int) string {
 			return fmt.Sprintf("/%s %d/%d", query, current, total)
 		},

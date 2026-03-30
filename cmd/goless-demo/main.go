@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/gdamore/goless"
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/goless/internal/view"
@@ -24,10 +25,14 @@ func main() {
 
 func run() error {
 	doc := model.NewDocument(32 * 1024)
+	var chromeName string
+	var title string
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [file]\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-chrome none|single|rounded] [-title text] [file]\n")
 	}
+	flag.StringVar(&chromeName, "chrome", "none", "chrome style: none, single, rounded")
+	flag.StringVar(&title, "title", "", "frame title")
 	flag.Parse()
 
 	var (
@@ -62,6 +67,7 @@ func run() error {
 	viewer := view.New(doc, view.Config{
 		TabWidth:   8,
 		WrapMode:   layout.NoWrap,
+		Chrome:     demoChrome(chromeName, title),
 		ShowStatus: true,
 	})
 
@@ -137,4 +143,30 @@ func stdinIsTerminal() bool {
 		return false
 	}
 	return info.Mode()&os.ModeCharDevice != 0
+}
+
+func demoChrome(name, title string) view.Chrome {
+	chrome := view.Chrome{Title: title}
+
+	var frame goless.Frame
+	switch name {
+	case "single":
+		frame = goless.SingleFrame()
+	case "rounded":
+		frame = goless.RoundedFrame()
+	case "none", "":
+		return chrome
+	default:
+		return chrome
+	}
+
+	chrome.Frame = view.Frame{
+		Horizontal:  frame.Horizontal,
+		Vertical:    frame.Vertical,
+		TopLeft:     frame.TopLeft,
+		TopRight:    frame.TopRight,
+		BottomLeft:  frame.BottomLeft,
+		BottomRight: frame.BottomRight,
+	}
+	return chrome
 }

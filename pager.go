@@ -30,6 +30,8 @@ type Config struct {
 	TabWidth int
 	// WrapMode selects horizontal scrolling or soft wrapping.
 	WrapMode WrapMode
+	// Chrome configures optional body framing and title display.
+	Chrome Chrome
 	// ShowStatus enables the status bar on the last screen row.
 	ShowStatus bool
 	// Text controls user-facing text, help content, and UI indicators.
@@ -51,6 +53,7 @@ func New(cfg Config) *Pager {
 		viewer: iview.New(doc, iview.Config{
 			TabWidth:   cfg.TabWidth,
 			WrapMode:   toInternalWrapMode(cfg.WrapMode),
+			Chrome:     toInternalChrome(cfg.Chrome),
 			ShowStatus: cfg.ShowStatus,
 			Text:       toInternalText(cfg.Text),
 		}),
@@ -243,5 +246,21 @@ func toInternalText(text Text) iview.Text {
 		CommandLine:            text.CommandLine,
 		LeftOverflowIndicator:  text.LeftOverflowIndicator,
 		RightOverflowIndicator: text.RightOverflowIndicator,
+	}
+}
+
+func toInternalChrome(chrome Chrome) iview.Chrome {
+	return iview.Chrome{
+		Title:       chrome.Title,
+		BorderStyle: chrome.BorderStyle,
+		TitleStyle:  chrome.TitleStyle,
+		Frame: iview.Frame{
+			Horizontal:  chrome.Frame.Horizontal,
+			Vertical:    chrome.Frame.Vertical,
+			TopLeft:     chrome.Frame.TopLeft,
+			TopRight:    chrome.Frame.TopRight,
+			BottomLeft:  chrome.Frame.BottomLeft,
+			BottomRight: chrome.Frame.BottomRight,
+		},
 	}
 }
