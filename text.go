@@ -12,25 +12,41 @@ import (
 // Text controls the user-facing text and indicators used by the pager UI.
 // Embedders can replace any of these values, including the help content.
 type Text struct {
+	// HelpTitle is shown in the help overlay title area.
 	HelpTitle string
+	// HelpClose is shown in the help overlay as a close hint.
 	HelpClose string
-	HelpBody  string
+	// HelpBody is the body text rendered in the help overlay.
+	HelpBody string
 
+	// StatusSearchInfo formats the left-side status text for an active search.
 	StatusSearchInfo func(query string, current, total int) string
-	StatusPosition   func(current, total, column int) string
-	FollowMode       string
+	// StatusPosition formats the right-side position text in the status bar.
+	StatusPosition func(current, total, column int) string
+	// FollowMode is appended to the status bar while follow mode is active.
+	FollowMode string
 
-	SearchEmpty      string
-	SearchNotFound   func(query string) string
+	// SearchEmpty is shown when an empty search is submitted.
+	SearchEmpty string
+	// SearchNotFound formats the message shown when no search match is found.
+	SearchNotFound func(query string) string
+	// SearchMatchCount formats the message shown after a successful search.
 	SearchMatchCount func(query string, count int) string
-	SearchNone       string
+	// SearchNone is shown when repeat-search is invoked without an active query.
+	SearchNone string
 
-	CommandUnknown    func(command string) string
-	CommandLineStart  string
+	// CommandUnknown formats the message shown for an unknown ':' command.
+	CommandUnknown func(command string) string
+	// CommandLineStart is shown when a line jump less than 1 is requested.
+	CommandLineStart string
+	// CommandOutOfRange formats the message shown for an out-of-range line jump.
 	CommandOutOfRange func(line int) string
-	CommandLine       func(line int) string
+	// CommandLine formats the message shown after a successful line jump.
+	CommandLine func(line int) string
 
-	LeftOverflowIndicator  string
+	// LeftOverflowIndicator marks undisplayed content to the left in no-wrap mode.
+	LeftOverflowIndicator string
+	// RightOverflowIndicator marks undisplayed content to the right in no-wrap mode.
 	RightOverflowIndicator string
 }
 

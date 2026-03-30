@@ -546,3 +546,4 @@ These should be settled early:
 3. Implement the source abstraction and buffering adapter for `io.Reader`.
 4. Build the ANSI/SGR parser with tests before any full-screen UI work.
 5. Add a minimal demo that renders sanitized plain content through `tcell`.
+6. Write a substantial README once the public API and demo usage stabilize a bit further.
