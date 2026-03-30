@@ -172,6 +172,16 @@ func (p *Pager) GoBottom() {
 	p.viewer.GoBottom()
 }
 
+// Follow pins the viewport to the end of the document as new content arrives.
+func (p *Pager) Follow() {
+	p.viewer.Follow()
+}
+
+// Following reports whether follow mode is active.
+func (p *Pager) Following() bool {
+	return p.viewer.Following()
+}
+
 func toInternalWrapMode(mode WrapMode) layout.WrapMode {
 	switch mode {
 	case SoftWrap:
@@ -198,6 +208,9 @@ func toInternalText(text Text) iview.Text {
 	}
 	if text.StatusPosition == nil {
 		text.StatusPosition = defaults.StatusPosition
+	}
+	if text.FollowMode == "" {
+		text.FollowMode = defaults.FollowMode
 	}
 	if text.SearchEmpty == "" {
 		text.SearchEmpty = defaults.SearchEmpty
@@ -236,6 +249,7 @@ func toInternalText(text Text) iview.Text {
 		HelpBody:               text.HelpBody,
 		StatusSearchInfo:       text.StatusSearchInfo,
 		StatusPosition:         text.StatusPosition,
+		FollowMode:             text.FollowMode,
 		SearchEmpty:            text.SearchEmpty,
 		SearchNotFound:         text.SearchNotFound,
 		SearchMatchCount:       text.SearchMatchCount,

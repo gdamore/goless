@@ -38,6 +38,7 @@ type Viewer struct {
 	height     int
 	rowOffset  int
 	colOffset  int
+	follow     bool
 	helpOffset int
 }
 
@@ -72,6 +73,10 @@ func (v *Viewer) SetSize(width, height int) {
 // Refresh rebuilds the derived layout using the current document contents.
 func (v *Viewer) Refresh() {
 	v.relayout()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+	}
 }
 
 // Draw renders the current viewport.
@@ -149,11 +154,15 @@ func (v *Viewer) HandleKey(ev *tcell.EventKey) bool {
 	case actionPromptCommand:
 		v.beginPrompt(promptCommand)
 	case actionSearchNext:
+		v.follow = false
 		v.repeatSearch(v.search.Forward)
 	case actionSearchPrev:
+		v.follow = false
 		v.repeatSearch(!v.search.Forward)
 	case actionToggleHelp:
 		v.toggleHelp()
+	case actionFollow:
+		v.Follow()
 	}
 
 	return false
@@ -177,6 +186,11 @@ func (v *Viewer) ToggleWrap() {
 		}
 	}
 	v.relayout()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+		return
+	}
 	v.restoreAnchor(anchor)
 }
 
@@ -185,11 +199,15 @@ func (v *Viewer) ScrollDown(n int) {
 	v.ensureLayout()
 	v.rowOffset += max(n, 0)
 	v.clampOffsets()
+	v.updateFollowAtBottom()
 }
 
 // ScrollUp moves the viewport up.
 func (v *Viewer) ScrollUp(n int) {
 	v.ensureLayout()
+	if n > 0 {
+		v.follow = false
+	}
 	v.rowOffset -= max(n, 0)
 	v.clampOffsets()
 }
@@ -226,6 +244,7 @@ func (v *Viewer) PageUp() {
 
 // GoTop moves the viewport to the beginning of the document.
 func (v *Viewer) GoTop() {
+	v.follow = false
 	v.rowOffset = 0
 	v.clampOffsets()
 }
@@ -234,7 +253,18 @@ func (v *Viewer) GoTop() {
 func (v *Viewer) GoBottom() {
 	v.ensureLayout()
 	v.rowOffset = v.maxRowOffset()
+	v.follow = true
 	v.clampOffsets()
+}
+
+// Follow enables follow mode and pins the viewport to the end of the document.
+func (v *Viewer) Follow() {
+	v.GoBottom()
+}
+
+// Following reports whether follow mode is active.
+func (v *Viewer) Following() bool {
+	return v.follow
 }
 
 func (v *Viewer) ensureLayout() {
@@ -519,6 +549,13 @@ func (v *Viewer) statusText() (left, right string) {
 		searchInfo = v.text.StatusSearchInfo(v.search.Query, position, len(v.search.Matches))
 	}
 	left = searchInfo
+	if v.follow {
+		if left != "" {
+			left = v.text.FollowMode + "  " + left
+		} else {
+			left = v.text.FollowMode
+		}
+	}
 	if v.message != "" {
 		if left != "" {
 			left += "  "
@@ -629,6 +666,10 @@ func (v *Viewer) toggleHelp() {
 	}
 	v.mode = modeHelp
 	v.helpOffset = 0
+}
+
+func (v *Viewer) updateFollowAtBottom() {
+	v.follow = v.rowOffset == v.maxRowOffset()
 }
 
 func styleForGrapheme(line model.Line, runeIndex int) ansi.Style {
