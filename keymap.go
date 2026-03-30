@@ -7,8 +7,6 @@ package goless
 type KeyGroup int
 
 const (
-	// DefaultKeyGroup selects the pager's default bundled key bindings.
-	DefaultKeyGroup KeyGroup = iota
-	// LessKeyGroup selects the pager's less-like bundled key bindings.
-	LessKeyGroup
+	DefaultKeyGroup KeyGroup = iota // DefaultKeyGroup selects the pager's default bundled key bindings.
+	LessKeyGroup                    // LessKeyGroup selects the pager's less-like bundled key bindings.
 )

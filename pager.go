@@ -21,24 +21,20 @@ type WrapMode int
 const (
 	// NoWrap preserves logical lines and allows horizontal scrolling.
 	NoWrap WrapMode = WrapMode(layout.NoWrap)
+
 	// SoftWrap wraps logical lines to the current viewport width.
 	SoftWrap WrapMode = WrapMode(layout.SoftWrap)
 )
 
 // Config configures a Pager.
 type Config struct {
-	// TabWidth controls tab expansion during layout. Values <= 0 default to 8.
-	TabWidth int
-	// WrapMode selects horizontal scrolling or soft wrapping.
-	WrapMode WrapMode
-	// KeyGroup selects a bundled set of key bindings.
-	KeyGroup KeyGroup
-	// RenderMode controls how escapes and control sequences are presented.
-	RenderMode RenderMode
-	// Chrome configures optional body framing and title display.
-	Chrome Chrome
-	// ShowStatus enables the status bar on the last screen row.
-	ShowStatus bool
+	TabWidth   int        // TabWidth controls tab expansion during layout. Values <= 0 default to 8.
+	WrapMode   WrapMode   // WrapMode selects horizontal scrolling or soft wrapping.
+	KeyGroup   KeyGroup   // KeyGroup selects a bundled set of key bindings.
+	RenderMode RenderMode // RenderMode controls how escapes and control sequences are presented.
+	Chrome     Chrome     // Chrome configures optional body framing and title display.
+	ShowStatus bool       // ShowStatus enables the status bar on the last screen row.
+
 	// Text controls user-facing text, help content, and UI indicators.
 	// Zero values are filled from DefaultText.
 	Text Text
@@ -51,6 +47,9 @@ type Pager struct {
 }
 
 // New constructs a Pager with the supplied configuration.
+//
+// The zero value of Config is valid. Missing optional configuration such as
+// text bundles, key groups, and tab width are filled with pager defaults.
 func New(cfg Config) *Pager {
 	doc := model.NewDocumentWithMode(defaultChunkSize, toInternalRenderMode(cfg.RenderMode))
 	return &Pager{
