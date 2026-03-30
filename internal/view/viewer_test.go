@@ -348,6 +348,41 @@ func TestViewerUsesCustomTextBundle(t *testing.T) {
 	}
 }
 
+func TestDrawHelpRespectsFrameInsets(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Chrome: Chrome{
+			Frame: Frame{
+				Horizontal:  "─",
+				Vertical:    "│",
+				TopLeft:     "╭",
+				TopRight:    "╮",
+				BottomLeft:  "╰",
+				BottomRight: "╯",
+			},
+		},
+	})
+	v.SetSize(20, 6)
+	v.toggleHelp()
+
+	_, screen := newMockScreen(t, 20, 6)
+	defer screen.Fini()
+
+	v.Draw(screen)
+
+	if got := cellRune(screen, 0, 0); got != '╭' {
+		t.Fatalf("top-left border rune = %q, want %q", got, '╭')
+	}
+	if got := cellRune(screen, 0, 1); got != '│' {
+		t.Fatalf("left border rune = %q, want %q", got, '│')
+	}
+	if got := cellRune(screen, 1, 1); got != 'N' {
+		t.Fatalf("help body rune = %q, want %q", got, 'N')
+	}
+}
+
 func TestStatusShowsRightOverflowIndicator(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyz")); err != nil {
