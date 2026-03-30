@@ -31,6 +31,8 @@ type Config struct {
 	TabWidth int
 	// WrapMode selects horizontal scrolling or soft wrapping.
 	WrapMode WrapMode
+	// KeyGroup selects a bundled set of key bindings.
+	KeyGroup KeyGroup
 	// RenderMode controls how escapes and control sequences are presented.
 	RenderMode RenderMode
 	// Chrome configures optional body framing and title display.
@@ -56,6 +58,7 @@ func New(cfg Config) *Pager {
 		viewer: iview.New(doc, iview.Config{
 			TabWidth:   cfg.TabWidth,
 			WrapMode:   toInternalWrapMode(cfg.WrapMode),
+			KeyGroup:   toInternalKeyGroup(cfg.KeyGroup),
 			Chrome:     toInternalChrome(cfg.Chrome),
 			ShowStatus: cfg.ShowStatus,
 			Text:       toInternalText(cfg.Text),
@@ -191,6 +194,15 @@ func toInternalWrapMode(mode WrapMode) layout.WrapMode {
 		return layout.SoftWrap
 	default:
 		return layout.NoWrap
+	}
+}
+
+func toInternalKeyGroup(group KeyGroup) iview.KeyGroup {
+	switch group {
+	case LessKeyGroup:
+		return iview.KeyGroupLess
+	default:
+		return iview.KeyGroupLess
 	}
 }
 

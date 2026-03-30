@@ -42,6 +42,43 @@ func TestToggleWrapPreservesAnchor(t *testing.T) {
 	}
 }
 
+func TestLessKeyMapGoBottom(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune("G"))
+
+	if got, want := v.firstVisibleAnchor().LineIndex, 3; got != want {
+		t.Fatalf("visible line after G = %d, want %d", got, want)
+	}
+}
+
+func TestLessKeyMapHelpScrollsAndCloses(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("hello\nworld\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+	v.mode = modeHelp
+
+	v.HandleKey(keyKey(tcell.KeyDown))
+	if got, want := v.helpOffset, 1; got != want {
+		t.Fatalf("help offset after down = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("H"))
+	if got, want := v.mode, modeNormal; got != want {
+		t.Fatalf("mode after H = %v, want %v", got, want)
+	}
+}
+
 func TestToggleWrapToNoWrapRestoresHorizontalAnchor(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("ab界cd")); err != nil {
