@@ -415,6 +415,22 @@ func TestCancelPromptPreservesFollowMode(t *testing.T) {
 	}
 }
 
+func TestSearchRepeatWithoutActiveSearchPreservesFollowMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.Follow()
+	v.HandleKey(keyRune("n"))
+
+	if !v.Following() {
+		t.Fatalf("follow mode = false, want true")
+	}
+}
+
 func TestToggleHelpMode(t *testing.T) {
 	doc := model.NewDocument(4)
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})

@@ -154,10 +154,14 @@ func (v *Viewer) HandleKey(ev *tcell.EventKey) bool {
 	case actionPromptCommand:
 		v.beginPrompt(promptCommand)
 	case actionSearchNext:
-		v.follow = false
+		if len(v.search.Matches) > 0 {
+			v.follow = false
+		}
 		v.repeatSearch(v.search.Forward)
 	case actionSearchPrev:
-		v.follow = false
+		if len(v.search.Matches) > 0 {
+			v.follow = false
+		}
 		v.repeatSearch(!v.search.Forward)
 	case actionToggleHelp:
 		v.toggleHelp()
