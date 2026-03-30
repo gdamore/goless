@@ -537,6 +537,7 @@ These should be settled early:
 3. Should unknown-size streaming sources be fully buffered before interaction, or should interaction begin while buffering continues?
 4. What visible glyph policy should be used for control characters?
 5. Should the public package expose parser primitives, or keep them internal?
+6. When public keymap customization is exposed, should the API support only bundled key groups, full replacement keymaps, or layered overrides on top of bundled groups?
 
 ## Immediate Next Steps
 

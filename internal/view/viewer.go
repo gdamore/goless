@@ -18,6 +18,7 @@ import (
 type Config struct {
 	TabWidth   int
 	WrapMode   layout.WrapMode
+	KeyGroup   KeyGroup
 	Chrome     Chrome
 	ShowStatus bool
 	Text       Text
@@ -32,6 +33,7 @@ type Viewer struct {
 	message    string
 	search     searchState
 	text       Text
+	keys       keyMap
 	lines      []model.Line
 	layout     layout.Result
 	width      int
@@ -53,6 +55,7 @@ func New(doc *model.Document, cfg Config) *Viewer {
 		doc:  doc,
 		cfg:  cfg,
 		text: cfg.Text,
+		keys: defaultKeyMap(cfg.KeyGroup),
 	}
 }
 
@@ -126,7 +129,7 @@ func (v *Viewer) HandleKey(ev *tcell.EventKey) bool {
 		return v.handlePromptKey(ev)
 	}
 
-	switch actionForKey(ev) {
+	switch v.keys.normalAction(ev) {
 	case actionQuit:
 		return true
 	case actionScrollUp:
@@ -604,31 +607,24 @@ func (v *Viewer) helpFrameTitle() string {
 }
 
 func (v *Viewer) handleHelpKey(ev *tcell.EventKey) bool {
-	switch ev.Key() {
-	case tcell.KeyEscape:
+	switch v.keys.helpAction(ev) {
+	case actionQuit:
+		return true
+	case actionToggleHelp:
 		v.toggleHelp()
 		return false
-	case tcell.KeyCtrlC:
-		return true
-	case tcell.KeyUp:
+	case actionScrollUp:
 		v.helpOffset--
-	case tcell.KeyDown:
+	case actionScrollDown:
 		v.helpOffset++
-	case tcell.KeyPgUp:
+	case actionPageUp:
 		v.helpOffset -= max(v.height-2, 1)
-	case tcell.KeyPgDn:
+	case actionPageDown:
 		v.helpOffset += max(v.height-2, 1)
-	case tcell.KeyHome:
+	case actionGoTop:
 		v.helpOffset = 0
-	case tcell.KeyEnd:
+	case actionGoBottom:
 		v.helpOffset = v.maxHelpOffset()
-	case tcell.KeyF1:
-		v.toggleHelp()
-	case tcell.KeyRune:
-		switch ev.Str() {
-		case "q", "H":
-			v.toggleHelp()
-		}
 	}
 	v.clampHelpOffset()
 	return false
