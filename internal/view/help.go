@@ -3,21 +3,14 @@
 
 package view
 
-import (
-	"strings"
-
-	"github.com/gdamore/tcell/v3"
-)
+import "github.com/gdamore/tcell/v3"
 
 func (v *Viewer) drawHelp(screen tcell.Screen) {
 	titleStyle := tcell.StyleDefault.Reverse(true)
 	bodyStyle := tcell.StyleDefault
 	if v.width > 0 {
 		title := " " + v.text.HelpTitle + "  " + v.text.HelpClose
-		if len(title) < v.width {
-			title += strings.Repeat(" ", v.width-len(title))
-		}
-		screen.PutStrStyled(0, 0, truncateToWidth(title, v.width), titleStyle)
+		screen.PutStrStyled(0, 0, padRightToWidth(title, v.width), titleStyle)
 	}
 
 	lines := v.text.helpLines()

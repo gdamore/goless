@@ -4,13 +4,16 @@
 package view
 
 import (
+	"runtime"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/tcell/v3"
 	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/gdamore/tcell/v3/vt"
 )
 
 func TestToggleWrapPreservesAnchor(t *testing.T) {
@@ -404,10 +407,161 @@ func TestStatusTextPlacesPositionOnRight(t *testing.T) {
 	}
 }
 
+func TestStatusBarUsesDisplayWidthForRightAlignedText(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		Text: Text{
+			StatusPosition: func(current, total, column int) string {
+				return "界a"
+			},
+		},
+	})
+	v.SetSize(10, 2)
+	v.relayout()
+
+	_, screen := newMockScreen(t, 10, 2)
+	defer screen.Fini()
+
+	v.drawStatus(screen, 1)
+
+	if got := cellRune(screen, 6, 1); got != '界' {
+		t.Fatalf("status rune at expected start = %q, want %q", got, '界')
+	}
+}
+
+func TestTruncateToWidthUsesDisplayCellsAndPreservesUTF8(t *testing.T) {
+	got := truncateToWidth("é界b", 2)
+	if !utf8.ValidString(got) {
+		t.Fatalf("truncateToWidth produced invalid UTF-8: %q", got)
+	}
+	if got != "é" {
+		t.Fatalf("truncateToWidth = %q, want %q", got, "é")
+	}
+}
+
+func TestDrawFrameInsetsContentAndRendersTitle(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("hi\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Chrome: Chrome{
+			Title: "Doc",
+			Frame: Frame{
+				Horizontal:  "─",
+				Vertical:    "│",
+				TopLeft:     "╭",
+				TopRight:    "╮",
+				BottomLeft:  "╰",
+				BottomRight: "╯",
+			},
+		},
+	})
+	v.SetSize(10, 4)
+
+	_, screen := newMockScreen(t, 10, 4)
+	defer screen.Fini()
+
+	v.Draw(screen)
+
+	if got := cellRune(screen, 0, 0); got != '╭' {
+		t.Fatalf("top-left border rune = %q, want %q", got, '╭')
+	}
+	if got := cellRune(screen, 2, 0); got != 'D' {
+		t.Fatalf("title rune = %q, want %q", got, 'D')
+	}
+	if got := cellRune(screen, 0, 1); got != '│' {
+		t.Fatalf("left border rune = %q, want %q", got, '│')
+	}
+	if got := cellRune(screen, 1, 1); got != 'h' {
+		t.Fatalf("content rune = %q, want %q", got, 'h')
+	}
+}
+
+func TestDrawFrameUsesBorderAndTitleStyles(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("hi\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	borderStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(4))
+	titleStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(15)).Bold(true)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Chrome: Chrome{
+			Title:       "Doc",
+			BorderStyle: borderStyle,
+			TitleStyle:  titleStyle,
+			Frame: Frame{
+				Horizontal:  "─",
+				Vertical:    "│",
+				TopLeft:     "┌",
+				TopRight:    "┐",
+				BottomLeft:  "└",
+				BottomRight: "┘",
+			},
+		},
+	})
+	v.SetSize(10, 4)
+
+	_, screen := newMockScreen(t, 10, 4)
+	defer screen.Fini()
+
+	v.Draw(screen)
+
+	_, borderCellStyle, _ := screen.Get(0, 0)
+	if got, want := borderCellStyle.GetForeground(), borderStyle.GetForeground(); got != want {
+		t.Fatalf("border foreground = %v, want %v", got, want)
+	}
+
+	_, titleCellStyle, _ := screen.Get(2, 0)
+	if got, want := titleCellStyle.GetForeground(), titleStyle.GetForeground(); got != want {
+		t.Fatalf("title foreground = %v, want %v", got, want)
+	}
+	if !titleCellStyle.HasBold() {
+		t.Fatalf("title style should be bold")
+	}
+}
+
 func keyRune(s string) *tcell.EventKey {
 	return tcell.NewEventKey(tcell.KeyRune, s, tcell.ModNone)
 }
 
 func keyKey(k tcell.Key) *tcell.EventKey {
 	return tcell.NewEventKey(k, "", tcell.ModNone)
+}
+
+func cellRune(screen tcell.Screen, x, y int) rune {
+	str, _, _ := screen.Get(x, y)
+	if str == "" {
+		return 0
+	}
+	return []rune(str)[0]
+}
+
+func newMockScreen(t *testing.T, width, height int) (vt.MockTerm, tcell.Screen) {
+	t.Helper()
+	if runtime.GOOS == "js" {
+		t.Skip("not supported on webasm")
+	}
+	term := vt.NewMockTerm(vt.MockOptSize{X: vt.Col(width), Y: vt.Row(height)})
+	screen, err := tcell.NewTerminfoScreenFromTty(term)
+	if err != nil {
+		t.Fatalf("failed to get mock screen: %v", err)
+	}
+	if err := screen.Init(); err != nil {
+		t.Fatalf("failed to initialize mock screen: %v", err)
+	}
+	return term, screen
 }

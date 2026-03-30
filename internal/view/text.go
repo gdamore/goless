@@ -6,6 +6,8 @@ package view
 import (
 	"fmt"
 	"strings"
+
+	"github.com/gdamore/goless/internal/defaults"
 )
 
 // Text controls user-facing text and indicators inside the viewer.
@@ -95,24 +97,7 @@ func defaultText() Text {
 	return Text{
 		HelpTitle: "Help",
 		HelpClose: "Esc/q/H/F1 close",
-		HelpBody: `Navigation
-Up/Down, j/k: move
-Left/Right, h/l: scroll horizontally
-PgUp/PgDn, b/f, Space: page
-g/G: top/bottom
-w: toggle wrap
-
-Search
-/: search forward
-?: search backward
-n/N: next/previous match
-
-Commands
-:123: jump to line 123
-
-General
-H or F1: help
-q or Esc: quit`,
+		HelpBody:  defaults.HelpBody,
 		StatusSearchInfo: func(query string, current, total int) string {
 			return fmt.Sprintf("/%s %d/%d", query, current, total)
 		},

@@ -11,12 +11,14 @@ import (
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/tcell/v3"
 	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/rivo/uniseg"
 )
 
 // Config controls viewer behavior.
 type Config struct {
 	TabWidth   int
 	WrapMode   layout.WrapMode
+	Chrome     Chrome
 	ShowStatus bool
 	Text       Text
 }
@@ -44,6 +46,7 @@ func New(doc *model.Document, cfg Config) *Viewer {
 	if cfg.TabWidth <= 0 {
 		cfg.TabWidth = 8
 	}
+	cfg.Chrome = cfg.Chrome.withDefaults()
 	cfg.Text = cfg.Text.withDefaults()
 	return &Viewer{
 		doc:  doc,
@@ -77,18 +80,21 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 	screen.Clear()
 
 	if v.mode == modeHelp {
+		v.drawFrame(screen, v.helpFrameTitle())
 		v.drawHelp(screen)
 		screen.Sync()
 		return
 	}
 
-	bodyHeight := v.bodyHeight()
+	v.drawFrame(screen, v.cfg.Chrome.Title)
+
+	bodyX, bodyY, _, bodyHeight := v.contentRect()
 	for y := 0; y < bodyHeight; y++ {
 		rowIndex := v.rowOffset + y
 		if rowIndex >= len(v.layout.Rows) {
 			break
 		}
-		v.drawRow(screen, y, v.layout.Rows[rowIndex])
+		v.drawRow(screen, bodyX, bodyY+y, v.layout.Rows[rowIndex])
 	}
 
 	if v.height > 0 {
@@ -240,7 +246,7 @@ func (v *Viewer) ensureLayout() {
 func (v *Viewer) relayout() {
 	v.lines = v.doc.Lines()
 	v.layout = layout.Build(v.lines, layout.Config{
-		Width:            max(v.width, 1),
+		Width:            max(v.contentWidth(), 1),
 		TabWidth:         v.cfg.TabWidth,
 		WrapMode:         v.cfg.WrapMode,
 		HorizontalOffset: v.horizontalOffset(),
@@ -286,17 +292,12 @@ func (v *Viewer) maxColOffset() int {
 			maxCells = line.TotalCells
 		}
 	}
-	return max(maxCells-max(v.width, 1), 0)
+	return max(maxCells-max(v.contentWidth(), 1), 0)
 }
 
 func (v *Viewer) bodyHeight() int {
-	if v.height <= 0 {
-		return 0
-	}
-	if (v.cfg.ShowStatus || v.mode == modePrompt) && v.height > 1 {
-		return v.height - 1
-	}
-	return v.height
+	_, _, _, h := v.contentRect()
+	return h
 }
 
 func (v *Viewer) firstVisibleAnchor() layout.Anchor {
@@ -332,7 +333,7 @@ func (v *Viewer) revealAnchor(anchor layout.Anchor) {
 	v.clampOffsets()
 }
 
-func (v *Viewer) drawRow(screen tcell.Screen, y int, row layout.VisualRow) {
+func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow) {
 	if row.LineIndex < 0 || row.LineIndex >= len(v.lines) {
 		return
 	}
@@ -349,9 +350,10 @@ func (v *Viewer) drawRow(screen tcell.Screen, y int, row layout.VisualRow) {
 			cellStyle = applyMatchCellStyle(cellStyle, current)
 		}
 		x := segment.RenderedCellFrom
-		if x >= v.width {
+		if x >= v.contentWidth() {
 			break
 		}
+		x += baseX
 
 		if segment.Display != "" {
 			screen.PutStrStyled(x, y, segment.Display, cellStyle)
@@ -367,31 +369,144 @@ func (v *Viewer) drawRow(screen tcell.Screen, y int, row layout.VisualRow) {
 	}
 }
 
+func (v *Viewer) drawFrame(screen tcell.Screen, title string) {
+	frame := v.cfg.Chrome.Frame
+	if !frame.enabled() || v.width <= 0 {
+		return
+	}
+	if v.height-v.bottomBarRows() < 2 {
+		return
+	}
+
+	topY := 0
+	bottomY := v.height - v.bottomBarRows() - 1
+	if bottomY <= topY {
+		return
+	}
+
+	borderStyle := v.cfg.Chrome.BorderStyle
+	titleStyle := v.cfg.Chrome.TitleStyle
+	if v.width == 1 {
+		screen.PutStrStyled(0, topY, fallback(frame.TopLeft, frame.Horizontal, frame.Vertical), borderStyle)
+		if bottomY != topY {
+			screen.PutStrStyled(0, bottomY, fallback(frame.BottomLeft, frame.Horizontal, frame.Vertical), borderStyle)
+		}
+		return
+	}
+
+	top := frameLine(v.width, frame.TopLeft, frame.Horizontal, frame.TopRight)
+	bottom := frameLine(v.width, frame.BottomLeft, frame.Horizontal, frame.BottomRight)
+	screen.PutStrStyled(0, topY, top, borderStyle)
+	screen.PutStrStyled(0, bottomY, bottom, borderStyle)
+	if label, x := frameTitleLabel(title, v.width); label != "" {
+		screen.PutStrStyled(x, topY, label, titleStyle)
+	}
+
+	side := fallback(frame.Vertical, "│")
+	for y := topY + 1; y < bottomY; y++ {
+		screen.PutStrStyled(0, y, side, borderStyle)
+		screen.PutStrStyled(v.width-1, y, side, borderStyle)
+	}
+}
+
 func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 	style := statusBarStyle
 	screen.PutStrStyled(0, y, strings.Repeat(" ", max(v.width, 0)), style)
 
-	left, right := v.statusOverflow()
-	if left && v.width > 1 {
-		screen.PutStrStyled(1, y, v.text.LeftOverflowIndicator, style)
-	}
-	if right && v.width > 2 {
-		screen.PutStrStyled(v.width-2, y, v.text.RightOverflowIndicator, style)
+	leftOverflow, rightOverflow := v.statusOverflow()
+	leftText, rightText := v.statusText()
+
+	leftIndicatorWidth := 0
+	if leftOverflow {
+		leftIndicatorWidth = stringWidth(v.text.LeftOverflowIndicator)
+		if leftIndicatorWidth > 0 && v.width > 1 {
+			screen.PutStrStyled(1, y, truncateToWidth(v.text.LeftOverflowIndicator, v.width-1), style)
+		}
 	}
 
-	leftText, rightText := v.statusText()
-	leftStart := 2
-	rightStart := v.width - 3 - len(rightText)
+	rightIndicatorWidth := 0
+	rightIndicatorStart := v.width - 1
+	if rightOverflow {
+		rightIndicatorWidth = stringWidth(v.text.RightOverflowIndicator)
+		rightIndicatorStart = max(v.width-1-rightIndicatorWidth, 0)
+		if rightIndicatorWidth > 0 && rightIndicatorStart < v.width-1 {
+			screen.PutStrStyled(rightIndicatorStart, y, truncateToWidth(v.text.RightOverflowIndicator, v.width-1-rightIndicatorStart), style)
+		}
+	}
+
+	leftStart := 2 + leftIndicatorWidth
+	rightLimit := v.width - 1
+	if rightOverflow {
+		rightLimit = rightIndicatorStart - 1
+	}
+	if rightLimit < leftStart {
+		rightLimit = leftStart
+	}
+
+	rightTextWidth := min(stringWidth(rightText), max(rightLimit-leftStart, 0))
+	rightText = truncateToWidth(rightText, rightTextWidth)
+	rightStart := rightLimit - stringWidth(rightText)
 	if rightStart < leftStart {
 		rightStart = leftStart
 	}
+
 	leftWidth := max(rightStart-leftStart-1, 0)
 	if leftWidth > 0 {
 		screen.PutStrStyled(leftStart, y, truncateToWidth(leftText, leftWidth), style)
 	}
-	if rightText != "" && rightStart < v.width-2 {
-		screen.PutStrStyled(rightStart, y, truncateToWidth(rightText, v.width-2-rightStart), style)
+	if rightText != "" && rightStart < rightLimit {
+		screen.PutStrStyled(rightStart, y, rightText, style)
 	}
+}
+
+func (v *Viewer) contentRect() (x, y, width, height int) {
+	width = v.width
+	height = v.height - v.bottomBarRows()
+	if height < 0 {
+		height = 0
+	}
+
+	if v.mode == modeHelp && !v.cfg.Chrome.Frame.enabled() {
+		y = 1
+		height--
+		if height < 0 {
+			height = 0
+		}
+		return x, y, width, height
+	}
+
+	if v.cfg.Chrome.Frame.enabled() {
+		x = 1
+		y = 1
+		width -= 2
+		height -= 2
+		if width < 0 {
+			width = 0
+		}
+		if height < 0 {
+			height = 0
+		}
+	}
+
+	return x, y, width, height
+}
+
+func (v *Viewer) contentWidth() int {
+	_, _, width, _ := v.contentRect()
+	return width
+}
+
+func (v *Viewer) bottomBarRows() int {
+	if v.mode == modeHelp {
+		return 0
+	}
+	if v.height <= 0 {
+		return 0
+	}
+	if (v.cfg.ShowStatus || v.mode == modePrompt) && v.height > 1 {
+		return 1
+	}
+	return 0
 }
 
 func (v *Viewer) statusText() (left, right string) {
@@ -433,10 +548,18 @@ func (v *Viewer) drawPrompt(screen tcell.Screen, y int) {
 	if v.prompt != nil {
 		prompt = " " + v.prompt.String()
 	}
-	if len(prompt) < v.width {
-		prompt += strings.Repeat(" ", v.width-len(prompt))
+	screen.PutStrStyled(0, y, padRightToWidth(prompt, v.width), style)
+}
+
+func (v *Viewer) helpFrameTitle() string {
+	title := v.text.HelpTitle
+	if v.text.HelpClose != "" {
+		if title != "" {
+			title += "  "
+		}
+		title += v.text.HelpClose
 	}
-	screen.PutStrStyled(0, y, truncateToWidth(prompt, v.width), style)
+	return title
 }
 
 func (v *Viewer) handleHelpKey(ev *tcell.EventKey) bool {
@@ -587,8 +710,69 @@ func truncateToWidth(s string, width int) string {
 	if width <= 0 {
 		return ""
 	}
-	if len(s) <= width {
+	if stringWidth(s) <= width {
 		return s
 	}
-	return s[:width]
+
+	var (
+		builder strings.Builder
+		total   int
+	)
+	gr := uniseg.NewGraphemes(s)
+	for gr.Next() {
+		cluster := gr.Str()
+		clusterWidth := uniseg.StringWidth(cluster)
+		if total+clusterWidth > width {
+			break
+		}
+		builder.WriteString(cluster)
+		total += clusterWidth
+	}
+	return builder.String()
+}
+
+func frameLine(width int, left, fill, right string) string {
+	if width <= 0 {
+		return ""
+	}
+	if width == 1 {
+		return fallback(left, fill, right)
+	}
+
+	left = fallback(left, fill, " ")
+	fill = fallback(fill, " ")
+	right = fallback(right, fill, " ")
+	return left + strings.Repeat(fill, width-2) + right
+}
+
+func fallback(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func frameTitleLabel(title string, width int) (label string, x int) {
+	if title == "" || width <= 2 {
+		return "", 0
+	}
+	label = " " + title + " "
+	if stringWidth(label) > width-2 {
+		label = truncateToWidth(label, width-2)
+	}
+	return label, 1
+}
+
+func padRightToWidth(s string, width int) string {
+	s = truncateToWidth(s, width)
+	if pad := width - stringWidth(s); pad > 0 {
+		s += strings.Repeat(" ", pad)
+	}
+	return s
+}
+
+func stringWidth(s string) int {
+	return uniseg.StringWidth(s)
 }
