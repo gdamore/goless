@@ -65,8 +65,8 @@ func (v *Viewer) activeSearch() *searchState {
 	return &v.search
 }
 
-func (v *Viewer) searchCaseLabel() string {
-	switch normalizeSearchCaseMode(v.cfg.SearchCase) {
+func searchCaseLabel(mode SearchCaseMode) string {
+	switch normalizeSearchCaseMode(mode) {
 	case SearchCaseSensitive:
 		return "case"
 	case SearchCaseInsensitive:
@@ -76,8 +76,8 @@ func (v *Viewer) searchCaseLabel() string {
 	}
 }
 
-func (v *Viewer) searchBehaviorLabel() string {
-	switch normalizeSearchMode(v.cfg.SearchMode) {
+func searchBehaviorLabel(mode SearchMode) string {
+	switch normalizeSearchMode(mode) {
 	case SearchWholeWord:
 		return "word"
 	case SearchRegex:
@@ -87,8 +87,18 @@ func (v *Viewer) searchBehaviorLabel() string {
 	}
 }
 
+func searchModeLabel(caseMode SearchCaseMode, mode SearchMode) string {
+	return searchCaseLabel(caseMode) + "," + searchBehaviorLabel(mode)
+}
+
 func (v *Viewer) searchModeLabel() string {
-	return v.searchCaseLabel() + "," + v.searchBehaviorLabel()
+	return searchModeLabel(v.cfg.SearchCase, v.cfg.SearchMode)
+}
+
+func (v *Viewer) maybeSetSearchModeMessage() {
+	if v.search.Query == "" {
+		v.message = "search:" + v.searchModeLabel()
+	}
 }
 
 func (v *Viewer) CycleSearchCaseMode() SearchCaseMode {
@@ -102,7 +112,7 @@ func (v *Viewer) CycleSearchCaseMode() SearchCaseMode {
 		next = SearchSmartCase
 	}
 	v.SetSearchCaseMode(next)
-	v.message = "search:" + v.searchModeLabel()
+	v.maybeSetSearchModeMessage()
 	return next
 }
 
@@ -117,7 +127,7 @@ func (v *Viewer) CycleSearchMode() SearchMode {
 		next = SearchSubstring
 	}
 	v.SetSearchMode(next)
-	v.message = "search:" + v.searchModeLabel()
+	v.maybeSetSearchModeMessage()
 	return next
 }
 
@@ -215,8 +225,7 @@ func (v *Viewer) commitPrompt() {
 }
 
 func (v *Viewer) commitPromptSearch(text string, forward bool) bool {
-	query := strings.TrimSpace(text)
-	if query == "" {
+	if text == "" {
 		v.clearSearch()
 		return true
 	}
@@ -231,7 +240,7 @@ func (v *Viewer) commitPromptSearch(text string, forward bool) bool {
 		v.search = *v.prompt.preview
 	} else {
 		v.search = searchState{
-			Query:    query,
+			Query:    text,
 			Forward:  forward,
 			CaseMode: normalizeSearchCaseMode(v.cfg.SearchCase),
 			Mode:     normalizeSearchMode(v.cfg.SearchMode),
@@ -244,14 +253,14 @@ func (v *Viewer) commitPromptSearch(text string, forward bool) bool {
 		return false
 	}
 	if len(v.search.Matches) == 0 {
-		v.message = v.text.SearchNotFound(query)
+		v.message = v.text.SearchNotFound(text)
 		return true
 	}
 	if v.search.Current < 0 || v.search.Current >= len(v.search.Matches) {
 		v.search.Current = v.pickInitialMatch(forward)
 	}
 	v.goToMatch(v.search.Current)
-	v.message = v.text.SearchMatchCount(query, len(v.search.Matches))
+	v.message = v.text.SearchMatchCount(text, len(v.search.Matches))
 	return true
 }
 
@@ -279,7 +288,7 @@ func (v *Viewer) updatePromptPreview() {
 		return
 	}
 
-	query := strings.TrimSpace(string(v.prompt.buffer))
+	query := string(v.prompt.buffer)
 	if query == "" {
 		v.prompt.preview = nil
 		v.prompt.errText = ""
@@ -307,7 +316,6 @@ func (v *Viewer) updatePromptPreview() {
 }
 
 func (v *Viewer) startSearch(query string, forward bool, mode SearchCaseMode) {
-	query = strings.TrimSpace(query)
 	if query == "" {
 		v.clearSearch()
 		return
@@ -527,7 +535,7 @@ func (v *Viewer) runSetCommand(text string) bool {
 		}
 
 		v.SetSearchCaseMode(mode)
-		v.message = "search:" + v.searchModeLabel()
+		v.maybeSetSearchModeMessage()
 		return true
 	case "searchmode":
 		var mode SearchMode
@@ -544,7 +552,7 @@ func (v *Viewer) runSetCommand(text string) bool {
 		}
 
 		v.SetSearchMode(mode)
-		v.message = "search:" + v.searchModeLabel()
+		v.maybeSetSearchModeMessage()
 		return true
 	case "searchword":
 		var mode SearchMode
@@ -559,7 +567,7 @@ func (v *Viewer) runSetCommand(text string) bool {
 		}
 
 		v.SetSearchMode(mode)
-		v.message = "search:" + v.searchModeLabel()
+		v.maybeSetSearchModeMessage()
 		return true
 	default:
 		return false

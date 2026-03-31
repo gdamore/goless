@@ -87,9 +87,6 @@ func (v *Viewer) SetSearchCaseMode(mode SearchCaseMode) {
 	v.updatePromptPrefix()
 	if v.mode == modePrompt && v.prompt != nil {
 		v.updatePromptPreview()
-		if v.prompt.preview != nil || v.prompt.errText != "" {
-			return
-		}
 	}
 	if v.search.Query == "" {
 		return
@@ -128,9 +125,6 @@ func (v *Viewer) SetSearchMode(mode SearchMode) {
 	v.updatePromptPrefix()
 	if v.mode == modePrompt && v.prompt != nil {
 		v.updatePromptPreview()
-		if v.prompt.preview != nil || v.prompt.errText != "" {
-			return
-		}
 	}
 	if v.search.Query == "" {
 		return
@@ -694,6 +688,9 @@ func (v *Viewer) bottomBarRows() int {
 func (v *Viewer) statusText() (left, right string) {
 	search := v.activeSearch()
 	searchInfo := "search:" + v.searchModeLabel()
+	if search.Query != "" {
+		searchInfo = "search:" + searchModeLabel(search.CaseMode, search.Mode)
+	}
 	if search.Query != "" {
 		position := 0
 		if len(search.Matches) > 0 && search.Current >= 0 {
