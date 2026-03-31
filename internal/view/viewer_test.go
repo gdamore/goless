@@ -313,6 +313,25 @@ func TestF2CyclesSearchCaseMode(t *testing.T) {
 	}
 }
 
+func TestF3CyclesSearchWordMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyKey(tcell.KeyF3))
+	if got, want := v.SearchWordMode(), SearchWholeWord; got != want {
+		t.Fatalf("SearchWordMode after first F3 = %v, want %v", got, want)
+	}
+	v.HandleKey(keyKey(tcell.KeyF3))
+	if got, want := v.SearchWordMode(), SearchSubstring; got != want {
+		t.Fatalf("SearchWordMode after second F3 = %v, want %v", got, want)
+	}
+}
+
 func TestF2UpdatesPromptPrefix(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alpha\n")); err != nil {
@@ -322,13 +341,18 @@ func TestF2UpdatesPromptPrefix(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 2)
 	v.HandleKey(keyRune("/"))
-	if got, want := v.prompt.String(), "/[smart] "; got != want {
+	if got, want := v.prompt.String(), "/[smart,sub] "; got != want {
 		t.Fatalf("prompt prefix = %q, want %q", got, want)
 	}
 
 	v.HandleKey(keyKey(tcell.KeyF2))
-	if got, want := v.prompt.String(), "/[case] "; got != want {
+	if got, want := v.prompt.String(), "/[case,sub] "; got != want {
 		t.Fatalf("prompt prefix after F2 = %q, want %q", got, want)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyF3))
+	if got, want := v.prompt.String(), "/[case,word] "; got != want {
+		t.Fatalf("prompt prefix after F3 = %q, want %q", got, want)
 	}
 }
 
@@ -351,6 +375,71 @@ func TestSetSearchCaseCommand(t *testing.T) {
 
 	if got, want := v.SearchCaseMode(), SearchSmartCase; got != want {
 		t.Fatalf("SearchCaseMode after :set commands = %v, want %v", got, want)
+	}
+}
+
+func TestSetSearchWordCommand(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alphabet alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	for _, command := range []string{"set searchword word", "set searchword sub"} {
+		v.HandleKey(keyRune(":"))
+		for _, s := range command {
+			v.HandleKey(keyRune(string(s)))
+		}
+		v.HandleKey(keyKey(tcell.KeyEnter))
+	}
+
+	if got, want := v.SearchWordMode(), SearchSubstring; got != want {
+		t.Fatalf("SearchWordMode after :set commands = %v, want %v", got, want)
+	}
+}
+
+func TestWholeWordSearchSkipsSubstrings(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alphabet alpha alpha_beta\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true, SearchWord: SearchWholeWord})
+	v.SetSize(20, 2)
+
+	if !v.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true")
+	}
+	if got, want := len(v.search.Matches), 1; got != want {
+		t.Fatalf("whole-word match count = %d, want %d", got, want)
+	}
+	if got, want := v.search.Matches[0].StartRune, 9; got != want {
+		t.Fatalf("whole-word match start rune = %d, want %d", got, want)
+	}
+}
+
+func TestF3UpdatesPromptPreviewMatches(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alphabet\nalpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune("/"))
+	for _, s := range []string{"a", "l", "p", "h", "a"} {
+		v.HandleKey(keyRune(s))
+	}
+	if got, want := len(v.prompt.preview.Matches), 2; got != want {
+		t.Fatalf("substring preview match count = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyF3))
+	if got, want := len(v.prompt.preview.Matches), 1; got != want {
+		t.Fatalf("whole-word preview match count = %d, want %d", got, want)
 	}
 }
 
@@ -778,7 +867,7 @@ func TestStatusTextPlacesPositionOnRight(t *testing.T) {
 	v.relayout()
 
 	leftText, rightText := v.statusText()
-	if got, want := leftText, "search:smart"; got != want {
+	if got, want := leftText, "search:smart,sub"; got != want {
 		t.Fatalf("left status text = %q, want %q", got, want)
 	}
 	if !strings.Contains(rightText, "row 1/2") {

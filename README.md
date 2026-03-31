@@ -118,7 +118,8 @@ The current exported `Pager` API is controller-oriented.
 - Mode control: `ToggleWrap`, `SetWrapMode`, `WrapMode`, `Follow`, `Following`
 - Search: `SearchForward`, `SearchBackward`, `SearchNext`, `SearchPrev`,
   `SearchForwardWithCase`, `SearchBackwardWithCase`, `SetSearchCaseMode`,
-  `SearchCaseMode`, `ClearSearch`
+  `SearchCaseMode`, `SetSearchWordMode`, `SearchWordMode`,
+  `CycleSearchCaseMode`, `CycleSearchWordMode`, `ClearSearch`
 - View state: `Position`
 
 The main config knobs are:
@@ -126,6 +127,7 @@ The main config knobs are:
 - `WrapMode`: `NoWrap` or `SoftWrap`
 - `SearchCase`: `SearchSmartCase`, `SearchCaseSensitive`, or
   `SearchCaseInsensitive`
+- `SearchWord`: `SearchSubstring` or `SearchWholeWord`
 - `RenderMode`: `RenderHybrid`, `RenderLiteral`, or `RenderPresentation`
 - `KeyGroup`: currently `LessKeyGroup`
 - `Chrome`: optional frame/title styling
@@ -139,12 +141,14 @@ By default, literal search uses smart-case behavior:
 The built-in pager UI exposes search mode controls directly:
 
 - `F2` in the bundled less-like key group cycles `smart -> case -> nocase`
+- `F3` in the bundled less-like key group toggles `sub -> word`
 - the current mode is shown in the status bar and search prompt
 - `:set searchcase smart|case|nocase` is available as a fallback
+- `:set searchword sub|word` is available as a fallback
 
-Embedders are not locked to `F2`. They can reserve bundled keys with
-`CaptureKey` and drive mode changes explicitly through `CycleSearchCaseMode` or
-`SetSearchCaseMode`.
+Embedders are not locked to `F2` or `F3`. They can reserve bundled keys with
+`CaptureKey` and drive mode changes explicitly through `CycleSearchCaseMode`,
+`SetSearchCaseMode`, `CycleSearchWordMode`, or `SetSearchWordMode`.
 
 ## Render Modes
 
@@ -184,9 +188,11 @@ The default key group is intentionally less-like. Common bindings include:
 - `w` to toggle wrap
 - `/` and `?` to search forward/backward
 - `n` and `N` to repeat search
-- `F2` to cycle search mode in the bundled key group
+- `F2` to cycle search case mode in the bundled key group
+- `F3` to toggle substring vs whole-word matching in the bundled key group
 - `:` then a number to jump to a line
 - `:set searchcase smart|case|nocase` to set search mode directly
+- `:set searchword sub|word` to set whole-word matching directly
 - `F` to enable follow mode
 - `H` or `F1` to toggle help
 
@@ -204,8 +210,7 @@ performance work measurable as the library evolves.
 ## Current Limitations
 
 - API compatibility is not stable yet
-- Search is currently literal substring search only
-- There is no regex search, smart-case search, or whole-word search yet
+- Search is currently literal only; there is no regex mode yet
 - The public package exposes a pager core, not a full standalone `less`
   replacement
 - The demo is intentionally small and does not aim to replicate every `less`

@@ -55,4 +55,5 @@ const (
 	actionToggleHelp
 	actionFollow
 	actionCycleSearchCase
+	actionCycleSearchWord
 )

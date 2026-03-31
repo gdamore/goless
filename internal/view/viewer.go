@@ -19,6 +19,7 @@ type Config struct {
 	TabWidth   int
 	WrapMode   layout.WrapMode
 	SearchCase SearchCaseMode
+	SearchWord SearchWordMode
 	KeyGroup   KeyGroup
 	Chrome     Chrome
 	ShowStatus bool
@@ -64,6 +65,7 @@ func New(doc *model.Document, cfg Config) *Viewer {
 		cfg.TabWidth = 8
 	}
 	cfg.SearchCase = normalizeSearchCaseMode(cfg.SearchCase)
+	cfg.SearchWord = normalizeSearchWordMode(cfg.SearchWord)
 	cfg.Chrome = cfg.Chrome.withDefaults()
 	cfg.Text = cfg.Text.withDefaults()
 	return &Viewer{
@@ -109,6 +111,43 @@ func (v *Viewer) SetSearchCaseMode(mode SearchCaseMode) {
 // SearchCaseMode reports the default case behavior for searches.
 func (v *Viewer) SearchCaseMode() SearchCaseMode {
 	return v.cfg.SearchCase
+}
+
+// SetSearchWordMode updates whether searches match substrings or whole words.
+func (v *Viewer) SetSearchWordMode(mode SearchWordMode) {
+	mode = normalizeSearchWordMode(mode)
+	if v.cfg.SearchWord == mode && (v.search.Query == "" || v.search.WordMode == mode) {
+		return
+	}
+
+	v.cfg.SearchWord = mode
+	v.updatePromptPrefix()
+	if v.mode == modePrompt && v.prompt != nil {
+		v.updatePromptPreview()
+		if v.prompt.preview != nil {
+			return
+		}
+	}
+	if v.search.Query == "" {
+		return
+	}
+
+	v.search.WordMode = mode
+	v.rebuildSearch()
+	if len(v.search.Matches) == 0 {
+		v.message = v.text.SearchNotFound(v.search.Query)
+		return
+	}
+	if v.search.Current < 0 || v.search.Current >= len(v.search.Matches) {
+		v.search.Current = v.pickInitialMatch(v.search.Forward)
+	}
+	v.goToMatch(v.search.Current)
+	v.message = v.text.SearchMatchCount(v.search.Query, len(v.search.Matches))
+}
+
+// SearchWordMode reports whether searches match substrings or whole words.
+func (v *Viewer) SearchWordMode() SearchWordMode {
+	return v.cfg.SearchWord
 }
 
 // SetWrapMode updates the viewer wrap mode while preserving the current anchor.
@@ -265,6 +304,8 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 		v.Follow()
 	case actionCycleSearchCase:
 		v.CycleSearchCaseMode()
+	case actionCycleSearchWord:
+		v.CycleSearchWordMode()
 	default:
 		return KeyResult{}
 	}
@@ -644,7 +685,7 @@ func (v *Viewer) bottomBarRows() int {
 
 func (v *Viewer) statusText() (left, right string) {
 	search := v.activeSearch()
-	searchInfo := "search:" + v.searchCaseLabel()
+	searchInfo := "search:" + v.searchModeLabel()
 	if search.Query != "" {
 		position := 0
 		if len(search.Matches) > 0 && search.Current >= 0 {
@@ -713,6 +754,9 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 	case actionCycleSearchCase:
 		v.CycleSearchCaseMode()
 		return KeyResult{Handled: true}
+	case actionCycleSearchWord:
+		v.CycleSearchWordMode()
+		return KeyResult{Handled: true}
 	case actionScrollUp:
 		v.helpOffset--
 	case actionScrollDown:
@@ -741,6 +785,9 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		return KeyResult{Handled: true, Quit: true}
 	case tcell.KeyF2:
 		v.CycleSearchCaseMode()
+		return KeyResult{Handled: true}
+	case tcell.KeyF3:
+		v.CycleSearchWordMode()
 		return KeyResult{Handled: true}
 	case tcell.KeyEnter:
 		v.commitPrompt()

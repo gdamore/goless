@@ -251,3 +251,31 @@ func TestPagerCycleSearchCaseMode(t *testing.T) {
 		t.Fatalf("CycleSearchCaseMode() third = %v, want %v", got, want)
 	}
 }
+
+func TestPagerSetSearchWordMode(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alphabet alpha\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.SetSearchWordMode(SearchWholeWord)
+
+	if got, want := pager.SearchWordMode(), SearchWholeWord; got != want {
+		t.Fatalf("SearchWordMode() = %v, want %v", got, want)
+	}
+	if !pager.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true under whole-word mode")
+	}
+}
+
+func TestPagerCycleSearchWordMode(t *testing.T) {
+	pager := New(Config{})
+
+	if got, want := pager.CycleSearchWordMode(), SearchWholeWord; got != want {
+		t.Fatalf("CycleSearchWordMode() = %v, want %v", got, want)
+	}
+	if got, want := pager.CycleSearchWordMode(), SearchSubstring; got != want {
+		t.Fatalf("CycleSearchWordMode() second = %v, want %v", got, want)
+	}
+}
