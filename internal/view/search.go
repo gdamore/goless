@@ -95,12 +95,6 @@ func (v *Viewer) searchModeLabel() string {
 	return searchModeLabel(v.cfg.SearchCase, v.cfg.SearchMode)
 }
 
-func (v *Viewer) maybeSetSearchModeMessage() {
-	if v.search.Query == "" {
-		v.message = "search:" + v.searchModeLabel()
-	}
-}
-
 func (v *Viewer) CycleSearchCaseMode() SearchCaseMode {
 	next := SearchSmartCase
 	switch normalizeSearchCaseMode(v.cfg.SearchCase) {
@@ -112,7 +106,6 @@ func (v *Viewer) CycleSearchCaseMode() SearchCaseMode {
 		next = SearchSmartCase
 	}
 	v.SetSearchCaseMode(next)
-	v.maybeSetSearchModeMessage()
 	return next
 }
 
@@ -127,7 +120,6 @@ func (v *Viewer) CycleSearchMode() SearchMode {
 		next = SearchSubstring
 	}
 	v.SetSearchMode(next)
-	v.maybeSetSearchModeMessage()
 	return next
 }
 
@@ -236,18 +228,14 @@ func (v *Viewer) commitPromptSearch(text string, forward bool) bool {
 
 	v.follow = false
 	v.ensureLayout()
-	if v.prompt != nil && v.prompt.preview != nil {
-		v.search = *v.prompt.preview
-	} else {
-		v.search = searchState{
-			Query:    text,
-			Forward:  forward,
-			CaseMode: normalizeSearchCaseMode(v.cfg.SearchCase),
-			Mode:     normalizeSearchMode(v.cfg.SearchMode),
-			Current:  -1,
-		}
-		v.rebuildSearch()
+	v.search = searchState{
+		Query:    text,
+		Forward:  forward,
+		CaseMode: normalizeSearchCaseMode(v.cfg.SearchCase),
+		Mode:     normalizeSearchMode(v.cfg.SearchMode),
+		Current:  -1,
 	}
+	v.rebuildSearch()
 	if v.search.CompileError != "" {
 		v.message = v.search.CompileError
 		return false
@@ -535,7 +523,6 @@ func (v *Viewer) runSetCommand(text string) bool {
 		}
 
 		v.SetSearchCaseMode(mode)
-		v.maybeSetSearchModeMessage()
 		return true
 	case "searchmode":
 		var mode SearchMode
@@ -552,7 +539,6 @@ func (v *Viewer) runSetCommand(text string) bool {
 		}
 
 		v.SetSearchMode(mode)
-		v.maybeSetSearchModeMessage()
 		return true
 	case "searchword":
 		var mode SearchMode
@@ -567,7 +553,6 @@ func (v *Viewer) runSetCommand(text string) bool {
 		}
 
 		v.SetSearchMode(mode)
-		v.maybeSetSearchModeMessage()
 		return true
 	default:
 		return false
