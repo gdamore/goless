@@ -194,6 +194,110 @@ func TestPromptSearchFindsAndRepeatsForward(t *testing.T) {
 	}
 }
 
+func TestPromptSearchUsesSmartCaseByDefault(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("Alpha\nbeta\nALPHA\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune("/"))
+	for _, s := range []string{"a", "l", "p", "h", "a"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := len(v.search.Matches), 2; got != want {
+		t.Fatalf("match count = %d, want %d", got, want)
+	}
+}
+
+func TestPromptSearchRespectsCaseSensitiveMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("Alpha\nbeta\nALPHA\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, SearchCase: SearchCaseSensitive, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune("/"))
+	for _, s := range []string{"a", "l", "p", "h", "a"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := len(v.search.Matches), 0; got != want {
+		t.Fatalf("match count = %d, want %d", got, want)
+	}
+}
+
+func TestF2CyclesSearchCaseMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyKey(tcell.KeyF2))
+	if got, want := v.SearchCaseMode(), SearchCaseSensitive; got != want {
+		t.Fatalf("SearchCaseMode after first F2 = %v, want %v", got, want)
+	}
+	v.HandleKey(keyKey(tcell.KeyF2))
+	if got, want := v.SearchCaseMode(), SearchCaseInsensitive; got != want {
+		t.Fatalf("SearchCaseMode after second F2 = %v, want %v", got, want)
+	}
+	v.HandleKey(keyKey(tcell.KeyF2))
+	if got, want := v.SearchCaseMode(), SearchSmartCase; got != want {
+		t.Fatalf("SearchCaseMode after third F2 = %v, want %v", got, want)
+	}
+}
+
+func TestF2UpdatesPromptPrefix(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.HandleKey(keyRune("/"))
+	if got, want := v.prompt.String(), "/[smart] "; got != want {
+		t.Fatalf("prompt prefix = %q, want %q", got, want)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyF2))
+	if got, want := v.prompt.String(), "/[case] "; got != want {
+		t.Fatalf("prompt prefix after F2 = %q, want %q", got, want)
+	}
+}
+
+func TestSetSearchCaseCommand(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("Alpha\nbeta\nALPHA\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	for _, command := range []string{"set searchcase case", "set searchcase nocase", "set searchcase smart"} {
+		v.HandleKey(keyRune(":"))
+		for _, s := range command {
+			v.HandleKey(keyRune(string(s)))
+		}
+		v.HandleKey(keyKey(tcell.KeyEnter))
+	}
+
+	if got, want := v.SearchCaseMode(), SearchSmartCase; got != want {
+		t.Fatalf("SearchCaseMode after :set commands = %v, want %v", got, want)
+	}
+}
+
 func TestEmptySearchClearsExistingMatches(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alpha\nbeta\nalpha\n")); err != nil {
@@ -618,8 +722,8 @@ func TestStatusTextPlacesPositionOnRight(t *testing.T) {
 	v.relayout()
 
 	leftText, rightText := v.statusText()
-	if leftText != "" {
-		t.Fatalf("left status text = %q, want empty", leftText)
+	if got, want := leftText, "search:smart"; got != want {
+		t.Fatalf("left status text = %q, want %q", got, want)
 	}
 	if !strings.Contains(rightText, "row 1/2") {
 		t.Fatalf("right status text = %q, want row indicator", rightText)

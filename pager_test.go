@@ -185,3 +185,69 @@ func TestPagerJumpToLine(t *testing.T) {
 		t.Fatal("JumpToLine(4) = true, want false")
 	}
 }
+
+func TestPagerSearchForwardSmartCase(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("Alpha\nbeta\nALPHA\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if !pager.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true under smart-case")
+	}
+	if !pager.SearchNext() {
+		t.Fatal("SearchNext() = false, want true")
+	}
+	if got, want := pager.Position().Row, 3; got != want {
+		t.Fatalf("Position().Row after smart-case SearchNext = %d, want %d", got, want)
+	}
+}
+
+func TestPagerSearchForwardWithCaseInsensitive(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nBeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if !pager.SearchForwardWithCase("BETA", SearchCaseInsensitive) {
+		t.Fatal("SearchForwardWithCase(BETA, SearchCaseInsensitive) = false, want true")
+	}
+	if got, want := pager.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row after case-insensitive search = %d, want %d", got, want)
+	}
+}
+
+func TestPagerSetSearchCaseMode(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nBeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.SetSearchCaseMode(SearchCaseSensitive)
+
+	if got, want := pager.SearchCaseMode(), SearchCaseSensitive; got != want {
+		t.Fatalf("SearchCaseMode() = %v, want %v", got, want)
+	}
+	if pager.SearchForward("BETA") {
+		t.Fatal("SearchForward(BETA) = true, want false under case-sensitive mode")
+	}
+}
+
+func TestPagerCycleSearchCaseMode(t *testing.T) {
+	pager := New(Config{})
+
+	if got, want := pager.CycleSearchCaseMode(), SearchCaseSensitive; got != want {
+		t.Fatalf("CycleSearchCaseMode() = %v, want %v", got, want)
+	}
+	if got, want := pager.CycleSearchCaseMode(), SearchCaseInsensitive; got != want {
+		t.Fatalf("CycleSearchCaseMode() second = %v, want %v", got, want)
+	}
+	if got, want := pager.CycleSearchCaseMode(), SearchSmartCase; got != want {
+		t.Fatalf("CycleSearchCaseMode() third = %v, want %v", got, want)
+	}
+}
