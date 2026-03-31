@@ -252,30 +252,52 @@ func TestPagerCycleSearchCaseMode(t *testing.T) {
 	}
 }
 
-func TestPagerSetSearchWordMode(t *testing.T) {
+func TestPagerSetSearchMode(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
 	if err := pager.AppendString("alphabet alpha\n"); err != nil {
 		t.Fatalf("AppendString failed: %v", err)
 	}
 	pager.Flush()
-	pager.SetSearchWordMode(SearchWholeWord)
+	pager.SetSearchMode(SearchWholeWord)
 
-	if got, want := pager.SearchWordMode(), SearchWholeWord; got != want {
-		t.Fatalf("SearchWordMode() = %v, want %v", got, want)
+	if got, want := pager.SearchMode(), SearchWholeWord; got != want {
+		t.Fatalf("SearchMode() = %v, want %v", got, want)
 	}
 	if !pager.SearchForward("alpha") {
 		t.Fatal("SearchForward(alpha) = false, want true under whole-word mode")
 	}
 }
 
-func TestPagerCycleSearchWordMode(t *testing.T) {
+func TestPagerCycleSearchMode(t *testing.T) {
 	pager := New(Config{})
 
-	if got, want := pager.CycleSearchWordMode(), SearchWholeWord; got != want {
-		t.Fatalf("CycleSearchWordMode() = %v, want %v", got, want)
+	if got, want := pager.CycleSearchMode(), SearchWholeWord; got != want {
+		t.Fatalf("CycleSearchMode() = %v, want %v", got, want)
 	}
-	if got, want := pager.CycleSearchWordMode(), SearchSubstring; got != want {
-		t.Fatalf("CycleSearchWordMode() second = %v, want %v", got, want)
+	if got, want := pager.CycleSearchMode(), SearchRegex; got != want {
+		t.Fatalf("CycleSearchMode() second = %v, want %v", got, want)
+	}
+	if got, want := pager.CycleSearchMode(), SearchSubstring; got != want {
+		t.Fatalf("CycleSearchMode() third = %v, want %v", got, want)
+	}
+}
+
+func TestPagerRegexSearch(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true, SearchMode: SearchRegex})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("error 500\nwarning 404\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if !pager.SearchForward(`[45]0[04]`) {
+		t.Fatal("SearchForward(regex) = false, want true")
+	}
+	if !pager.SearchNext() {
+		t.Fatal("SearchNext() = false, want true")
+	}
+	if got, want := pager.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row after regex SearchNext = %d, want %d", got, want)
 	}
 }

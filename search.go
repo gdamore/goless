@@ -15,12 +15,14 @@ const (
 	SearchCaseInsensitive
 )
 
-// SearchWordMode controls whether literal search matches substrings or whole words.
-type SearchWordMode int
+// SearchMode controls whether search uses literal substring, whole-word, or regex matching.
+type SearchMode int
 
 const (
 	// SearchSubstring matches the query anywhere in the visible text.
-	SearchSubstring SearchWordMode = iota
+	SearchSubstring SearchMode = iota
 	// SearchWholeWord restricts matches to whole-word boundaries.
 	SearchWholeWord
+	// SearchRegex treats the query as a regular expression.
+	SearchRegex
 )

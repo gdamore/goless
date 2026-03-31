@@ -4,6 +4,7 @@
 package view
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -25,14 +26,16 @@ const (
 	SearchCaseInsensitive
 )
 
-// SearchWordMode controls whether literal search matches substrings or whole words.
-type SearchWordMode int
+// SearchMode controls whether search uses literal substring, whole-word, or regex matching.
+type SearchMode int
 
 const (
 	// SearchSubstring matches the query anywhere in the visible text.
-	SearchSubstring SearchWordMode = iota
+	SearchSubstring SearchMode = iota
 	// SearchWholeWord restricts matches to whole-word boundaries.
 	SearchWholeWord
+	// SearchRegex treats the query as a regular expression.
+	SearchRegex
 )
 
 type searchMatch struct {
@@ -46,12 +49,13 @@ type searchMatch struct {
 }
 
 type searchState struct {
-	Query    string
-	Forward  bool
-	CaseMode SearchCaseMode
-	WordMode SearchWordMode
-	Matches  []searchMatch
-	Current  int
+	Query        string
+	Forward      bool
+	CaseMode     SearchCaseMode
+	Mode         SearchMode
+	Matches      []searchMatch
+	Current      int
+	CompileError string
 }
 
 func (v *Viewer) activeSearch() *searchState {
@@ -72,17 +76,19 @@ func (v *Viewer) searchCaseLabel() string {
 	}
 }
 
-func (v *Viewer) searchWordLabel() string {
-	switch normalizeSearchWordMode(v.cfg.SearchWord) {
+func (v *Viewer) searchBehaviorLabel() string {
+	switch normalizeSearchMode(v.cfg.SearchMode) {
 	case SearchWholeWord:
 		return "word"
+	case SearchRegex:
+		return "regex"
 	default:
 		return "sub"
 	}
 }
 
 func (v *Viewer) searchModeLabel() string {
-	return v.searchCaseLabel() + "," + v.searchWordLabel()
+	return v.searchCaseLabel() + "," + v.searchBehaviorLabel()
 }
 
 func (v *Viewer) CycleSearchCaseMode() SearchCaseMode {
@@ -100,15 +106,17 @@ func (v *Viewer) CycleSearchCaseMode() SearchCaseMode {
 	return next
 }
 
-func (v *Viewer) CycleSearchWordMode() SearchWordMode {
+func (v *Viewer) CycleSearchMode() SearchMode {
 	next := SearchSubstring
-	switch normalizeSearchWordMode(v.cfg.SearchWord) {
+	switch normalizeSearchMode(v.cfg.SearchMode) {
 	case SearchSubstring:
 		next = SearchWholeWord
 	case SearchWholeWord:
+		next = SearchRegex
+	case SearchRegex:
 		next = SearchSubstring
 	}
-	v.SetSearchWordMode(next)
+	v.SetSearchMode(next)
 	v.message = "search:" + v.searchModeLabel()
 	return next
 }
@@ -124,28 +132,47 @@ func (v *Viewer) rebuildSearchState(state *searchState) {
 	if state.Query == "" {
 		state.Matches = nil
 		state.Current = -1
+		state.CompileError = ""
 		return
 	}
 
+	state.CompileError = ""
 	var matches []searchMatch
 	pattern := state.Query
-	patternRunes := utf8.RuneCountInString(pattern)
 	effectiveCase := resolveSearchCaseMode(state.CaseMode, pattern)
-	effectiveWord := normalizeSearchWordMode(state.WordMode)
-	for lineIndex, line := range v.lines {
-		for _, match := range findStringMatches(line, pattern, patternRunes, effectiveCase, effectiveWord) {
-			match.LineIndex = lineIndex
-			matches = append(matches, searchMatch{
-				LineIndex:  match.LineIndex,
-				StartByte:  match.StartByte,
-				EndByte:    match.EndByte,
-				StartRune:  match.StartRune,
-				EndRune:    match.EndRune,
-				StartGraph: match.StartGraph,
-				EndGraph:   match.EndGraph,
-			})
+	switch normalizeSearchMode(state.Mode) {
+	case SearchRegex:
+		re, err := compileSearchRegexp(pattern, effectiveCase)
+		if err != nil {
+			state.Matches = nil
+			state.Current = -1
+			state.CompileError = "regex:error " + err.Error()
+			return
+		}
+		for lineIndex, line := range v.lines {
+			for _, match := range findRegexpMatches(line, re) {
+				match.LineIndex = lineIndex
+				matches = append(matches, match)
+			}
+		}
+	default:
+		patternRunes := utf8.RuneCountInString(pattern)
+		for lineIndex, line := range v.lines {
+			for _, match := range findStringMatches(line, pattern, patternRunes, effectiveCase, normalizeSearchMode(state.Mode)) {
+				match.LineIndex = lineIndex
+				matches = append(matches, searchMatch{
+					LineIndex:  match.LineIndex,
+					StartByte:  match.StartByte,
+					EndByte:    match.EndByte,
+					StartRune:  match.StartRune,
+					EndRune:    match.EndRune,
+					StartGraph: match.StartGraph,
+					EndGraph:   match.EndGraph,
+				})
+			}
 		}
 	}
+
 	state.Matches = matches
 	if len(matches) == 0 {
 		state.Current = -1
@@ -173,22 +200,29 @@ func (v *Viewer) commitPrompt() {
 	}
 
 	text := string(v.prompt.buffer)
+	commit := true
 	switch v.prompt.kind {
 	case promptSearchForward:
-		v.commitPromptSearch(text, true)
+		commit = v.commitPromptSearch(text, true)
 	case promptSearchBackward:
-		v.commitPromptSearch(text, false)
+		commit = v.commitPromptSearch(text, false)
 	case promptCommand:
 		v.runCommand(text)
 	}
-	v.cancelPrompt()
+	if commit {
+		v.cancelPrompt()
+	}
 }
 
-func (v *Viewer) commitPromptSearch(text string, forward bool) {
+func (v *Viewer) commitPromptSearch(text string, forward bool) bool {
 	query := strings.TrimSpace(text)
 	if query == "" {
 		v.clearSearch()
-		return
+		return true
+	}
+	if v.prompt != nil && v.prompt.errText != "" {
+		v.message = v.prompt.errText
+		return false
 	}
 
 	v.follow = false
@@ -200,20 +234,25 @@ func (v *Viewer) commitPromptSearch(text string, forward bool) {
 			Query:    query,
 			Forward:  forward,
 			CaseMode: normalizeSearchCaseMode(v.cfg.SearchCase),
-			WordMode: normalizeSearchWordMode(v.cfg.SearchWord),
+			Mode:     normalizeSearchMode(v.cfg.SearchMode),
 			Current:  -1,
 		}
 		v.rebuildSearch()
 	}
+	if v.search.CompileError != "" {
+		v.message = v.search.CompileError
+		return false
+	}
 	if len(v.search.Matches) == 0 {
 		v.message = v.text.SearchNotFound(query)
-		return
+		return true
 	}
 	if v.search.Current < 0 || v.search.Current >= len(v.search.Matches) {
 		v.search.Current = v.pickInitialMatch(forward)
 	}
 	v.goToMatch(v.search.Current)
 	v.message = v.text.SearchMatchCount(query, len(v.search.Matches))
+	return true
 }
 
 func (v *Viewer) updatePromptPrefix() {
@@ -243,6 +282,7 @@ func (v *Viewer) updatePromptPreview() {
 	query := strings.TrimSpace(string(v.prompt.buffer))
 	if query == "" {
 		v.prompt.preview = nil
+		v.prompt.errText = ""
 		return
 	}
 
@@ -250,11 +290,16 @@ func (v *Viewer) updatePromptPreview() {
 		Query:    query,
 		Forward:  v.prompt.kind == promptSearchForward,
 		CaseMode: normalizeSearchCaseMode(v.cfg.SearchCase),
-		WordMode: normalizeSearchWordMode(v.cfg.SearchWord),
+		Mode:     normalizeSearchMode(v.cfg.SearchMode),
 		Current:  -1,
 	}
 	v.ensureLayout()
 	v.rebuildSearchState(preview)
+	if preview.CompileError != "" {
+		v.prompt.errText = preview.CompileError
+		return
+	}
+	v.prompt.errText = ""
 	if len(preview.Matches) > 0 {
 		preview.Current = v.pickInitialPreviewMatch(preview)
 	}
@@ -273,9 +318,13 @@ func (v *Viewer) startSearch(query string, forward bool, mode SearchCaseMode) {
 	v.search.Query = query
 	v.search.Forward = forward
 	v.search.CaseMode = normalizeSearchCaseMode(mode)
-	v.search.WordMode = normalizeSearchWordMode(v.cfg.SearchWord)
+	v.search.Mode = normalizeSearchMode(v.cfg.SearchMode)
 	v.search.Current = -1
 	v.rebuildSearch()
+	if v.search.CompileError != "" {
+		v.message = v.search.CompileError
+		return
+	}
 	if len(v.search.Matches) == 0 {
 		v.message = v.text.SearchNotFound(query)
 		return
@@ -286,25 +335,25 @@ func (v *Viewer) startSearch(query string, forward bool, mode SearchCaseMode) {
 	v.message = v.text.SearchMatchCount(query, len(v.search.Matches))
 }
 
-// SearchForward starts a forward literal search and reports whether any match exists.
+// SearchForward starts a forward search and reports whether any match exists.
 func (v *Viewer) SearchForward(query string) bool {
 	v.startSearch(query, true, v.cfg.SearchCase)
 	return len(v.search.Matches) > 0
 }
 
-// SearchForwardWithCase starts a forward literal search with the supplied case mode.
+// SearchForwardWithCase starts a forward search with the supplied case mode.
 func (v *Viewer) SearchForwardWithCase(query string, mode SearchCaseMode) bool {
 	v.startSearch(query, true, mode)
 	return len(v.search.Matches) > 0
 }
 
-// SearchBackward starts a backward literal search and reports whether any match exists.
+// SearchBackward starts a backward search and reports whether any match exists.
 func (v *Viewer) SearchBackward(query string) bool {
 	v.startSearch(query, false, v.cfg.SearchCase)
 	return len(v.search.Matches) > 0
 }
 
-// SearchBackwardWithCase starts a backward literal search with the supplied case mode.
+// SearchBackwardWithCase starts a backward search with the supplied case mode.
 func (v *Viewer) SearchBackwardWithCase(query string, mode SearchCaseMode) bool {
 	v.startSearch(query, false, mode)
 	return len(v.search.Matches) > 0
@@ -322,6 +371,10 @@ func (v *Viewer) ClearSearch() {
 
 func (v *Viewer) repeatSearch(forward bool) {
 	if len(v.search.Matches) == 0 {
+		if v.search.CompileError != "" {
+			v.message = v.search.CompileError
+			return
+		}
 		v.message = v.text.SearchNone
 		return
 	}
@@ -476,8 +529,25 @@ func (v *Viewer) runSetCommand(text string) bool {
 		v.SetSearchCaseMode(mode)
 		v.message = "search:" + v.searchModeLabel()
 		return true
+	case "searchmode":
+		var mode SearchMode
+		switch fields[2] {
+		case "sub", "substring":
+			mode = SearchSubstring
+		case "word", "wholeword":
+			mode = SearchWholeWord
+		case "regex":
+			mode = SearchRegex
+		default:
+			v.message = v.text.CommandUnknown(text)
+			return true
+		}
+
+		v.SetSearchMode(mode)
+		v.message = "search:" + v.searchModeLabel()
+		return true
 	case "searchword":
-		var mode SearchWordMode
+		var mode SearchMode
 		switch fields[2] {
 		case "sub", "substring":
 			mode = SearchSubstring
@@ -488,7 +558,7 @@ func (v *Viewer) runSetCommand(text string) bool {
 			return true
 		}
 
-		v.SetSearchWordMode(mode)
+		v.SetSearchMode(mode)
 		v.message = "search:" + v.searchModeLabel()
 		return true
 	default:
@@ -571,12 +641,12 @@ func (v *Viewer) pickInitialPreviewMatch(search *searchState) int {
 	return len(search.Matches) - 1
 }
 
-func findStringMatches(line model.Line, pattern string, patternRunes int, caseMode SearchCaseMode, wordMode SearchWordMode) []searchMatch {
+func findStringMatches(line model.Line, pattern string, patternRunes int, caseMode SearchCaseMode, mode SearchMode) []searchMatch {
 	if pattern == "" || len(pattern) > len(line.Text) {
 		return nil
 	}
 	if caseMode != SearchCaseInsensitive {
-		return findSensitiveMatches(line, pattern, patternRunes, wordMode)
+		return findSensitiveMatches(line, pattern, patternRunes, mode)
 	}
 
 	patternFold := []rune(pattern)
@@ -593,7 +663,7 @@ func findStringMatches(line model.Line, pattern string, patternRunes int, caseMo
 				StartGraph: graphemeIndexForRune(line, startRune),
 				EndGraph:   graphemeIndexForRuneEnd(line, endRune),
 			}
-			if matchAllowed(line.Text, match, wordMode) {
+			if matchAllowed(line.Text, match, mode) {
 				matches = append(matches, match)
 			}
 		}
@@ -609,7 +679,7 @@ func findStringMatches(line model.Line, pattern string, patternRunes int, caseMo
 	return matches
 }
 
-func findSensitiveMatches(line model.Line, pattern string, patternRunes int, wordMode SearchWordMode) []searchMatch {
+func findSensitiveMatches(line model.Line, pattern string, patternRunes int, mode SearchMode) []searchMatch {
 	var matches []searchMatch
 	searchByte := 0
 	searchRune := 0
@@ -632,7 +702,7 @@ func findSensitiveMatches(line model.Line, pattern string, patternRunes int, wor
 			StartGraph: graphemeIndexForRune(line, startRune),
 			EndGraph:   graphemeIndexForRuneEnd(line, endRune),
 		}
-		if matchAllowed(line.Text, match, wordMode) {
+		if matchAllowed(line.Text, match, mode) {
 			matches = append(matches, match)
 		}
 
@@ -644,6 +714,30 @@ func findSensitiveMatches(line model.Line, pattern string, patternRunes int, wor
 		searchRune = startRune + 1
 	}
 
+	return matches
+}
+
+func findRegexpMatches(line model.Line, re *regexp.Regexp) []searchMatch {
+	if re == nil || line.Text == "" {
+		return nil
+	}
+	var matches []searchMatch
+	for _, loc := range re.FindAllStringIndex(line.Text, -1) {
+		startByte, endByte := loc[0], loc[1]
+		if startByte == endByte {
+			continue
+		}
+		startRune := utf8.RuneCountInString(line.Text[:startByte])
+		endRune := startRune + utf8.RuneCountInString(line.Text[startByte:endByte])
+		matches = append(matches, searchMatch{
+			StartByte:  startByte,
+			EndByte:    endByte,
+			StartRune:  startRune,
+			EndRune:    endRune,
+			StartGraph: graphemeIndexForRune(line, startRune),
+			EndGraph:   graphemeIndexForRuneEnd(line, endRune),
+		})
+	}
 	return matches
 }
 
@@ -696,20 +790,27 @@ func normalizeSearchCaseMode(mode SearchCaseMode) SearchCaseMode {
 	}
 }
 
-func normalizeSearchWordMode(mode SearchWordMode) SearchWordMode {
+func normalizeSearchMode(mode SearchMode) SearchMode {
 	switch mode {
-	case SearchWholeWord:
+	case SearchWholeWord, SearchRegex:
 		return mode
 	default:
 		return SearchSubstring
 	}
 }
 
-func matchAllowed(text string, match searchMatch, mode SearchWordMode) bool {
-	if normalizeSearchWordMode(mode) != SearchWholeWord {
+func matchAllowed(text string, match searchMatch, mode SearchMode) bool {
+	if normalizeSearchMode(mode) != SearchWholeWord {
 		return true
 	}
 	return isWholeWordMatch(text, match.StartByte, match.EndByte)
+}
+
+func compileSearchRegexp(pattern string, caseMode SearchCaseMode) (*regexp.Regexp, error) {
+	if resolveSearchCaseMode(caseMode, pattern) == SearchCaseInsensitive {
+		pattern = "(?i)" + pattern
+	}
+	return regexp.Compile(pattern)
 }
 
 func isWholeWordMatch(text string, startByte, endByte int) bool {
