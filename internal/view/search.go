@@ -162,15 +162,7 @@ func (v *Viewer) rebuildSearchState(state *searchState) {
 		for lineIndex, line := range v.lines {
 			for _, match := range findStringMatches(line, pattern, patternRunes, effectiveCase, normalizeSearchMode(state.Mode)) {
 				match.LineIndex = lineIndex
-				matches = append(matches, searchMatch{
-					LineIndex:  match.LineIndex,
-					StartByte:  match.StartByte,
-					EndByte:    match.EndByte,
-					StartRune:  match.StartRune,
-					EndRune:    match.EndRune,
-					StartGraph: match.StartGraph,
-					EndGraph:   match.EndGraph,
-				})
+				matches = append(matches, match)
 			}
 		}
 	}
@@ -406,35 +398,7 @@ func (v *Viewer) SearchPrev() bool {
 }
 
 func (v *Viewer) pickInitialMatch(forward bool) int {
-	if len(v.search.Matches) == 0 {
-		return -1
-	}
-
-	anchor := v.firstVisibleAnchor()
-	anchorRune := 0
-	if anchor.LineIndex >= 0 && anchor.LineIndex < len(v.lines) {
-		line := v.lines[anchor.LineIndex]
-		if anchor.GraphemeIndex >= 0 && anchor.GraphemeIndex < len(line.Graphemes) {
-			anchorRune = line.Graphemes[anchor.GraphemeIndex].RuneStart
-		}
-	}
-
-	if forward {
-		for i, match := range v.search.Matches {
-			if match.LineIndex > anchor.LineIndex || (match.LineIndex == anchor.LineIndex && match.StartRune >= anchorRune) {
-				return i
-			}
-		}
-		return 0
-	}
-
-	for i := len(v.search.Matches) - 1; i >= 0; i-- {
-		match := v.search.Matches[i]
-		if match.LineIndex < anchor.LineIndex || (match.LineIndex == anchor.LineIndex && match.StartRune <= anchorRune) {
-			return i
-		}
-	}
-	return len(v.search.Matches) - 1
+	return v.pickMatchAtAnchor(v.search.Matches, forward)
 }
 
 func (v *Viewer) goToMatch(index int) {
@@ -540,20 +504,6 @@ func (v *Viewer) runSetCommand(text string) bool {
 
 		v.SetSearchMode(mode)
 		return true
-	case "searchword":
-		var mode SearchMode
-		switch fields[2] {
-		case "sub", "substring":
-			mode = SearchSubstring
-		case "word", "wholeword":
-			mode = SearchWholeWord
-		default:
-			v.message = v.text.CommandUnknown(text)
-			return true
-		}
-
-		v.SetSearchMode(mode)
-		return true
 	default:
 		return false
 	}
@@ -603,10 +553,16 @@ func (v *Viewer) graphemeMatched(line model.Line, lineIndex int, grapheme model.
 }
 
 func (v *Viewer) pickInitialPreviewMatch(search *searchState) int {
-	if search == nil || len(search.Matches) == 0 {
+	if search == nil {
 		return -1
 	}
+	return v.pickMatchAtAnchor(search.Matches, search.Forward)
+}
 
+func (v *Viewer) pickMatchAtAnchor(matches []searchMatch, forward bool) int {
+	if len(matches) == 0 {
+		return -1
+	}
 	anchor := v.firstVisibleAnchor()
 	anchorRune := 0
 	if anchor.LineIndex >= 0 && anchor.LineIndex < len(v.lines) {
@@ -616,8 +572,8 @@ func (v *Viewer) pickInitialPreviewMatch(search *searchState) int {
 		}
 	}
 
-	if search.Forward {
-		for i, match := range search.Matches {
+	if forward {
+		for i, match := range matches {
 			if match.LineIndex > anchor.LineIndex || (match.LineIndex == anchor.LineIndex && match.StartRune >= anchorRune) {
 				return i
 			}
@@ -625,13 +581,13 @@ func (v *Viewer) pickInitialPreviewMatch(search *searchState) int {
 		return 0
 	}
 
-	for i := len(search.Matches) - 1; i >= 0; i-- {
-		match := search.Matches[i]
+	for i := len(matches) - 1; i >= 0; i-- {
+		match := matches[i]
 		if match.LineIndex < anchor.LineIndex || (match.LineIndex == anchor.LineIndex && match.StartRune <= anchorRune) {
 			return i
 		}
 	}
-	return len(search.Matches) - 1
+	return len(matches) - 1
 }
 
 func findStringMatches(line model.Line, pattern string, patternRunes int, caseMode SearchCaseMode, mode SearchMode) []searchMatch {
