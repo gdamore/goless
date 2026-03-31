@@ -430,6 +430,34 @@ func TestPromptSearchPreservesWhitespace(t *testing.T) {
 	}
 }
 
+func TestPromptCommitRebuildsSearchAfterDocumentChange(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune("/"))
+	for _, s := range []string{"b", "e", "t", "a"} {
+		v.HandleKey(keyRune(s))
+	}
+	if v.prompt == nil || v.prompt.preview == nil || len(v.prompt.preview.Matches) != 0 {
+		t.Fatal("expected zero cached preview matches before document change")
+	}
+
+	if err := doc.Append([]byte("beta\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	v.Refresh()
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := len(v.search.Matches), 1; got != want {
+		t.Fatalf("committed match count after document change = %d, want %d", got, want)
+	}
+}
+
 func TestWholeWordSearchSkipsSubstrings(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alphabet alpha alpha_beta\n")); err != nil {
@@ -1059,6 +1087,23 @@ func TestStatusTextUsesActiveSearchOverride(t *testing.T) {
 	leftText, _ := v.statusText()
 	if !strings.Contains(leftText, "search:nocase,sub") {
 		t.Fatalf("left status text = %q, want active override label", leftText)
+	}
+}
+
+func TestStatusTextDoesNotDuplicateModeMessage(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.relayout()
+	v.CycleSearchMode()
+
+	leftText, _ := v.statusText()
+	if got, want := leftText, "search:smart,word"; got != want {
+		t.Fatalf("left status text after F3 = %q, want %q", got, want)
 	}
 }
 
