@@ -259,6 +259,21 @@ func (p *Pager) CycleSearchMode() SearchMode {
 	return SearchMode(p.viewer.CycleSearchMode())
 }
 
+// SearchState reports the current committed or preview search state.
+func (p *Pager) SearchState() SearchState {
+	state := p.viewer.SearchSnapshot()
+	return SearchState{
+		Query:        state.Query,
+		Forward:      state.Forward,
+		CaseMode:     SearchCaseMode(state.CaseMode),
+		Mode:         SearchMode(state.Mode),
+		MatchCount:   state.MatchCount,
+		CurrentMatch: state.CurrentMatch,
+		CompileError: state.CompileError,
+		Preview:      state.Preview,
+	}
+}
+
 // SearchForward starts a forward search and reports whether any match exists.
 func (p *Pager) SearchForward(query string) bool {
 	return p.viewer.SearchForward(query)

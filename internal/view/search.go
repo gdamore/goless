@@ -58,11 +58,78 @@ type searchState struct {
 	CompileError string
 }
 
+// SearchSnapshot summarizes the current search state visible to embedders.
+//
+// CurrentMatch is 1-based. It is 0 when no match is selected.
+type SearchSnapshot struct {
+	// Query is the current committed or preview search text.
+	Query string
+	// Forward reports whether the search direction is forward rather than backward.
+	Forward bool
+	// CaseMode is the active search case mode for this state.
+	CaseMode SearchCaseMode
+	// Mode is the active search behavior for this state.
+	Mode SearchMode
+	// MatchCount is the number of matches currently found for Query.
+	MatchCount int
+	// CurrentMatch is the 1-based selected match index, or 0 when no match is selected.
+	CurrentMatch int
+	// CompileError reports the current regex compilation error, if any.
+	CompileError string
+	// Preview reports whether this state comes from an in-progress search prompt.
+	Preview bool
+}
+
 func (v *Viewer) activeSearch() *searchState {
 	if v.mode == modePrompt && v.prompt != nil && v.prompt.preview != nil {
 		return v.prompt.preview
 	}
 	return &v.search
+}
+
+// SearchSnapshot reports the current committed or preview search state.
+func (v *Viewer) SearchSnapshot() SearchSnapshot {
+	if v.mode == modePrompt && v.prompt != nil {
+		switch v.prompt.kind {
+		case promptSearchForward, promptSearchBackward:
+			snapshot := SearchSnapshot{
+				Query:        string(v.prompt.buffer),
+				Forward:      v.prompt.kind == promptSearchForward,
+				CaseMode:     normalizeSearchCaseMode(v.cfg.SearchCase),
+				Mode:         normalizeSearchMode(v.cfg.SearchMode),
+				CompileError: v.prompt.errText,
+				Preview:      true,
+			}
+			if v.prompt.preview != nil && v.prompt.preview.Query == snapshot.Query && snapshot.CompileError == "" {
+				snapshot.MatchCount = len(v.prompt.preview.Matches)
+				if v.prompt.preview.Current >= 0 && v.prompt.preview.Current < snapshot.MatchCount {
+					snapshot.CurrentMatch = v.prompt.preview.Current + 1
+				}
+			}
+			return snapshot
+		}
+	}
+
+	snapshot := SearchSnapshot{
+		Query:   v.search.Query,
+		Forward: v.search.Forward,
+		Preview: false,
+	}
+	if snapshot.Query != "" {
+		snapshot.CaseMode = normalizeSearchCaseMode(v.search.CaseMode)
+		snapshot.Mode = normalizeSearchMode(v.search.Mode)
+		snapshot.CompileError = v.search.CompileError
+		snapshot.MatchCount = len(v.search.Matches)
+		if v.search.Current >= 0 && v.search.Current < snapshot.MatchCount {
+			snapshot.CurrentMatch = v.search.Current + 1
+		}
+		return snapshot
+	}
+
+	snapshot.Forward = true
+	snapshot.CaseMode = normalizeSearchCaseMode(v.cfg.SearchCase)
+	snapshot.Mode = normalizeSearchMode(v.cfg.SearchMode)
+	return snapshot
 }
 
 func searchCaseLabel(mode SearchCaseMode) string {

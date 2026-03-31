@@ -252,6 +252,141 @@ func TestPagerCycleSearchCaseMode(t *testing.T) {
 	}
 }
 
+func TestPagerSearchStateDefaults(t *testing.T) {
+	pager := New(Config{})
+	pager.SetSearchCaseMode(SearchCaseSensitive)
+	pager.SetSearchMode(SearchRegex)
+
+	state := pager.SearchState()
+	if state.Query != "" {
+		t.Fatalf("SearchState().Query = %q, want empty", state.Query)
+	}
+	if !state.Forward {
+		t.Fatal("SearchState().Forward = false, want true default")
+	}
+	if got, want := state.CaseMode, SearchCaseSensitive; got != want {
+		t.Fatalf("SearchState().CaseMode = %v, want %v", got, want)
+	}
+	if got, want := state.Mode, SearchRegex; got != want {
+		t.Fatalf("SearchState().Mode = %v, want %v", got, want)
+	}
+	if state.MatchCount != 0 || state.CurrentMatch != 0 {
+		t.Fatalf("SearchState() matches = %d/%d, want 0/0", state.CurrentMatch, state.MatchCount)
+	}
+	if state.CompileError != "" {
+		t.Fatalf("SearchState().CompileError = %q, want empty", state.CompileError)
+	}
+	if state.Preview {
+		t.Fatal("SearchState().Preview = true, want false")
+	}
+}
+
+func TestPagerSearchStateCommittedSearch(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\nalpha\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if !pager.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true")
+	}
+
+	state := pager.SearchState()
+	if got, want := state.Query, "alpha"; got != want {
+		t.Fatalf("SearchState().Query = %q, want %q", got, want)
+	}
+	if !state.Forward {
+		t.Fatal("SearchState().Forward = false, want true")
+	}
+	if got, want := state.CaseMode, SearchSmartCase; got != want {
+		t.Fatalf("SearchState().CaseMode = %v, want %v", got, want)
+	}
+	if got, want := state.Mode, SearchSubstring; got != want {
+		t.Fatalf("SearchState().Mode = %v, want %v", got, want)
+	}
+	if got, want := state.MatchCount, 2; got != want {
+		t.Fatalf("SearchState().MatchCount = %d, want %d", got, want)
+	}
+	if got, want := state.CurrentMatch, 1; got != want {
+		t.Fatalf("SearchState().CurrentMatch = %d, want %d", got, want)
+	}
+	if state.CompileError != "" {
+		t.Fatalf("SearchState().CompileError = %q, want empty", state.CompileError)
+	}
+	if state.Preview {
+		t.Fatal("SearchState().Preview = true, want false")
+	}
+}
+
+func TestPagerSearchStateShowsPreview(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nalpine\nbeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if got := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "/", tcell.ModNone)); !got.Handled {
+		t.Fatal("HandleKeyResult(/).Handled = false, want true")
+	}
+	if got := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "a", tcell.ModNone)); !got.Handled {
+		t.Fatal("HandleKeyResult(a).Handled = false, want true")
+	}
+
+	state := pager.SearchState()
+	if got, want := state.Query, "a"; got != want {
+		t.Fatalf("SearchState().Query = %q, want %q", got, want)
+	}
+	if !state.Forward {
+		t.Fatal("SearchState().Forward = false, want true")
+	}
+	if got, want := state.MatchCount, 4; got != want {
+		t.Fatalf("SearchState().MatchCount = %d, want %d", got, want)
+	}
+	if got, want := state.CurrentMatch, 1; got != want {
+		t.Fatalf("SearchState().CurrentMatch = %d, want %d", got, want)
+	}
+	if state.CompileError != "" {
+		t.Fatalf("SearchState().CompileError = %q, want empty", state.CompileError)
+	}
+	if !state.Preview {
+		t.Fatal("SearchState().Preview = false, want true")
+	}
+}
+
+func TestPagerSearchStateShowsInvalidRegexPreview(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	pager.SetSearchMode(SearchRegex)
+	if err := pager.AppendString("alpha\nalpine\nbeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "/", tcell.ModNone))
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "a", tcell.ModNone))
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "(", tcell.ModNone))
+
+	state := pager.SearchState()
+	if got, want := state.Query, "a("; got != want {
+		t.Fatalf("SearchState().Query = %q, want %q", got, want)
+	}
+	if got, want := state.Mode, SearchRegex; got != want {
+		t.Fatalf("SearchState().Mode = %v, want %v", got, want)
+	}
+	if state.CompileError == "" {
+		t.Fatal("SearchState().CompileError = empty, want regex error")
+	}
+	if state.MatchCount != 0 || state.CurrentMatch != 0 {
+		t.Fatalf("SearchState() matches = %d/%d, want 0/0 for invalid regex", state.CurrentMatch, state.MatchCount)
+	}
+	if !state.Preview {
+		t.Fatal("SearchState().Preview = false, want true")
+	}
+}
+
 func TestPagerSetSearchMode(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
