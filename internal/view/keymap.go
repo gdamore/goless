@@ -11,7 +11,67 @@ type KeyGroup int
 const (
 	// KeyGroupLess selects less-like bundled bindings.
 	KeyGroupLess KeyGroup = iota
+	// KeyGroupEmpty starts with no bundled bindings.
+	KeyGroupEmpty
 )
+
+type keyContext int
+
+const (
+	keyContextNormal keyContext = iota
+	keyContextHelp
+	keyContextPrompt
+)
+
+// KeyContext selects which viewer mode a key binding applies to.
+type KeyContext = keyContext
+
+const (
+	KeyContextNormal = keyContextNormal
+	KeyContextHelp   = keyContextHelp
+	KeyContextPrompt = keyContextPrompt
+)
+
+// KeyAction identifies a viewer action that can be triggered from a binding.
+type KeyAction = action
+
+const (
+	KeyActionNone                 = actionNone
+	KeyActionQuit                 = actionQuit
+	KeyActionScrollUp             = actionScrollUp
+	KeyActionScrollDown           = actionScrollDown
+	KeyActionScrollLeft           = actionScrollLeft
+	KeyActionScrollRight          = actionScrollRight
+	KeyActionPageUp               = actionPageUp
+	KeyActionPageDown             = actionPageDown
+	KeyActionGoTop                = actionGoTop
+	KeyActionGoBottom             = actionGoBottom
+	KeyActionToggleWrap           = actionToggleWrap
+	KeyActionPromptSearchForward  = actionPromptSearchForward
+	KeyActionPromptSearchBackward = actionPromptSearchBackward
+	KeyActionPromptCommand        = actionPromptCommand
+	KeyActionSearchNext           = actionSearchNext
+	KeyActionSearchPrev           = actionSearchPrev
+	KeyActionToggleHelp           = actionToggleHelp
+	KeyActionFollow               = actionFollow
+	KeyActionCycleSearchCase      = actionCycleSearchCase
+	KeyActionCycleSearchMode      = actionCycleSearchMode
+)
+
+// KeyStroke identifies a key in a specific viewer context.
+type KeyStroke struct {
+	Context     KeyContext
+	Key         tcell.Key
+	Rune        string
+	Modifiers   tcell.ModMask
+	AnyModifier bool
+}
+
+// KeyBinding associates a key stroke with a viewer action.
+type KeyBinding struct {
+	KeyStroke
+	Action KeyAction
+}
 
 type keyBinding struct {
 	key    tcell.Key
@@ -24,10 +84,13 @@ type keyBinding struct {
 type keyMap struct {
 	normal []keyBinding
 	help   []keyBinding
+	prompt []keyBinding
 }
 
 func defaultKeyMap(group KeyGroup) keyMap {
 	switch group {
+	case KeyGroupEmpty:
+		return keyMap{}
 	case KeyGroupLess:
 		fallthrough
 	default:
@@ -85,7 +148,58 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyRune, rune: "q", action: actionToggleHelp},
 			{key: tcell.KeyRune, rune: "H", action: actionToggleHelp},
 		},
+		prompt: []keyBinding{
+			{key: tcell.KeyCtrlC, action: actionQuit},
+			{key: tcell.KeyF2, action: actionCycleSearchCase},
+			{key: tcell.KeyF3, action: actionCycleSearchMode},
+		},
 	}
+}
+
+func (m keyMap) withOverrides(unbind []KeyStroke, bind []KeyBinding) keyMap {
+	for _, stroke := range unbind {
+		switch stroke.Context {
+		case KeyContextHelp:
+			m.help = removeBindings(m.help, stroke)
+		case KeyContextPrompt:
+			m.prompt = removeBindings(m.prompt, stroke)
+		default:
+			m.normal = removeBindings(m.normal, stroke)
+		}
+	}
+
+	var prependNormal []keyBinding
+	var prependHelp []keyBinding
+	var prependPrompt []keyBinding
+	for _, binding := range bind {
+		converted := keyBinding{
+			key:    binding.Key,
+			rune:   binding.Rune,
+			mod:    binding.Modifiers,
+			anyMod: binding.AnyModifier,
+			action: action(binding.Action),
+		}
+		switch binding.Context {
+		case KeyContextHelp:
+			prependHelp = append(prependHelp, converted)
+		case KeyContextPrompt:
+			prependPrompt = append(prependPrompt, converted)
+		default:
+			prependNormal = append(prependNormal, converted)
+		}
+	}
+
+	if len(prependNormal) > 0 {
+		m.normal = append(prependNormal, m.normal...)
+	}
+	if len(prependHelp) > 0 {
+		m.help = append(prependHelp, m.help...)
+	}
+	if len(prependPrompt) > 0 {
+		m.prompt = append(prependPrompt, m.prompt...)
+	}
+
+	return m
 }
 
 func (m keyMap) normalAction(ev *tcell.EventKey) action {
@@ -94,6 +208,10 @@ func (m keyMap) normalAction(ev *tcell.EventKey) action {
 
 func (m keyMap) helpAction(ev *tcell.EventKey) action {
 	return actionForBindings(m.help, ev)
+}
+
+func (m keyMap) promptAction(ev *tcell.EventKey) action {
+	return actionForBindings(m.prompt, ev)
 }
 
 func actionForBindings(bindings []keyBinding, ev *tcell.EventKey) action {
@@ -116,4 +234,21 @@ func (b keyBinding) matches(ev *tcell.EventKey) bool {
 		return false
 	}
 	return true
+}
+
+func removeBindings(bindings []keyBinding, stroke KeyStroke) []keyBinding {
+	if len(bindings) == 0 {
+		return nil
+	}
+	filtered := bindings[:0]
+	for _, binding := range bindings {
+		if binding.key == stroke.Key &&
+			binding.rune == stroke.Rune &&
+			binding.mod == stroke.Modifiers &&
+			binding.anyMod == stroke.AnyModifier {
+			continue
+		}
+		filtered = append(filtered, binding)
+	}
+	return filtered
 }

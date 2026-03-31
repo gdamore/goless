@@ -21,6 +21,8 @@ type Config struct {
 	SearchCase SearchCaseMode
 	SearchMode SearchMode
 	KeyGroup   KeyGroup
+	KeyUnbind  []KeyStroke
+	KeyBind    []KeyBinding
 	Chrome     Chrome
 	ShowStatus bool
 	Text       Text
@@ -72,7 +74,7 @@ func New(doc *model.Document, cfg Config) *Viewer {
 		doc:  doc,
 		cfg:  cfg,
 		text: cfg.Text,
-		keys: defaultKeyMap(cfg.KeyGroup),
+		keys: defaultKeyMap(cfg.KeyGroup).withOverrides(cfg.KeyUnbind, cfg.KeyBind),
 	}
 }
 
@@ -795,14 +797,6 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 	case tcell.KeyEscape:
 		v.cancelPrompt()
 		return KeyResult{Handled: true}
-	case tcell.KeyCtrlC:
-		return KeyResult{Handled: true, Quit: true}
-	case tcell.KeyF2:
-		v.CycleSearchCaseMode()
-		return KeyResult{Handled: true}
-	case tcell.KeyF3:
-		v.CycleSearchMode()
-		return KeyResult{Handled: true}
 	case tcell.KeyEnter:
 		v.commitPrompt()
 		return KeyResult{Handled: true}
@@ -819,13 +813,34 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		v.updatePromptPreview()
 		return KeyResult{Handled: true}
 	case tcell.KeyRune:
+		if result, ok := v.handlePromptMappedAction(v.keys.promptAction(ev)); ok {
+			return result
+		}
 		if v.prompt != nil {
 			v.prompt.buffer = append(v.prompt.buffer, []rune(ev.Str())...)
 		}
 		v.updatePromptPreview()
 		return KeyResult{Handled: true}
 	}
+	if result, ok := v.handlePromptMappedAction(v.keys.promptAction(ev)); ok {
+		return result
+	}
 	return KeyResult{}
+}
+
+func (v *Viewer) handlePromptMappedAction(a action) (KeyResult, bool) {
+	switch a {
+	case actionQuit:
+		return KeyResult{Handled: true, Quit: true}, true
+	case actionCycleSearchCase:
+		v.CycleSearchCaseMode()
+		return KeyResult{Handled: true}, true
+	case actionCycleSearchMode:
+		v.CycleSearchMode()
+		return KeyResult{Handled: true}, true
+	default:
+		return KeyResult{}, false
+	}
 }
 
 func (v *Viewer) toggleHelp() {
