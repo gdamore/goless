@@ -18,6 +18,7 @@ import (
 type Config struct {
 	TabWidth   int
 	WrapMode   layout.WrapMode
+	SearchCase SearchCaseMode
 	KeyGroup   KeyGroup
 	Chrome     Chrome
 	ShowStatus bool
@@ -62,6 +63,7 @@ func New(doc *model.Document, cfg Config) *Viewer {
 	if cfg.TabWidth <= 0 {
 		cfg.TabWidth = 8
 	}
+	cfg.SearchCase = normalizeSearchCaseMode(cfg.SearchCase)
 	cfg.Chrome = cfg.Chrome.withDefaults()
 	cfg.Text = cfg.Text.withDefaults()
 	return &Viewer{
@@ -70,6 +72,37 @@ func New(doc *model.Document, cfg Config) *Viewer {
 		text: cfg.Text,
 		keys: defaultKeyMap(cfg.KeyGroup),
 	}
+}
+
+// SetSearchCaseMode updates the default case behavior for new and active searches.
+func (v *Viewer) SetSearchCaseMode(mode SearchCaseMode) {
+	mode = normalizeSearchCaseMode(mode)
+	if v.cfg.SearchCase == mode && (v.search.Query == "" || v.search.CaseMode == mode) {
+		return
+	}
+
+	v.cfg.SearchCase = mode
+	v.updatePromptPrefix()
+	if v.search.Query == "" {
+		return
+	}
+
+	v.search.CaseMode = mode
+	v.rebuildSearch()
+	if len(v.search.Matches) == 0 {
+		v.message = v.text.SearchNotFound(v.search.Query)
+		return
+	}
+	if v.search.Current < 0 || v.search.Current >= len(v.search.Matches) {
+		v.search.Current = v.pickInitialMatch(v.search.Forward)
+	}
+	v.goToMatch(v.search.Current)
+	v.message = v.text.SearchMatchCount(v.search.Query, len(v.search.Matches))
+}
+
+// SearchCaseMode reports the default case behavior for searches.
+func (v *Viewer) SearchCaseMode() SearchCaseMode {
+	return v.cfg.SearchCase
 }
 
 // SetWrapMode updates the viewer wrap mode while preserving the current anchor.
@@ -224,6 +257,8 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 		v.toggleHelp()
 	case actionFollow:
 		v.Follow()
+	case actionCycleSearchCase:
+		v.CycleSearchCaseMode()
 	default:
 		return KeyResult{}
 	}
@@ -602,13 +637,13 @@ func (v *Viewer) bottomBarRows() int {
 }
 
 func (v *Viewer) statusText() (left, right string) {
-	searchInfo := ""
+	searchInfo := "search:" + v.searchCaseLabel()
 	if v.search.Query != "" {
 		position := 0
 		if len(v.search.Matches) > 0 && v.search.Current >= 0 {
 			position = v.search.Current + 1
 		}
-		searchInfo = v.text.StatusSearchInfo(v.search.Query, position, len(v.search.Matches))
+		searchInfo += "  " + v.text.StatusSearchInfo(v.search.Query, position, len(v.search.Matches))
 	}
 	left = searchInfo
 	if v.follow {
@@ -668,6 +703,9 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 	case actionToggleHelp:
 		v.toggleHelp()
 		return KeyResult{Handled: true}
+	case actionCycleSearchCase:
+		v.CycleSearchCaseMode()
+		return KeyResult{Handled: true}
 	case actionScrollUp:
 		v.helpOffset--
 	case actionScrollDown:
@@ -694,6 +732,9 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		return KeyResult{Handled: true}
 	case tcell.KeyCtrlC:
 		return KeyResult{Handled: true, Quit: true}
+	case tcell.KeyF2:
+		v.CycleSearchCaseMode()
+		return KeyResult{Handled: true}
 	case tcell.KeyEnter:
 		v.commitPrompt()
 		return KeyResult{Handled: true}

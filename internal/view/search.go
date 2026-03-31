@@ -6,10 +6,23 @@ package view
 import (
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
+)
+
+// SearchCaseMode controls literal search case matching.
+type SearchCaseMode int
+
+const (
+	// SearchSmartCase uses case-insensitive matching unless the query contains an uppercase rune.
+	SearchSmartCase SearchCaseMode = iota
+	// SearchCaseSensitive requires exact rune case matches.
+	SearchCaseSensitive
+	// SearchCaseInsensitive matches runes case-insensitively.
+	SearchCaseInsensitive
 )
 
 type searchMatch struct {
@@ -21,10 +34,37 @@ type searchMatch struct {
 }
 
 type searchState struct {
-	Query   string
-	Forward bool
-	Matches []searchMatch
-	Current int
+	Query    string
+	Forward  bool
+	CaseMode SearchCaseMode
+	Matches  []searchMatch
+	Current  int
+}
+
+func (v *Viewer) searchCaseLabel() string {
+	switch normalizeSearchCaseMode(v.cfg.SearchCase) {
+	case SearchCaseSensitive:
+		return "case"
+	case SearchCaseInsensitive:
+		return "nocase"
+	default:
+		return "smart"
+	}
+}
+
+func (v *Viewer) CycleSearchCaseMode() SearchCaseMode {
+	next := SearchSmartCase
+	switch normalizeSearchCaseMode(v.cfg.SearchCase) {
+	case SearchSmartCase:
+		next = SearchCaseSensitive
+	case SearchCaseSensitive:
+		next = SearchCaseInsensitive
+	case SearchCaseInsensitive:
+		next = SearchSmartCase
+	}
+	v.SetSearchCaseMode(next)
+	v.message = "search:" + v.searchCaseLabel()
+	return next
 }
 
 func (v *Viewer) rebuildSearch() {
@@ -37,8 +77,9 @@ func (v *Viewer) rebuildSearch() {
 	var matches []searchMatch
 	pattern := v.search.Query
 	patternRunes := utf8.RuneCountInString(pattern)
+	effectiveCase := resolveSearchCaseMode(v.search.CaseMode, pattern)
 	for lineIndex, line := range v.lines {
-		for _, match := range findStringMatches(line, pattern, patternRunes) {
+		for _, match := range findStringMatches(line, pattern, patternRunes, effectiveCase) {
 			match.LineIndex = lineIndex
 			matches = append(matches, searchMatch{
 				LineIndex:  match.LineIndex,
@@ -62,14 +103,7 @@ func (v *Viewer) rebuildSearch() {
 func (v *Viewer) beginPrompt(kind promptKind) {
 	v.mode = modePrompt
 	v.prompt = &promptState{kind: kind}
-	switch kind {
-	case promptSearchForward:
-		v.prompt.prefix = "/"
-	case promptSearchBackward:
-		v.prompt.prefix = "?"
-	case promptCommand:
-		v.prompt.prefix = ":"
-	}
+	v.updatePromptPrefix()
 }
 
 func (v *Viewer) cancelPrompt() {
@@ -85,16 +119,30 @@ func (v *Viewer) commitPrompt() {
 	text := string(v.prompt.buffer)
 	switch v.prompt.kind {
 	case promptSearchForward:
-		v.startSearch(text, true)
+		v.startSearch(text, true, v.cfg.SearchCase)
 	case promptSearchBackward:
-		v.startSearch(text, false)
+		v.startSearch(text, false, v.cfg.SearchCase)
 	case promptCommand:
 		v.runCommand(text)
 	}
 	v.cancelPrompt()
 }
 
-func (v *Viewer) startSearch(query string, forward bool) {
+func (v *Viewer) updatePromptPrefix() {
+	if v.prompt == nil {
+		return
+	}
+	switch v.prompt.kind {
+	case promptSearchForward:
+		v.prompt.prefix = "/[" + v.searchCaseLabel() + "] "
+	case promptSearchBackward:
+		v.prompt.prefix = "?[" + v.searchCaseLabel() + "] "
+	case promptCommand:
+		v.prompt.prefix = ":"
+	}
+}
+
+func (v *Viewer) startSearch(query string, forward bool, mode SearchCaseMode) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		v.clearSearch()
@@ -105,6 +153,7 @@ func (v *Viewer) startSearch(query string, forward bool) {
 	v.ensureLayout()
 	v.search.Query = query
 	v.search.Forward = forward
+	v.search.CaseMode = normalizeSearchCaseMode(mode)
 	v.search.Current = -1
 	v.rebuildSearch()
 	if len(v.search.Matches) == 0 {
@@ -119,13 +168,25 @@ func (v *Viewer) startSearch(query string, forward bool) {
 
 // SearchForward starts a forward literal search and reports whether any match exists.
 func (v *Viewer) SearchForward(query string) bool {
-	v.startSearch(query, true)
+	v.startSearch(query, true, v.cfg.SearchCase)
+	return len(v.search.Matches) > 0
+}
+
+// SearchForwardWithCase starts a forward literal search with the supplied case mode.
+func (v *Viewer) SearchForwardWithCase(query string, mode SearchCaseMode) bool {
+	v.startSearch(query, true, mode)
 	return len(v.search.Matches) > 0
 }
 
 // SearchBackward starts a backward literal search and reports whether any match exists.
 func (v *Viewer) SearchBackward(query string) bool {
-	v.startSearch(query, false)
+	v.startSearch(query, false, v.cfg.SearchCase)
+	return len(v.search.Matches) > 0
+}
+
+// SearchBackwardWithCase starts a backward literal search with the supplied case mode.
+func (v *Viewer) SearchBackwardWithCase(query string, mode SearchCaseMode) bool {
+	v.startSearch(query, false, mode)
 	return len(v.search.Matches) > 0
 }
 
@@ -259,12 +320,40 @@ func (v *Viewer) runCommand(text string) {
 		return
 	}
 
+	if v.runSetCommand(text) {
+		return
+	}
+
 	lineNumber, err := strconv.Atoi(text)
 	if err != nil {
 		v.message = v.text.CommandUnknown(text)
 		return
 	}
 	v.goToLine(lineNumber)
+}
+
+func (v *Viewer) runSetCommand(text string) bool {
+	fields := strings.Fields(text)
+	if len(fields) != 3 || fields[0] != "set" || fields[1] != "searchcase" {
+		return false
+	}
+
+	var mode SearchCaseMode
+	switch fields[2] {
+	case "smart":
+		mode = SearchSmartCase
+	case "case", "sensitive":
+		mode = SearchCaseSensitive
+	case "nocase", "insensitive":
+		mode = SearchCaseInsensitive
+	default:
+		v.message = v.text.CommandUnknown(text)
+		return true
+	}
+
+	v.SetSearchCaseMode(mode)
+	v.message = "search:" + v.searchCaseLabel()
+	return true
 }
 
 func (v *Viewer) goToLine(lineNumber int) {
@@ -309,11 +398,40 @@ func (v *Viewer) graphemeMatched(line model.Line, lineIndex int, grapheme model.
 	return false, false
 }
 
-func findStringMatches(line model.Line, pattern string, patternRunes int) []searchMatch {
+func findStringMatches(line model.Line, pattern string, patternRunes int, mode SearchCaseMode) []searchMatch {
 	if pattern == "" || len(pattern) > len(line.Text) {
 		return nil
 	}
+	if mode != SearchCaseInsensitive {
+		return findSensitiveMatches(line, pattern, patternRunes)
+	}
 
+	patternFold := []rune(pattern)
+	var matches []searchMatch
+	text := line.Text
+	for startByte, startRune := 0, 0; startByte < len(text); {
+		endRune, ok := foldedPrefixRuneEnd(text[startByte:], patternFold, startRune)
+		if ok {
+			matches = append(matches, searchMatch{
+				StartRune:  startRune,
+				EndRune:    endRune,
+				StartGraph: graphemeIndexForRune(line, startRune),
+				EndGraph:   graphemeIndexForRuneEnd(line, endRune),
+			})
+		}
+
+		_, width := utf8.DecodeRuneInString(text[startByte:])
+		if width <= 0 {
+			width = 1
+		}
+		startByte += width
+		startRune++
+	}
+
+	return matches
+}
+
+func findSensitiveMatches(line model.Line, pattern string, patternRunes int) []searchMatch {
 	var matches []searchMatch
 	searchByte := 0
 	searchRune := 0
@@ -344,6 +462,64 @@ func findStringMatches(line model.Line, pattern string, patternRunes int) []sear
 	}
 
 	return matches
+}
+
+func foldedPrefixRuneEnd(text string, pattern []rune, startRune int) (int, bool) {
+	byteOffset := 0
+	runeIndex := startRune
+	for _, want := range pattern {
+		if byteOffset >= len(text) {
+			return 0, false
+		}
+		got, width := utf8.DecodeRuneInString(text[byteOffset:])
+		if width <= 0 || !equalFoldRune(got, want) {
+			return 0, false
+		}
+		byteOffset += width
+		runeIndex++
+	}
+	return runeIndex, true
+}
+
+func equalFoldRune(a, b rune) bool {
+	if a == b {
+		return true
+	}
+	for folded := unicode.SimpleFold(a); folded != a; folded = unicode.SimpleFold(folded) {
+		if folded == b {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveSearchCaseMode(mode SearchCaseMode, query string) SearchCaseMode {
+	mode = normalizeSearchCaseMode(mode)
+	if mode != SearchSmartCase {
+		return mode
+	}
+	if queryHasUppercase(query) {
+		return SearchCaseSensitive
+	}
+	return SearchCaseInsensitive
+}
+
+func normalizeSearchCaseMode(mode SearchCaseMode) SearchCaseMode {
+	switch mode {
+	case SearchCaseSensitive, SearchCaseInsensitive:
+		return mode
+	default:
+		return SearchSmartCase
+	}
+}
+
+func queryHasUppercase(query string) bool {
+	for _, r := range query {
+		if unicode.IsUpper(r) {
+			return true
+		}
+	}
+	return false
 }
 
 func graphemeIndexForRune(line model.Line, runeIndex int) int {

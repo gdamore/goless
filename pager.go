@@ -30,6 +30,7 @@ const (
 type Config struct {
 	TabWidth   int                        // TabWidth controls tab expansion during layout. Values <= 0 default to 8.
 	WrapMode   WrapMode                   // WrapMode selects horizontal scrolling or soft wrapping.
+	SearchCase SearchCaseMode             // SearchCase selects smart-case, case-sensitive, or case-insensitive literal search behavior.
 	KeyGroup   KeyGroup                   // KeyGroup selects a bundled set of key bindings.
 	RenderMode RenderMode                 // RenderMode controls how escapes and control sequences are presented.
 	Chrome     Chrome                     // Chrome configures optional body framing and title display.
@@ -73,6 +74,7 @@ func New(cfg Config) *Pager {
 		viewer: iview.New(doc, iview.Config{
 			TabWidth:   cfg.TabWidth,
 			WrapMode:   toInternalWrapMode(cfg.WrapMode),
+			SearchCase: toInternalSearchCaseMode(cfg.SearchCase),
 			KeyGroup:   toInternalKeyGroup(cfg.KeyGroup),
 			Chrome:     toInternalChrome(cfg.Chrome),
 			ShowStatus: cfg.ShowStatus,
@@ -225,14 +227,39 @@ func (p *Pager) Following() bool {
 	return p.viewer.Following()
 }
 
+// SetSearchCaseMode updates the default case behavior for new and active searches.
+func (p *Pager) SetSearchCaseMode(mode SearchCaseMode) {
+	p.viewer.SetSearchCaseMode(toInternalSearchCaseMode(mode))
+}
+
+// SearchCaseMode reports the default case behavior for searches.
+func (p *Pager) SearchCaseMode() SearchCaseMode {
+	return SearchCaseMode(p.viewer.SearchCaseMode())
+}
+
+// CycleSearchCaseMode rotates through smart-case, case-sensitive, and case-insensitive search modes.
+func (p *Pager) CycleSearchCaseMode() SearchCaseMode {
+	return SearchCaseMode(p.viewer.CycleSearchCaseMode())
+}
+
 // SearchForward starts a forward literal search and reports whether any match exists.
 func (p *Pager) SearchForward(query string) bool {
 	return p.viewer.SearchForward(query)
 }
 
+// SearchForwardWithCase starts a forward literal search with the supplied case mode.
+func (p *Pager) SearchForwardWithCase(query string, mode SearchCaseMode) bool {
+	return p.viewer.SearchForwardWithCase(query, toInternalSearchCaseMode(mode))
+}
+
 // SearchBackward starts a backward literal search and reports whether any match exists.
 func (p *Pager) SearchBackward(query string) bool {
 	return p.viewer.SearchBackward(query)
+}
+
+// SearchBackwardWithCase starts a backward literal search with the supplied case mode.
+func (p *Pager) SearchBackwardWithCase(query string, mode SearchCaseMode) bool {
+	return p.viewer.SearchBackwardWithCase(query, toInternalSearchCaseMode(mode))
 }
 
 // SearchNext advances to the next match in the active search direction.
@@ -271,6 +298,17 @@ func toInternalWrapMode(mode WrapMode) layout.WrapMode {
 		return layout.SoftWrap
 	default:
 		return layout.NoWrap
+	}
+}
+
+func toInternalSearchCaseMode(mode SearchCaseMode) iview.SearchCaseMode {
+	switch mode {
+	case SearchCaseSensitive:
+		return iview.SearchCaseSensitive
+	case SearchCaseInsensitive:
+		return iview.SearchCaseInsensitive
+	default:
+		return iview.SearchSmartCase
 	}
 }
 

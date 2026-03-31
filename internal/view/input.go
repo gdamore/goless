@@ -53,4 +53,5 @@ const (
 	actionSearchPrev
 	actionToggleHelp
 	actionFollow
+	actionCycleSearchCase
 )
