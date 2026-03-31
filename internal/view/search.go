@@ -6,6 +6,7 @@ package view
 import (
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
@@ -34,16 +35,17 @@ func (v *Viewer) rebuildSearch() {
 	}
 
 	var matches []searchMatch
-	pattern := []rune(v.search.Query)
+	pattern := v.search.Query
+	patternRunes := utf8.RuneCountInString(pattern)
 	for lineIndex, line := range v.lines {
-		text := []rune(line.Text)
-		for _, start := range findRuneMatches(text, pattern) {
+		for _, match := range findStringMatches(line, pattern, patternRunes) {
+			match.LineIndex = lineIndex
 			matches = append(matches, searchMatch{
-				LineIndex:  lineIndex,
-				StartRune:  start,
-				EndRune:    start + len(pattern),
-				StartGraph: graphemeIndexForRune(line, start),
-				EndGraph:   graphemeIndexForRuneEnd(line, start+len(pattern)),
+				LineIndex:  match.LineIndex,
+				StartRune:  match.StartRune,
+				EndRune:    match.EndRune,
+				StartGraph: match.StartGraph,
+				EndGraph:   match.EndGraph,
 			})
 		}
 	}
@@ -307,29 +309,41 @@ func (v *Viewer) graphemeMatched(line model.Line, lineIndex int, grapheme model.
 	return false, false
 }
 
-func findRuneMatches(text []rune, pattern []rune) []int {
-	if len(pattern) == 0 || len(pattern) > len(text) {
+func findStringMatches(line model.Line, pattern string, patternRunes int) []searchMatch {
+	if pattern == "" || len(pattern) > len(line.Text) {
 		return nil
 	}
-	var matches []int
-	for i := 0; i+len(pattern) <= len(text); i++ {
-		if runeSliceEqual(text[i:i+len(pattern)], pattern) {
-			matches = append(matches, i)
-		}
-	}
-	return matches
-}
 
-func runeSliceEqual(a []rune, b []rune) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
+	var matches []searchMatch
+	searchByte := 0
+	searchRune := 0
+	text := line.Text
+
+	for searchByte <= len(text)-len(pattern) {
+		idx := strings.Index(text[searchByte:], pattern)
+		if idx < 0 {
+			break
 		}
+
+		startByte := searchByte + idx
+		startRune := searchRune + utf8.RuneCountInString(text[searchByte:startByte])
+		endRune := startRune + patternRunes
+		matches = append(matches, searchMatch{
+			StartRune:  startRune,
+			EndRune:    endRune,
+			StartGraph: graphemeIndexForRune(line, startRune),
+			EndGraph:   graphemeIndexForRuneEnd(line, endRune),
+		})
+
+		_, width := utf8.DecodeRuneInString(text[startByte:])
+		if width <= 0 {
+			width = 1
+		}
+		searchByte = startByte + width
+		searchRune = startRune + 1
 	}
-	return true
+
+	return matches
 }
 
 func graphemeIndexForRune(line model.Line, runeIndex int) int {
