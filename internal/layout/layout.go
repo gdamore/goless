@@ -71,6 +71,7 @@ func Build(lines []model.Line, cfg Config) Result {
 	result := Result{
 		Config: cfg,
 		Lines:  make([]LineLayout, len(lines)),
+		Rows:   make([]VisualRow, 0, len(lines)),
 	}
 
 	for i, line := range lines {
@@ -236,6 +237,7 @@ func buildScrolledRow(lineIndex int, line model.Line, info LineLayout, width int
 		LineIndex:       lineIndex,
 		SourceCellStart: horizontalOffset,
 		SourceCellEnd:   horizontalOffset,
+		Segments:        make([]VisualSegment, 0, min(len(line.Graphemes), width+1)),
 	}
 	if width <= 0 {
 		return row

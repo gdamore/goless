@@ -151,7 +151,7 @@ func segmentGraphemes(text string) []Grapheme {
 		return nil
 	}
 
-	var graphemes []Grapheme
+	graphemes := make([]Grapheme, 0, utf8.RuneCountInString(text))
 	byteStart := 0
 	runeStart := 0
 	state := -1
