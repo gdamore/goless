@@ -83,6 +83,12 @@ func (v *Viewer) SetSearchCaseMode(mode SearchCaseMode) {
 
 	v.cfg.SearchCase = mode
 	v.updatePromptPrefix()
+	if v.mode == modePrompt && v.prompt != nil {
+		v.updatePromptPreview()
+		if v.prompt.preview != nil {
+			return
+		}
+	}
 	if v.search.Query == "" {
 		return
 	}
@@ -637,13 +643,14 @@ func (v *Viewer) bottomBarRows() int {
 }
 
 func (v *Viewer) statusText() (left, right string) {
+	search := v.activeSearch()
 	searchInfo := "search:" + v.searchCaseLabel()
-	if v.search.Query != "" {
+	if search.Query != "" {
 		position := 0
-		if len(v.search.Matches) > 0 && v.search.Current >= 0 {
-			position = v.search.Current + 1
+		if len(search.Matches) > 0 && search.Current >= 0 {
+			position = search.Current + 1
 		}
-		searchInfo += "  " + v.text.StatusSearchInfo(v.search.Query, position, len(v.search.Matches))
+		searchInfo += "  " + v.text.StatusSearchInfo(search.Query, position, len(search.Matches))
 	}
 	left = searchInfo
 	if v.follow {
@@ -742,16 +749,19 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		if v.prompt != nil && len(v.prompt.buffer) > 0 {
 			v.prompt.buffer = v.prompt.buffer[:len(v.prompt.buffer)-1]
 		}
+		v.updatePromptPreview()
 		return KeyResult{Handled: true}
 	case tcell.KeyCtrlU:
 		if v.prompt != nil {
 			v.prompt.buffer = v.prompt.buffer[:0]
 		}
+		v.updatePromptPreview()
 		return KeyResult{Handled: true}
 	case tcell.KeyRune:
 		if v.prompt != nil {
 			v.prompt.buffer = append(v.prompt.buffer, []rune(ev.Str())...)
 		}
+		v.updatePromptPreview()
 		return KeyResult{Handled: true}
 	}
 	return KeyResult{}

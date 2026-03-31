@@ -20,9 +20,10 @@ const (
 )
 
 type promptState struct {
-	kind   promptKind
-	prefix string
-	buffer []rune
+	kind    promptKind
+	prefix  string
+	buffer  []rune
+	preview *searchState
 }
 
 func (p *promptState) String() string {

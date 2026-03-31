@@ -41,6 +41,13 @@ type searchState struct {
 	Current  int
 }
 
+func (v *Viewer) activeSearch() *searchState {
+	if v.mode == modePrompt && v.prompt != nil && v.prompt.preview != nil {
+		return v.prompt.preview
+	}
+	return &v.search
+}
+
 func (v *Viewer) searchCaseLabel() string {
 	switch normalizeSearchCaseMode(v.cfg.SearchCase) {
 	case SearchCaseSensitive:
@@ -68,16 +75,23 @@ func (v *Viewer) CycleSearchCaseMode() SearchCaseMode {
 }
 
 func (v *Viewer) rebuildSearch() {
-	if v.search.Query == "" {
-		v.search.Matches = nil
-		v.search.Current = -1
+	v.rebuildSearchState(&v.search)
+}
+
+func (v *Viewer) rebuildSearchState(state *searchState) {
+	if state == nil {
+		return
+	}
+	if state.Query == "" {
+		state.Matches = nil
+		state.Current = -1
 		return
 	}
 
 	var matches []searchMatch
-	pattern := v.search.Query
+	pattern := state.Query
 	patternRunes := utf8.RuneCountInString(pattern)
-	effectiveCase := resolveSearchCaseMode(v.search.CaseMode, pattern)
+	effectiveCase := resolveSearchCaseMode(state.CaseMode, pattern)
 	for lineIndex, line := range v.lines {
 		for _, match := range findStringMatches(line, pattern, patternRunes, effectiveCase) {
 			match.LineIndex = lineIndex
@@ -90,13 +104,13 @@ func (v *Viewer) rebuildSearch() {
 			})
 		}
 	}
-	v.search.Matches = matches
+	state.Matches = matches
 	if len(matches) == 0 {
-		v.search.Current = -1
+		state.Current = -1
 		return
 	}
-	if v.search.Current < 0 || v.search.Current >= len(matches) {
-		v.search.Current = 0
+	if state.Current < 0 || state.Current >= len(matches) {
+		state.Current = 0
 	}
 }
 
@@ -119,13 +133,44 @@ func (v *Viewer) commitPrompt() {
 	text := string(v.prompt.buffer)
 	switch v.prompt.kind {
 	case promptSearchForward:
-		v.startSearch(text, true, v.cfg.SearchCase)
+		v.commitPromptSearch(text, true)
 	case promptSearchBackward:
-		v.startSearch(text, false, v.cfg.SearchCase)
+		v.commitPromptSearch(text, false)
 	case promptCommand:
 		v.runCommand(text)
 	}
 	v.cancelPrompt()
+}
+
+func (v *Viewer) commitPromptSearch(text string, forward bool) {
+	query := strings.TrimSpace(text)
+	if query == "" {
+		v.clearSearch()
+		return
+	}
+
+	v.follow = false
+	v.ensureLayout()
+	if v.prompt != nil && v.prompt.preview != nil {
+		v.search = *v.prompt.preview
+	} else {
+		v.search = searchState{
+			Query:    query,
+			Forward:  forward,
+			CaseMode: normalizeSearchCaseMode(v.cfg.SearchCase),
+			Current:  -1,
+		}
+		v.rebuildSearch()
+	}
+	if len(v.search.Matches) == 0 {
+		v.message = v.text.SearchNotFound(query)
+		return
+	}
+	if v.search.Current < 0 || v.search.Current >= len(v.search.Matches) {
+		v.search.Current = v.pickInitialMatch(forward)
+	}
+	v.goToMatch(v.search.Current)
+	v.message = v.text.SearchMatchCount(query, len(v.search.Matches))
 }
 
 func (v *Viewer) updatePromptPrefix() {
@@ -140,6 +185,36 @@ func (v *Viewer) updatePromptPrefix() {
 	case promptCommand:
 		v.prompt.prefix = ":"
 	}
+}
+
+func (v *Viewer) updatePromptPreview() {
+	if v.prompt == nil {
+		return
+	}
+	switch v.prompt.kind {
+	case promptSearchForward, promptSearchBackward:
+	default:
+		return
+	}
+
+	query := strings.TrimSpace(string(v.prompt.buffer))
+	if query == "" {
+		v.prompt.preview = nil
+		return
+	}
+
+	preview := &searchState{
+		Query:    query,
+		Forward:  v.prompt.kind == promptSearchForward,
+		CaseMode: normalizeSearchCaseMode(v.cfg.SearchCase),
+		Current:  -1,
+	}
+	v.ensureLayout()
+	v.rebuildSearchState(preview)
+	if len(preview.Matches) > 0 {
+		preview.Current = v.pickInitialPreviewMatch(preview)
+	}
+	v.prompt.preview = preview
 }
 
 func (v *Viewer) startSearch(query string, forward bool, mode SearchCaseMode) {
@@ -383,19 +458,52 @@ func (v *Viewer) JumpToLine(lineNumber int) bool {
 }
 
 func (v *Viewer) graphemeMatched(line model.Line, lineIndex int, grapheme model.Grapheme) (bool, bool) {
-	if len(v.search.Matches) == 0 {
+	search := v.activeSearch()
+	if len(search.Matches) == 0 {
 		return false, false
 	}
-	for i, match := range v.search.Matches {
+	for i, match := range search.Matches {
 		if match.LineIndex != lineIndex {
 			continue
 		}
 		if grapheme.RuneStart >= match.EndRune || grapheme.RuneEnd <= match.StartRune {
 			continue
 		}
-		return true, i == v.search.Current
+		return true, i == search.Current
 	}
 	return false, false
+}
+
+func (v *Viewer) pickInitialPreviewMatch(search *searchState) int {
+	if search == nil || len(search.Matches) == 0 {
+		return -1
+	}
+
+	anchor := v.firstVisibleAnchor()
+	anchorRune := 0
+	if anchor.LineIndex >= 0 && anchor.LineIndex < len(v.lines) {
+		line := v.lines[anchor.LineIndex]
+		if anchor.GraphemeIndex >= 0 && anchor.GraphemeIndex < len(line.Graphemes) {
+			anchorRune = line.Graphemes[anchor.GraphemeIndex].RuneStart
+		}
+	}
+
+	if search.Forward {
+		for i, match := range search.Matches {
+			if match.LineIndex > anchor.LineIndex || (match.LineIndex == anchor.LineIndex && match.StartRune >= anchorRune) {
+				return i
+			}
+		}
+		return 0
+	}
+
+	for i := len(search.Matches) - 1; i >= 0; i-- {
+		match := search.Matches[i]
+		if match.LineIndex < anchor.LineIndex || (match.LineIndex == anchor.LineIndex && match.StartRune <= anchorRune) {
+			return i
+		}
+	}
+	return len(search.Matches) - 1
 }
 
 func findStringMatches(line model.Line, pattern string, patternRunes int, mode SearchCaseMode) []searchMatch {

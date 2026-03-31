@@ -214,6 +214,62 @@ func TestPromptSearchUsesSmartCaseByDefault(t *testing.T) {
 	}
 }
 
+func TestPromptSearchProgressivelyNarrowsMatches(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nalpine\nbeta\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune("/"))
+	v.HandleKey(keyRune("a"))
+	if v.prompt == nil || v.prompt.preview == nil {
+		t.Fatal("prompt preview = nil, want live search preview")
+	}
+	if got, want := len(v.prompt.preview.Matches), 4; got != want {
+		t.Fatalf("preview match count after /a = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("l"))
+	v.HandleKey(keyRune("p"))
+	if got, want := len(v.prompt.preview.Matches), 2; got != want {
+		t.Fatalf("preview match count after /alp = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("h"))
+	if got, want := len(v.prompt.preview.Matches), 1; got != want {
+		t.Fatalf("preview match count after /alph = %d, want %d", got, want)
+	}
+}
+
+func TestPromptSearchCancelRestoresCommittedSearch(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nalpine\nbeta\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	if !v.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true")
+	}
+
+	v.HandleKey(keyRune("/"))
+	v.HandleKey(keyRune("a"))
+	v.HandleKey(keyRune("l"))
+	v.HandleKey(keyRune("p"))
+	v.HandleKey(keyKey(tcell.KeyEscape))
+
+	if got, want := v.search.Query, "alpha"; got != want {
+		t.Fatalf("search query after Esc = %q, want %q", got, want)
+	}
+	if got, want := len(v.search.Matches), 1; got != want {
+		t.Fatalf("match count after Esc = %d, want %d", got, want)
+	}
+}
+
 func TestPromptSearchRespectsCaseSensitiveMode(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("Alpha\nbeta\nALPHA\n")); err != nil {
