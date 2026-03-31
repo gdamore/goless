@@ -44,6 +44,12 @@ type Viewer struct {
 	helpOffset int
 }
 
+// KeyResult summarizes how the viewer handled a key event.
+type KeyResult struct {
+	Handled bool
+	Quit    bool
+}
+
 // Position summarizes the current visible viewport state.
 type Position struct {
 	Row    int
@@ -165,6 +171,11 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 
 // HandleKey applies minimal navigation and returns true when the viewer should exit.
 func (v *Viewer) HandleKey(ev *tcell.EventKey) bool {
+	return v.HandleKeyResult(ev).Quit
+}
+
+// HandleKeyResult applies a key event and reports whether it was handled and whether the viewer should exit.
+func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 	if v.mode == modeHelp {
 		return v.handleHelpKey(ev)
 	}
@@ -174,7 +185,7 @@ func (v *Viewer) HandleKey(ev *tcell.EventKey) bool {
 
 	switch v.keys.normalAction(ev) {
 	case actionQuit:
-		return true
+		return KeyResult{Handled: true, Quit: true}
 	case actionScrollUp:
 		v.ScrollUp(1)
 	case actionScrollDown:
@@ -213,9 +224,11 @@ func (v *Viewer) HandleKey(ev *tcell.EventKey) bool {
 		v.toggleHelp()
 	case actionFollow:
 		v.Follow()
+	default:
+		return KeyResult{}
 	}
 
-	return false
+	return KeyResult{Handled: true}
 }
 
 // ToggleWrap switches between horizontal scrolling and soft wrap modes.
@@ -648,13 +661,13 @@ func (v *Viewer) helpFrameTitle() string {
 	return title
 }
 
-func (v *Viewer) handleHelpKey(ev *tcell.EventKey) bool {
+func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 	switch v.keys.helpAction(ev) {
 	case actionQuit:
-		return true
+		return KeyResult{Handled: true, Quit: true}
 	case actionToggleHelp:
 		v.toggleHelp()
-		return false
+		return KeyResult{Handled: true}
 	case actionScrollUp:
 		v.helpOffset--
 	case actionScrollDown:
@@ -667,38 +680,40 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) bool {
 		v.helpOffset = 0
 	case actionGoBottom:
 		v.helpOffset = v.maxHelpOffset()
+	default:
+		return KeyResult{}
 	}
 	v.clampHelpOffset()
-	return false
+	return KeyResult{Handled: true}
 }
 
-func (v *Viewer) handlePromptKey(ev *tcell.EventKey) bool {
+func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 	switch ev.Key() {
 	case tcell.KeyEscape:
 		v.cancelPrompt()
-		return false
+		return KeyResult{Handled: true}
 	case tcell.KeyCtrlC:
-		return true
+		return KeyResult{Handled: true, Quit: true}
 	case tcell.KeyEnter:
 		v.commitPrompt()
-		return false
+		return KeyResult{Handled: true}
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if v.prompt != nil && len(v.prompt.buffer) > 0 {
 			v.prompt.buffer = v.prompt.buffer[:len(v.prompt.buffer)-1]
 		}
-		return false
+		return KeyResult{Handled: true}
 	case tcell.KeyCtrlU:
 		if v.prompt != nil {
 			v.prompt.buffer = v.prompt.buffer[:0]
 		}
-		return false
+		return KeyResult{Handled: true}
 	case tcell.KeyRune:
 		if v.prompt != nil {
 			v.prompt.buffer = append(v.prompt.buffer, []rune(ev.Str())...)
 		}
-		return false
+		return KeyResult{Handled: true}
 	}
-	return false
+	return KeyResult{}
 }
 
 func (v *Viewer) toggleHelp() {

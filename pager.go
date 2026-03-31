@@ -28,16 +28,23 @@ const (
 
 // Config configures a Pager.
 type Config struct {
-	TabWidth   int        // TabWidth controls tab expansion during layout. Values <= 0 default to 8.
-	WrapMode   WrapMode   // WrapMode selects horizontal scrolling or soft wrapping.
-	KeyGroup   KeyGroup   // KeyGroup selects a bundled set of key bindings.
-	RenderMode RenderMode // RenderMode controls how escapes and control sequences are presented.
-	Chrome     Chrome     // Chrome configures optional body framing and title display.
-	ShowStatus bool       // ShowStatus enables the status bar on the last screen row.
+	TabWidth   int                        // TabWidth controls tab expansion during layout. Values <= 0 default to 8.
+	WrapMode   WrapMode                   // WrapMode selects horizontal scrolling or soft wrapping.
+	KeyGroup   KeyGroup                   // KeyGroup selects a bundled set of key bindings.
+	RenderMode RenderMode                 // RenderMode controls how escapes and control sequences are presented.
+	Chrome     Chrome                     // Chrome configures optional body framing and title display.
+	ShowStatus bool                       // ShowStatus enables the status bar on the last screen row.
+	CaptureKey func(*tcell.EventKey) bool // CaptureKey reserves keys for the embedder before normal pager handling.
 
 	// Text controls user-facing text, help content, and UI indicators.
 	// Zero values are filled from DefaultText.
 	Text Text
+}
+
+// KeyResult summarizes how the pager handled a key event.
+type KeyResult struct {
+	Handled bool
+	Quit    bool
 }
 
 // Position summarizes the current visible pager viewport.
@@ -49,8 +56,9 @@ type Position struct {
 
 // Pager is an embeddable document pager backed by an appendable document model.
 type Pager struct {
-	doc    *model.Document
-	viewer *iview.Viewer
+	doc        *model.Document
+	viewer     *iview.Viewer
+	captureKey func(*tcell.EventKey) bool
 }
 
 // New constructs a Pager with the supplied configuration.
@@ -60,7 +68,8 @@ type Pager struct {
 func New(cfg Config) *Pager {
 	doc := model.NewDocumentWithMode(defaultChunkSize, toInternalRenderMode(cfg.RenderMode))
 	return &Pager{
-		doc: doc,
+		doc:        doc,
+		captureKey: cfg.CaptureKey,
 		viewer: iview.New(doc, iview.Config{
 			TabWidth:   cfg.TabWidth,
 			WrapMode:   toInternalWrapMode(cfg.WrapMode),
@@ -136,7 +145,19 @@ func (p *Pager) Refresh() {
 
 // HandleKey applies a key event and reports whether the caller should exit.
 func (p *Pager) HandleKey(ev *tcell.EventKey) bool {
-	return p.viewer.HandleKey(ev)
+	return p.HandleKeyResult(ev).Quit
+}
+
+// HandleKeyResult applies a key event and reports whether it was handled and whether the caller should exit.
+func (p *Pager) HandleKeyResult(ev *tcell.EventKey) KeyResult {
+	if p.captureKey != nil && p.captureKey(ev) {
+		return KeyResult{}
+	}
+	result := p.viewer.HandleKeyResult(ev)
+	return KeyResult{
+		Handled: result.Handled,
+		Quit:    result.Quit,
+	}
 }
 
 // ToggleWrap switches between horizontal scrolling and soft wrapping.
