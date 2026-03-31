@@ -14,3 +14,13 @@ const (
 	// SearchCaseInsensitive matches runes case-insensitively.
 	SearchCaseInsensitive
 )
+
+// SearchWordMode controls whether literal search matches substrings or whole words.
+type SearchWordMode int
+
+const (
+	// SearchSubstring matches the query anywhere in the visible text.
+	SearchSubstring SearchWordMode = iota
+	// SearchWholeWord restricts matches to whole-word boundaries.
+	SearchWholeWord
+)

@@ -31,6 +31,7 @@ type Config struct {
 	TabWidth   int                        // TabWidth controls tab expansion during layout. Values <= 0 default to 8.
 	WrapMode   WrapMode                   // WrapMode selects horizontal scrolling or soft wrapping.
 	SearchCase SearchCaseMode             // SearchCase selects smart-case, case-sensitive, or case-insensitive literal search behavior.
+	SearchWord SearchWordMode             // SearchWord selects substring or whole-word literal search behavior.
 	KeyGroup   KeyGroup                   // KeyGroup selects a bundled set of key bindings.
 	RenderMode RenderMode                 // RenderMode controls how escapes and control sequences are presented.
 	Chrome     Chrome                     // Chrome configures optional body framing and title display.
@@ -75,6 +76,7 @@ func New(cfg Config) *Pager {
 			TabWidth:   cfg.TabWidth,
 			WrapMode:   toInternalWrapMode(cfg.WrapMode),
 			SearchCase: toInternalSearchCaseMode(cfg.SearchCase),
+			SearchWord: toInternalSearchWordMode(cfg.SearchWord),
 			KeyGroup:   toInternalKeyGroup(cfg.KeyGroup),
 			Chrome:     toInternalChrome(cfg.Chrome),
 			ShowStatus: cfg.ShowStatus,
@@ -242,6 +244,21 @@ func (p *Pager) CycleSearchCaseMode() SearchCaseMode {
 	return SearchCaseMode(p.viewer.CycleSearchCaseMode())
 }
 
+// SetSearchWordMode updates whether searches match substrings or whole words.
+func (p *Pager) SetSearchWordMode(mode SearchWordMode) {
+	p.viewer.SetSearchWordMode(toInternalSearchWordMode(mode))
+}
+
+// SearchWordMode reports whether searches match substrings or whole words.
+func (p *Pager) SearchWordMode() SearchWordMode {
+	return SearchWordMode(p.viewer.SearchWordMode())
+}
+
+// CycleSearchWordMode rotates between substring and whole-word search modes.
+func (p *Pager) CycleSearchWordMode() SearchWordMode {
+	return SearchWordMode(p.viewer.CycleSearchWordMode())
+}
+
 // SearchForward starts a forward literal search and reports whether any match exists.
 func (p *Pager) SearchForward(query string) bool {
 	return p.viewer.SearchForward(query)
@@ -309,6 +326,15 @@ func toInternalSearchCaseMode(mode SearchCaseMode) iview.SearchCaseMode {
 		return iview.SearchCaseInsensitive
 	default:
 		return iview.SearchSmartCase
+	}
+}
+
+func toInternalSearchWordMode(mode SearchWordMode) iview.SearchWordMode {
+	switch mode {
+	case SearchWholeWord:
+		return iview.SearchWholeWord
+	default:
+		return iview.SearchSubstring
 	}
 }
 
