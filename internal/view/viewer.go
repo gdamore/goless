@@ -793,6 +793,10 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 }
 
 func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
+	if result, ok := v.handlePromptMappedAction(v.keys.promptAction(ev)); ok {
+		return result
+	}
+
 	switch ev.Key() {
 	case tcell.KeyEscape:
 		v.cancelPrompt()
@@ -813,17 +817,11 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		v.updatePromptPreview()
 		return KeyResult{Handled: true}
 	case tcell.KeyRune:
-		if result, ok := v.handlePromptMappedAction(v.keys.promptAction(ev)); ok {
-			return result
-		}
 		if v.prompt != nil {
 			v.prompt.buffer = append(v.prompt.buffer, []rune(ev.Str())...)
 		}
 		v.updatePromptPreview()
 		return KeyResult{Handled: true}
-	}
-	if result, ok := v.handlePromptMappedAction(v.keys.promptAction(ev)); ok {
-		return result
 	}
 	return KeyResult{}
 }

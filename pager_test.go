@@ -226,6 +226,39 @@ func TestPagerKeyBindingsOverrideBundledBindings(t *testing.T) {
 	}
 }
 
+func TestPagerPromptKeyBindingOverridesBuiltins(t *testing.T) {
+	pager := New(Config{
+		KeyGroup: LessKeyGroup,
+		KeyBindings: []KeyBinding{
+			{
+				KeyStroke: KeyStroke{Context: PromptKeyContext, Key: tcell.KeyEscape},
+				Action:    KeyActionQuit,
+			},
+		},
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		ShowStatus: true,
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "/", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(/).Handled = false, want true")
+	}
+
+	result = pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyEscape, "", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(Escape).Handled = false, want true")
+	}
+	if !result.Quit {
+		t.Fatal("HandleKeyResult(Escape).Quit = false, want true for prompt override")
+	}
+}
+
 func TestPagerSearchMethods(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
