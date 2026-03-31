@@ -409,6 +409,27 @@ func TestSetSearchModeCommand(t *testing.T) {
 	}
 }
 
+func TestPromptSearchPreservesWhitespace(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("a b\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune("/"))
+	v.HandleKey(keyRune(" "))
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.search.Query, " "; got != want {
+		t.Fatalf("search query after space search = %q, want %q", got, want)
+	}
+	if got, want := len(v.search.Matches), 1; got != want {
+		t.Fatalf("space search match count = %d, want %d", got, want)
+	}
+}
+
 func TestWholeWordSearchSkipsSubstrings(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alphabet alpha alpha_beta\n")); err != nil {
@@ -512,6 +533,81 @@ func TestInvalidRegexEnterKeepsPromptOpen(t *testing.T) {
 	}
 	if v.prompt == nil || v.prompt.errText == "" {
 		t.Fatal("expected prompt error to remain visible after invalid regex Enter")
+	}
+}
+
+func TestCycleSearchCaseModePreservesRegexDiagnostic(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true, SearchMode: SearchRegex})
+	v.SetSize(20, 2)
+
+	if v.SearchForward("[") {
+		t.Fatal("SearchForward([) = true, want false")
+	}
+	v.CycleSearchCaseMode()
+
+	if got := v.message; !strings.HasPrefix(got, "regex:error ") {
+		t.Fatalf("message after F2 on invalid regex = %q, want regex:error prefix", got)
+	}
+}
+
+func TestPromptCaseToggleUpdatesCommittedSearch(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("Alpha\nalpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	if !v.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true")
+	}
+	if got, want := len(v.search.Matches), 2; got != want {
+		t.Fatalf("initial match count = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("/"))
+	v.HandleKey(keyRune("x"))
+	v.HandleKey(keyKey(tcell.KeyF2))
+	v.HandleKey(keyKey(tcell.KeyEscape))
+
+	if got, want := v.SearchCaseMode(), SearchCaseSensitive; got != want {
+		t.Fatalf("SearchCaseMode after cancel = %v, want %v", got, want)
+	}
+	if got, want := len(v.search.Matches), 1; got != want {
+		t.Fatalf("committed match count after cancel = %d, want %d", got, want)
+	}
+}
+
+func TestPromptModeToggleUpdatesCommittedSearch(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alphabet alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	if !v.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true")
+	}
+	if got, want := len(v.search.Matches), 2; got != want {
+		t.Fatalf("initial match count = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("/"))
+	v.HandleKey(keyRune("x"))
+	v.HandleKey(keyKey(tcell.KeyF3))
+	v.HandleKey(keyKey(tcell.KeyEscape))
+
+	if got, want := v.SearchMode(), SearchWholeWord; got != want {
+		t.Fatalf("SearchMode after cancel = %v, want %v", got, want)
+	}
+	if got, want := len(v.search.Matches), 1; got != want {
+		t.Fatalf("committed whole-word match count after cancel = %d, want %d", got, want)
 	}
 }
 
@@ -944,6 +1040,25 @@ func TestStatusTextPlacesPositionOnRight(t *testing.T) {
 	}
 	if !strings.Contains(rightText, "row 1/2") {
 		t.Fatalf("right status text = %q, want row indicator", rightText)
+	}
+}
+
+func TestStatusTextUsesActiveSearchOverride(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("Beta\nbeta\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.relayout()
+	if !v.SearchForwardWithCase("BETA", SearchCaseInsensitive) {
+		t.Fatal("SearchForwardWithCase(BETA, SearchCaseInsensitive) = false, want true")
+	}
+
+	leftText, _ := v.statusText()
+	if !strings.Contains(leftText, "search:nocase,sub") {
+		t.Fatalf("left status text = %q, want active override label", leftText)
 	}
 }
 

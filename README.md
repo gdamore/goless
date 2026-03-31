@@ -211,7 +211,7 @@ performance work measurable as the library evolves.
 ## Current Limitations
 
 - API compatibility is not stable yet
-- Search is currently literal only; there is no regex mode yet
+- Regex search is available, but the search feature set is intentionally lightweight
 - The public package exposes a pager core, not a full standalone `less`
   replacement
 - The demo is intentionally small and does not aim to replicate every `less`

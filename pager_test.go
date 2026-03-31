@@ -301,3 +301,16 @@ func TestPagerRegexSearch(t *testing.T) {
 		t.Fatalf("Position().Row after regex SearchNext = %d, want %d", got, want)
 	}
 }
+
+func TestPagerSearchPreservesWhitespace(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("a b\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if !pager.SearchForward(" ") {
+		t.Fatal("SearchForward(space) = false, want true")
+	}
+}
