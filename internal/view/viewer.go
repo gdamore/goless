@@ -259,14 +259,15 @@ func (v *Viewer) GoTop() {
 // GoBottom moves the viewport to the end of the document.
 func (v *Viewer) GoBottom() {
 	v.ensureLayout()
+	v.follow = false
 	v.rowOffset = v.maxRowOffset()
-	v.follow = true
 	v.clampOffsets()
 }
 
 // Follow enables follow mode and pins the viewport to the end of the document.
 func (v *Viewer) Follow() {
 	v.GoBottom()
+	v.follow = true
 }
 
 // Following reports whether follow mode is active.

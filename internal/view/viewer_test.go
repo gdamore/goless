@@ -56,6 +56,9 @@ func TestLessKeyMapGoBottom(t *testing.T) {
 	if got, want := v.firstVisibleAnchor().LineIndex, 3; got != want {
 		t.Fatalf("visible line after G = %d, want %d", got, want)
 	}
+	if v.follow {
+		t.Fatalf("follow after G = true, want false")
+	}
 }
 
 func TestLessKeyMapHelpScrollsAndCloses(t *testing.T) {
@@ -76,6 +79,34 @@ func TestLessKeyMapHelpScrollsAndCloses(t *testing.T) {
 	v.HandleKey(keyRune("H"))
 	if got, want := v.mode, modeNormal; got != want {
 		t.Fatalf("mode after H = %v, want %v", got, want)
+	}
+}
+
+func TestKeyBindingMatchesRequireExactNoModifierByDefault(t *testing.T) {
+	binding := keyBinding{
+		key:    tcell.KeyRune,
+		rune:   "q",
+		mod:    tcell.ModNone,
+		action: actionQuit,
+	}
+
+	if !binding.matches(tcell.NewEventKey(tcell.KeyRune, "q", tcell.ModNone)) {
+		t.Fatalf("unmodified q should match")
+	}
+	if binding.matches(tcell.NewEventKey(tcell.KeyRune, "q", tcell.ModAlt)) {
+		t.Fatalf("modified q should not match exact unmodified binding")
+	}
+}
+
+func TestKeyBindingAnyModifierWildcard(t *testing.T) {
+	binding := keyBinding{
+		key:    tcell.KeyF1,
+		anyMod: true,
+		action: actionToggleHelp,
+	}
+
+	if !binding.matches(tcell.NewEventKey(tcell.KeyF1, "", tcell.ModAlt)) {
+		t.Fatalf("F1 with modifiers should match wildcard binding")
 	}
 }
 
