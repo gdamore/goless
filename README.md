@@ -129,7 +129,9 @@ The main config knobs are:
   `SearchCaseInsensitive`
 - `SearchMode`: `SearchSubstring`, `SearchWholeWord`, or `SearchRegex`
 - `RenderMode`: `RenderHybrid`, `RenderLiteral`, or `RenderPresentation`
-- `KeyGroup`: currently `LessKeyGroup`
+- `KeyGroup`: `LessKeyGroup` or `EmptyKeyGroup`
+- `UnbindKeys` and `KeyBindings`: remove or prepend bindings in normal, help,
+  or prompt contexts
 - `Chrome`: optional frame/title styling
 - `Text`: override help text, status text, and UI strings
 
@@ -147,9 +149,12 @@ The built-in pager UI exposes search mode controls directly:
 - `:set searchmode sub|word|regex` is available as a fallback
 - invalid regexes stay in the search prompt and are marked visibly until fixed
 
-Embedders are not locked to `F2` or `F3`. They can reserve bundled keys with
-`CaptureKey` and drive mode changes explicitly through `CycleSearchCaseMode`,
-`SetSearchCaseMode`, `CycleSearchMode`, or `SetSearchMode`.
+Embedders are not locked to the bundled keys. They can:
+
+- start from `EmptyKeyGroup`
+- remove exact bundled keys with `UnbindKeys`
+- prepend custom bindings with `KeyBindings`
+- still reserve keys before pager dispatch with `CaptureKey`
 
 `SearchState` exposes the current committed or preview search query, direction,
 mode, case handling, match count/current position, and any regex compile error.

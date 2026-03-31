@@ -110,6 +110,122 @@ func TestPagerCaptureKeyReservesBinding(t *testing.T) {
 	}
 }
 
+func TestPagerEmptyKeyGroupDisablesBundledBindings(t *testing.T) {
+	pager := New(Config{
+		KeyGroup:   EmptyKeyGroup,
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		ShowStatus: true,
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "q", tcell.ModNone))
+	if result.Handled {
+		t.Fatal("HandleKeyResult(q).Handled = true, want false with EmptyKeyGroup")
+	}
+	if result.Quit {
+		t.Fatal("HandleKeyResult(q).Quit = true, want false with EmptyKeyGroup")
+	}
+}
+
+func TestPagerUnbindKeyRemovesSpecificDefaultBinding(t *testing.T) {
+	pager := New(Config{
+		KeyGroup: LessKeyGroup,
+		UnbindKeys: []KeyStroke{
+			{Context: NormalKeyContext, Key: tcell.KeyRune, Rune: "n"},
+		},
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		ShowStatus: true,
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\nalpha\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	if !pager.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true")
+	}
+
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "n", tcell.ModNone))
+	if result.Handled {
+		t.Fatal("HandleKeyResult(n).Handled = true, want false after unbind")
+	}
+	if got, want := pager.SearchState().CurrentMatch, 1; got != want {
+		t.Fatalf("SearchState().CurrentMatch after n = %d, want %d", got, want)
+	}
+
+	result = pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "N", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(N).Handled = false, want true")
+	}
+	if got, want := pager.SearchState().CurrentMatch, 2; got != want {
+		t.Fatalf("SearchState().CurrentMatch after N = %d, want %d", got, want)
+	}
+}
+
+func TestPagerKeyBindingsOverrideBundledBindings(t *testing.T) {
+	pager := New(Config{
+		KeyGroup: LessKeyGroup,
+		KeyBindings: []KeyBinding{
+			{
+				KeyStroke: KeyStroke{Context: NormalKeyContext, Key: tcell.KeyRune, Rune: "x"},
+				Action:    KeyActionSearchNext,
+			},
+			{
+				KeyStroke: KeyStroke{Context: PromptKeyContext, Key: tcell.KeyF4},
+				Action:    KeyActionCycleSearchMode,
+			},
+		},
+		UnbindKeys: []KeyStroke{
+			{Context: PromptKeyContext, Key: tcell.KeyF3},
+		},
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		ShowStatus: true,
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\nalpha\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	if !pager.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true")
+	}
+
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "x", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(x).Handled = false, want true for custom binding")
+	}
+	if got, want := pager.SearchState().CurrentMatch, 2; got != want {
+		t.Fatalf("SearchState().CurrentMatch after x = %d, want %d", got, want)
+	}
+
+	result = pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "/", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(/).Handled = false, want true")
+	}
+	result = pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyF3, "", tcell.ModNone))
+	if result.Handled {
+		t.Fatal("HandleKeyResult(F3).Handled = true, want false after prompt unbind")
+	}
+	if got, want := pager.SearchMode(), SearchSubstring; got != want {
+		t.Fatalf("SearchMode() after F3 = %v, want %v", got, want)
+	}
+
+	result = pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyF4, "", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(F4).Handled = false, want true for prompt binding")
+	}
+	if got, want := pager.SearchMode(), SearchWholeWord; got != want {
+		t.Fatalf("SearchMode() after F4 = %v, want %v", got, want)
+	}
+}
+
 func TestPagerSearchMethods(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
