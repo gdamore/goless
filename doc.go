@@ -14,7 +14,7 @@
 //   - append content with Append, AppendString, or ReadFrom
 //   - size it with SetSize
 //   - render it with Draw
-//   - feed input through HandleKey or direct navigation methods
+//   - feed input through HandleKey or direct navigation/search methods
 //
 // The bundled demo in cmd/goless-demo shows the intended integration model for
 // a full-screen tcell application.

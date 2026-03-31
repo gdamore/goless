@@ -115,9 +115,26 @@ func (v *Viewer) startSearch(query string, forward bool) {
 	v.message = v.text.SearchMatchCount(query, len(v.search.Matches))
 }
 
+// SearchForward starts a forward literal search and reports whether any match exists.
+func (v *Viewer) SearchForward(query string) bool {
+	v.startSearch(query, true)
+	return len(v.search.Matches) > 0
+}
+
+// SearchBackward starts a backward literal search and reports whether any match exists.
+func (v *Viewer) SearchBackward(query string) bool {
+	v.startSearch(query, false)
+	return len(v.search.Matches) > 0
+}
+
 func (v *Viewer) clearSearch() {
 	v.search = searchState{}
 	v.message = v.text.SearchEmpty
+}
+
+// ClearSearch removes any active search state.
+func (v *Viewer) ClearSearch() {
+	v.clearSearch()
 }
 
 func (v *Viewer) repeatSearch(forward bool) {
@@ -132,6 +149,28 @@ func (v *Viewer) repeatSearch(forward bool) {
 	}
 	v.search.Current = (v.search.Current + step + len(v.search.Matches)) % len(v.search.Matches)
 	v.goToMatch(v.search.Current)
+}
+
+// SearchNext advances to the next match in the active search direction.
+func (v *Viewer) SearchNext() bool {
+	if len(v.search.Matches) == 0 {
+		v.repeatSearch(v.search.Forward)
+		return false
+	}
+	v.follow = false
+	v.repeatSearch(v.search.Forward)
+	return true
+}
+
+// SearchPrev advances to the previous match relative to the active search direction.
+func (v *Viewer) SearchPrev() bool {
+	if len(v.search.Matches) == 0 {
+		v.repeatSearch(!v.search.Forward)
+		return false
+	}
+	v.follow = false
+	v.repeatSearch(!v.search.Forward)
+	return true
 }
 
 func (v *Viewer) pickInitialMatch(forward bool) int {
@@ -244,6 +283,12 @@ func (v *Viewer) goToLine(lineNumber int) {
 	}
 	v.restoreAnchor(layout.Anchor{LineIndex: lineIndex, GraphemeIndex: 0})
 	v.message = v.text.CommandLine(lineNumber)
+}
+
+// JumpToLine moves the viewport to the requested logical line.
+func (v *Viewer) JumpToLine(lineNumber int) bool {
+	v.goToLine(lineNumber)
+	return lineNumber > 0 && lineNumber <= len(v.lines)
 }
 
 func (v *Viewer) graphemeMatched(line model.Line, lineIndex int, grapheme model.Grapheme) (bool, bool) {
