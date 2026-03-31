@@ -19,7 +19,7 @@ type Config struct {
 	TabWidth   int
 	WrapMode   layout.WrapMode
 	SearchCase SearchCaseMode
-	SearchWord SearchWordMode
+	SearchMode SearchMode
 	KeyGroup   KeyGroup
 	Chrome     Chrome
 	ShowStatus bool
@@ -65,7 +65,7 @@ func New(doc *model.Document, cfg Config) *Viewer {
 		cfg.TabWidth = 8
 	}
 	cfg.SearchCase = normalizeSearchCaseMode(cfg.SearchCase)
-	cfg.SearchWord = normalizeSearchWordMode(cfg.SearchWord)
+	cfg.SearchMode = normalizeSearchMode(cfg.SearchMode)
 	cfg.Chrome = cfg.Chrome.withDefaults()
 	cfg.Text = cfg.Text.withDefaults()
 	return &Viewer{
@@ -87,7 +87,7 @@ func (v *Viewer) SetSearchCaseMode(mode SearchCaseMode) {
 	v.updatePromptPrefix()
 	if v.mode == modePrompt && v.prompt != nil {
 		v.updatePromptPreview()
-		if v.prompt.preview != nil {
+		if v.prompt.preview != nil || v.prompt.errText != "" {
 			return
 		}
 	}
@@ -97,6 +97,10 @@ func (v *Viewer) SetSearchCaseMode(mode SearchCaseMode) {
 
 	v.search.CaseMode = mode
 	v.rebuildSearch()
+	if v.search.CompileError != "" {
+		v.message = v.search.CompileError
+		return
+	}
 	if len(v.search.Matches) == 0 {
 		v.message = v.text.SearchNotFound(v.search.Query)
 		return
@@ -113,18 +117,18 @@ func (v *Viewer) SearchCaseMode() SearchCaseMode {
 	return v.cfg.SearchCase
 }
 
-// SetSearchWordMode updates whether searches match substrings or whole words.
-func (v *Viewer) SetSearchWordMode(mode SearchWordMode) {
-	mode = normalizeSearchWordMode(mode)
-	if v.cfg.SearchWord == mode && (v.search.Query == "" || v.search.WordMode == mode) {
+// SetSearchMode updates whether searches use substring, whole-word, or regex matching.
+func (v *Viewer) SetSearchMode(mode SearchMode) {
+	mode = normalizeSearchMode(mode)
+	if v.cfg.SearchMode == mode && (v.search.Query == "" || v.search.Mode == mode) {
 		return
 	}
 
-	v.cfg.SearchWord = mode
+	v.cfg.SearchMode = mode
 	v.updatePromptPrefix()
 	if v.mode == modePrompt && v.prompt != nil {
 		v.updatePromptPreview()
-		if v.prompt.preview != nil {
+		if v.prompt.preview != nil || v.prompt.errText != "" {
 			return
 		}
 	}
@@ -132,8 +136,12 @@ func (v *Viewer) SetSearchWordMode(mode SearchWordMode) {
 		return
 	}
 
-	v.search.WordMode = mode
+	v.search.Mode = mode
 	v.rebuildSearch()
+	if v.search.CompileError != "" {
+		v.message = v.search.CompileError
+		return
+	}
 	if len(v.search.Matches) == 0 {
 		v.message = v.text.SearchNotFound(v.search.Query)
 		return
@@ -145,9 +153,9 @@ func (v *Viewer) SetSearchWordMode(mode SearchWordMode) {
 	v.message = v.text.SearchMatchCount(v.search.Query, len(v.search.Matches))
 }
 
-// SearchWordMode reports whether searches match substrings or whole words.
-func (v *Viewer) SearchWordMode() SearchWordMode {
-	return v.cfg.SearchWord
+// SearchMode reports whether searches use substring, whole-word, or regex matching.
+func (v *Viewer) SearchMode() SearchMode {
+	return v.cfg.SearchMode
 }
 
 // SetWrapMode updates the viewer wrap mode while preserving the current anchor.
@@ -304,8 +312,8 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 		v.Follow()
 	case actionCycleSearchCase:
 		v.CycleSearchCaseMode()
-	case actionCycleSearchWord:
-		v.CycleSearchWordMode()
+	case actionCycleSearchMode:
+		v.CycleSearchMode()
 	default:
 		return KeyResult{}
 	}
@@ -731,6 +739,15 @@ func (v *Viewer) drawPrompt(screen tcell.Screen, y int) {
 		prompt = " " + v.prompt.String()
 	}
 	screen.PutStrStyled(0, y, padRightToWidth(prompt, v.width), style)
+	if v.prompt != nil && v.prompt.errText != "" && v.width > 0 {
+		errText := "  " + v.prompt.errText
+		paddedPrompt := truncateToWidth(prompt, v.width)
+		start := stringWidth(paddedPrompt)
+		if start < v.width {
+			errStyle := style.Foreground(tcolor.Red)
+			screen.PutStrStyled(start, y, truncateToWidth(errText, v.width-start), errStyle)
+		}
+	}
 }
 
 func (v *Viewer) helpFrameTitle() string {
@@ -754,8 +771,8 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 	case actionCycleSearchCase:
 		v.CycleSearchCaseMode()
 		return KeyResult{Handled: true}
-	case actionCycleSearchWord:
-		v.CycleSearchWordMode()
+	case actionCycleSearchMode:
+		v.CycleSearchMode()
 		return KeyResult{Handled: true}
 	case actionScrollUp:
 		v.helpOffset--
@@ -787,7 +804,7 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		v.CycleSearchCaseMode()
 		return KeyResult{Handled: true}
 	case tcell.KeyF3:
-		v.CycleSearchWordMode()
+		v.CycleSearchMode()
 		return KeyResult{Handled: true}
 	case tcell.KeyEnter:
 		v.commitPrompt()

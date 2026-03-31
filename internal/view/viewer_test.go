@@ -313,7 +313,7 @@ func TestF2CyclesSearchCaseMode(t *testing.T) {
 	}
 }
 
-func TestF3CyclesSearchWordMode(t *testing.T) {
+func TestF3CyclesSearchMode(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alpha\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -323,12 +323,16 @@ func TestF3CyclesSearchWordMode(t *testing.T) {
 	v.SetSize(20, 2)
 
 	v.HandleKey(keyKey(tcell.KeyF3))
-	if got, want := v.SearchWordMode(), SearchWholeWord; got != want {
-		t.Fatalf("SearchWordMode after first F3 = %v, want %v", got, want)
+	if got, want := v.SearchMode(), SearchWholeWord; got != want {
+		t.Fatalf("SearchMode after first F3 = %v, want %v", got, want)
 	}
 	v.HandleKey(keyKey(tcell.KeyF3))
-	if got, want := v.SearchWordMode(), SearchSubstring; got != want {
-		t.Fatalf("SearchWordMode after second F3 = %v, want %v", got, want)
+	if got, want := v.SearchMode(), SearchRegex; got != want {
+		t.Fatalf("SearchMode after second F3 = %v, want %v", got, want)
+	}
+	v.HandleKey(keyKey(tcell.KeyF3))
+	if got, want := v.SearchMode(), SearchSubstring; got != want {
+		t.Fatalf("SearchMode after third F3 = %v, want %v", got, want)
 	}
 }
 
@@ -354,6 +358,11 @@ func TestF2UpdatesPromptPrefix(t *testing.T) {
 	if got, want := v.prompt.String(), "/[case,word] "; got != want {
 		t.Fatalf("prompt prefix after F3 = %q, want %q", got, want)
 	}
+
+	v.HandleKey(keyKey(tcell.KeyF3))
+	if got, want := v.prompt.String(), "/[case,regex] "; got != want {
+		t.Fatalf("prompt prefix after second F3 = %q, want %q", got, want)
+	}
 }
 
 func TestSetSearchCaseCommand(t *testing.T) {
@@ -378,7 +387,7 @@ func TestSetSearchCaseCommand(t *testing.T) {
 	}
 }
 
-func TestSetSearchWordCommand(t *testing.T) {
+func TestSetSearchModeCommand(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alphabet alpha\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -387,7 +396,7 @@ func TestSetSearchWordCommand(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 2)
 
-	for _, command := range []string{"set searchword word", "set searchword sub"} {
+	for _, command := range []string{"set searchmode word", "set searchmode regex", "set searchmode sub"} {
 		v.HandleKey(keyRune(":"))
 		for _, s := range command {
 			v.HandleKey(keyRune(string(s)))
@@ -395,8 +404,8 @@ func TestSetSearchWordCommand(t *testing.T) {
 		v.HandleKey(keyKey(tcell.KeyEnter))
 	}
 
-	if got, want := v.SearchWordMode(), SearchSubstring; got != want {
-		t.Fatalf("SearchWordMode after :set commands = %v, want %v", got, want)
+	if got, want := v.SearchMode(), SearchSubstring; got != want {
+		t.Fatalf("SearchMode after :set commands = %v, want %v", got, want)
 	}
 }
 
@@ -406,7 +415,7 @@ func TestWholeWordSearchSkipsSubstrings(t *testing.T) {
 		t.Fatalf("Append failed: %v", err)
 	}
 
-	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true, SearchWord: SearchWholeWord})
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true, SearchMode: SearchWholeWord})
 	v.SetSize(20, 2)
 
 	if !v.SearchForward("alpha") {
@@ -440,6 +449,69 @@ func TestF3UpdatesPromptPreviewMatches(t *testing.T) {
 	v.HandleKey(keyKey(tcell.KeyF3))
 	if got, want := len(v.prompt.preview.Matches), 1; got != want {
 		t.Fatalf("whole-word preview match count = %d, want %d", got, want)
+	}
+}
+
+func TestRegexSearchMatchesPattern(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("error 500\nwarning 404\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true, SearchMode: SearchRegex})
+	v.SetSize(20, 2)
+
+	if !v.SearchForward(`[45]0[04]`) {
+		t.Fatal("SearchForward(regex) = false, want true")
+	}
+	if got, want := len(v.search.Matches), 2; got != want {
+		t.Fatalf("regex match count = %d, want %d", got, want)
+	}
+}
+
+func TestInvalidRegexPreviewKeepsLastValidMatches(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true, SearchMode: SearchRegex})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune("/"))
+	v.HandleKey(keyRune("a"))
+	v.HandleKey(keyRune("l"))
+	if v.prompt.preview == nil || len(v.prompt.preview.Matches) != 1 {
+		t.Fatal("expected valid regex preview for al")
+	}
+
+	v.HandleKey(keyRune("["))
+	if v.prompt.errText == "" {
+		t.Fatal("expected invalid regex error text")
+	}
+	if v.prompt.preview == nil || v.prompt.preview.Query != "al" {
+		t.Fatalf("preview query after invalid regex = %#v, want last valid preview", v.prompt.preview)
+	}
+}
+
+func TestInvalidRegexEnterKeepsPromptOpen(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true, SearchMode: SearchRegex})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune("/"))
+	v.HandleKey(keyRune("["))
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.mode, modePrompt; got != want {
+		t.Fatalf("viewer mode after invalid regex Enter = %v, want %v", got, want)
+	}
+	if v.prompt == nil || v.prompt.errText == "" {
+		t.Fatal("expected prompt error to remain visible after invalid regex Enter")
 	}
 }
 

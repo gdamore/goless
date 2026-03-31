@@ -118,8 +118,8 @@ The current exported `Pager` API is controller-oriented.
 - Mode control: `ToggleWrap`, `SetWrapMode`, `WrapMode`, `Follow`, `Following`
 - Search: `SearchForward`, `SearchBackward`, `SearchNext`, `SearchPrev`,
   `SearchForwardWithCase`, `SearchBackwardWithCase`, `SetSearchCaseMode`,
-  `SearchCaseMode`, `SetSearchWordMode`, `SearchWordMode`,
-  `CycleSearchCaseMode`, `CycleSearchWordMode`, `ClearSearch`
+  `SearchCaseMode`, `SetSearchMode`, `SearchMode`, `CycleSearchCaseMode`,
+  `CycleSearchMode`, `ClearSearch`
 - View state: `Position`
 
 The main config knobs are:
@@ -127,7 +127,7 @@ The main config knobs are:
 - `WrapMode`: `NoWrap` or `SoftWrap`
 - `SearchCase`: `SearchSmartCase`, `SearchCaseSensitive`, or
   `SearchCaseInsensitive`
-- `SearchWord`: `SearchSubstring` or `SearchWholeWord`
+- `SearchMode`: `SearchSubstring`, `SearchWholeWord`, or `SearchRegex`
 - `RenderMode`: `RenderHybrid`, `RenderLiteral`, or `RenderPresentation`
 - `KeyGroup`: currently `LessKeyGroup`
 - `Chrome`: optional frame/title styling
@@ -141,14 +141,15 @@ By default, literal search uses smart-case behavior:
 The built-in pager UI exposes search mode controls directly:
 
 - `F2` in the bundled less-like key group cycles `smart -> case -> nocase`
-- `F3` in the bundled less-like key group toggles `sub -> word`
+- `F3` in the bundled less-like key group cycles `sub -> word -> regex`
 - the current mode is shown in the status bar and search prompt
 - `:set searchcase smart|case|nocase` is available as a fallback
-- `:set searchword sub|word` is available as a fallback
+- `:set searchmode sub|word|regex` is available as a fallback
+- invalid regexes stay in the search prompt and are marked visibly until fixed
 
 Embedders are not locked to `F2` or `F3`. They can reserve bundled keys with
 `CaptureKey` and drive mode changes explicitly through `CycleSearchCaseMode`,
-`SetSearchCaseMode`, `CycleSearchWordMode`, or `SetSearchWordMode`.
+`SetSearchCaseMode`, `CycleSearchMode`, or `SetSearchMode`.
 
 ## Render Modes
 
@@ -189,10 +190,10 @@ The default key group is intentionally less-like. Common bindings include:
 - `/` and `?` to search forward/backward
 - `n` and `N` to repeat search
 - `F2` to cycle search case mode in the bundled key group
-- `F3` to toggle substring vs whole-word matching in the bundled key group
+- `F3` to cycle substring, whole-word, and regex matching in the bundled key group
 - `:` then a number to jump to a line
 - `:set searchcase smart|case|nocase` to set search mode directly
-- `:set searchword sub|word` to set whole-word matching directly
+- `:set searchmode sub|word|regex` to set search mode directly
 - `F` to enable follow mode
 - `H` or `F1` to toggle help
 

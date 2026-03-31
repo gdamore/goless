@@ -24,6 +24,7 @@ type promptState struct {
 	prefix  string
 	buffer  []rune
 	preview *searchState
+	errText string
 }
 
 func (p *promptState) String() string {
@@ -55,5 +56,5 @@ const (
 	actionToggleHelp
 	actionFollow
 	actionCycleSearchCase
-	actionCycleSearchWord
+	actionCycleSearchMode
 )

@@ -9,13 +9,13 @@ Search
 /: search forward
 ?: search backward
 n/N: next/previous match
-F2: cycle search mode (smart/case/nocase)
-F3: toggle substring/whole-word matching
+F2: cycle search case mode (smart/case/nocase)
+F3: cycle substring/whole-word/regex matching
 
 Commands
 :123: jump to line 123
 :set searchcase smart|case|nocase
-:set searchword sub|word
+:set searchmode sub|word|regex
 
 General
 H or F1: help

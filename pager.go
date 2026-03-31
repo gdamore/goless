@@ -31,7 +31,7 @@ type Config struct {
 	TabWidth   int                        // TabWidth controls tab expansion during layout. Values <= 0 default to 8.
 	WrapMode   WrapMode                   // WrapMode selects horizontal scrolling or soft wrapping.
 	SearchCase SearchCaseMode             // SearchCase selects smart-case, case-sensitive, or case-insensitive literal search behavior.
-	SearchWord SearchWordMode             // SearchWord selects substring or whole-word literal search behavior.
+	SearchMode SearchMode                 // SearchMode selects substring, whole-word, or regex search behavior.
 	KeyGroup   KeyGroup                   // KeyGroup selects a bundled set of key bindings.
 	RenderMode RenderMode                 // RenderMode controls how escapes and control sequences are presented.
 	Chrome     Chrome                     // Chrome configures optional body framing and title display.
@@ -76,7 +76,7 @@ func New(cfg Config) *Pager {
 			TabWidth:   cfg.TabWidth,
 			WrapMode:   toInternalWrapMode(cfg.WrapMode),
 			SearchCase: toInternalSearchCaseMode(cfg.SearchCase),
-			SearchWord: toInternalSearchWordMode(cfg.SearchWord),
+			SearchMode: toInternalSearchMode(cfg.SearchMode),
 			KeyGroup:   toInternalKeyGroup(cfg.KeyGroup),
 			Chrome:     toInternalChrome(cfg.Chrome),
 			ShowStatus: cfg.ShowStatus,
@@ -244,37 +244,37 @@ func (p *Pager) CycleSearchCaseMode() SearchCaseMode {
 	return SearchCaseMode(p.viewer.CycleSearchCaseMode())
 }
 
-// SetSearchWordMode updates whether searches match substrings or whole words.
-func (p *Pager) SetSearchWordMode(mode SearchWordMode) {
-	p.viewer.SetSearchWordMode(toInternalSearchWordMode(mode))
+// SetSearchMode updates whether searches use substring, whole-word, or regex matching.
+func (p *Pager) SetSearchMode(mode SearchMode) {
+	p.viewer.SetSearchMode(toInternalSearchMode(mode))
 }
 
-// SearchWordMode reports whether searches match substrings or whole words.
-func (p *Pager) SearchWordMode() SearchWordMode {
-	return SearchWordMode(p.viewer.SearchWordMode())
+// SearchMode reports whether searches use substring, whole-word, or regex matching.
+func (p *Pager) SearchMode() SearchMode {
+	return SearchMode(p.viewer.SearchMode())
 }
 
-// CycleSearchWordMode rotates between substring and whole-word search modes.
-func (p *Pager) CycleSearchWordMode() SearchWordMode {
-	return SearchWordMode(p.viewer.CycleSearchWordMode())
+// CycleSearchMode rotates through substring, whole-word, and regex search modes.
+func (p *Pager) CycleSearchMode() SearchMode {
+	return SearchMode(p.viewer.CycleSearchMode())
 }
 
-// SearchForward starts a forward literal search and reports whether any match exists.
+// SearchForward starts a forward search and reports whether any match exists.
 func (p *Pager) SearchForward(query string) bool {
 	return p.viewer.SearchForward(query)
 }
 
-// SearchForwardWithCase starts a forward literal search with the supplied case mode.
+// SearchForwardWithCase starts a forward search with the supplied case mode.
 func (p *Pager) SearchForwardWithCase(query string, mode SearchCaseMode) bool {
 	return p.viewer.SearchForwardWithCase(query, toInternalSearchCaseMode(mode))
 }
 
-// SearchBackward starts a backward literal search and reports whether any match exists.
+// SearchBackward starts a backward search and reports whether any match exists.
 func (p *Pager) SearchBackward(query string) bool {
 	return p.viewer.SearchBackward(query)
 }
 
-// SearchBackwardWithCase starts a backward literal search with the supplied case mode.
+// SearchBackwardWithCase starts a backward search with the supplied case mode.
 func (p *Pager) SearchBackwardWithCase(query string, mode SearchCaseMode) bool {
 	return p.viewer.SearchBackwardWithCase(query, toInternalSearchCaseMode(mode))
 }
@@ -329,10 +329,12 @@ func toInternalSearchCaseMode(mode SearchCaseMode) iview.SearchCaseMode {
 	}
 }
 
-func toInternalSearchWordMode(mode SearchWordMode) iview.SearchWordMode {
+func toInternalSearchMode(mode SearchMode) iview.SearchMode {
 	switch mode {
 	case SearchWholeWord:
 		return iview.SearchWholeWord
+	case SearchRegex:
+		return iview.SearchRegex
 	default:
 		return iview.SearchSubstring
 	}
