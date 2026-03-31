@@ -17,6 +17,7 @@ type keyBinding struct {
 	key    tcell.Key
 	rune   string
 	mod    tcell.ModMask
+	anyMod bool
 	action action
 }
 
@@ -104,7 +105,7 @@ func (b keyBinding) matches(ev *tcell.EventKey) bool {
 	if ev.Key() != b.key {
 		return false
 	}
-	if b.mod != 0 && ev.Modifiers() != b.mod {
+	if !b.anyMod && ev.Modifiers() != b.mod {
 		return false
 	}
 	if b.key == tcell.KeyRune && ev.Str() != b.rune {
