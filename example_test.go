@@ -38,6 +38,9 @@ func ExampleNew() {
 	defer screen.Fini()
 
 	pager.Draw(screen)
+	if result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "x", tcell.ModNone)); result.Handled {
+		return
+	}
 	_ = pager.SearchForward("world")
 	pager.HandleKey(tcell.NewEventKey(tcell.KeyRune, "G", tcell.ModNone))
 	pager.Draw(screen)

@@ -55,6 +55,61 @@ func TestPagerHandleKey(t *testing.T) {
 	}
 }
 
+func TestPagerHandleKeyResult(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 4)
+	if err := pager.AppendString("hello\nworld\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "x", tcell.ModNone))
+	if result.Handled {
+		t.Fatal("HandleKeyResult(x).Handled = true, want false")
+	}
+	if result.Quit {
+		t.Fatal("HandleKeyResult(x).Quit = true, want false")
+	}
+
+	result = pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "q", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(q).Handled = false, want true")
+	}
+	if !result.Quit {
+		t.Fatal("HandleKeyResult(q).Quit = false, want true")
+	}
+}
+
+func TestPagerCaptureKeyReservesBinding(t *testing.T) {
+	pager := New(Config{
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		ShowStatus: true,
+		CaptureKey: func(ev *tcell.EventKey) bool {
+			return ev.Key() == tcell.KeyRune && ev.Str() == "n"
+		},
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\nalpha\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	if !pager.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true")
+	}
+
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "n", tcell.ModNone))
+	if result.Handled {
+		t.Fatal("HandleKeyResult(n).Handled = true, want false when captured")
+	}
+	if result.Quit {
+		t.Fatal("HandleKeyResult(n).Quit = true, want false")
+	}
+	if got, want := pager.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row after captured n = %d, want %d", got, want)
+	}
+}
+
 func TestPagerSearchMethods(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
