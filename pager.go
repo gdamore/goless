@@ -40,6 +40,13 @@ type Config struct {
 	Text Text
 }
 
+// Position summarizes the current visible pager viewport.
+type Position struct {
+	Row    int
+	Rows   int
+	Column int
+}
+
 // Pager is an embeddable document pager backed by an appendable document model.
 type Pager struct {
 	doc    *model.Document
@@ -137,6 +144,16 @@ func (p *Pager) ToggleWrap() {
 	p.viewer.ToggleWrap()
 }
 
+// SetWrapMode updates the pager wrap mode while preserving the current anchor.
+func (p *Pager) SetWrapMode(mode WrapMode) {
+	p.viewer.SetWrapMode(toInternalWrapMode(mode))
+}
+
+// WrapMode reports the current wrap mode.
+func (p *Pager) WrapMode() WrapMode {
+	return WrapMode(p.viewer.WrapMode())
+}
+
 // ScrollDown moves the viewport down by n rows.
 func (p *Pager) ScrollDown(n int) {
 	p.viewer.ScrollDown(n)
@@ -185,6 +202,46 @@ func (p *Pager) Follow() {
 // Following reports whether follow mode is active.
 func (p *Pager) Following() bool {
 	return p.viewer.Following()
+}
+
+// SearchForward starts a forward literal search and reports whether any match exists.
+func (p *Pager) SearchForward(query string) bool {
+	return p.viewer.SearchForward(query)
+}
+
+// SearchBackward starts a backward literal search and reports whether any match exists.
+func (p *Pager) SearchBackward(query string) bool {
+	return p.viewer.SearchBackward(query)
+}
+
+// SearchNext advances to the next match in the active search direction.
+func (p *Pager) SearchNext() bool {
+	return p.viewer.SearchNext()
+}
+
+// SearchPrev advances to the previous match relative to the active search direction.
+func (p *Pager) SearchPrev() bool {
+	return p.viewer.SearchPrev()
+}
+
+// ClearSearch removes any active search state.
+func (p *Pager) ClearSearch() {
+	p.viewer.ClearSearch()
+}
+
+// JumpToLine moves the viewport to the requested logical line.
+func (p *Pager) JumpToLine(lineNumber int) bool {
+	return p.viewer.JumpToLine(lineNumber)
+}
+
+// Position reports the current visible row, total row count, and horizontal offset.
+func (p *Pager) Position() Position {
+	pos := p.viewer.Position()
+	return Position{
+		Row:    pos.Row,
+		Rows:   pos.Rows,
+		Column: pos.Column,
+	}
 }
 
 func toInternalWrapMode(mode WrapMode) layout.WrapMode {

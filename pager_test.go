@@ -54,3 +54,79 @@ func TestPagerHandleKey(t *testing.T) {
 		t.Fatalf("HandleKey(q) = false, want true")
 	}
 }
+
+func TestPagerSearchMethods(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\nalpha\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if !pager.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true")
+	}
+	if got, want := pager.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row after SearchForward = %d, want %d", got, want)
+	}
+	if !pager.SearchNext() {
+		t.Fatal("SearchNext() = false, want true")
+	}
+	if got, want := pager.Position().Row, 3; got != want {
+		t.Fatalf("Position().Row after SearchNext = %d, want %d", got, want)
+	}
+	if !pager.SearchPrev() {
+		t.Fatal("SearchPrev() = false, want true")
+	}
+	if got, want := pager.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row after SearchPrev = %d, want %d", got, want)
+	}
+	if pager.SearchForward("missing") {
+		t.Fatal("SearchForward(missing) = true, want false")
+	}
+}
+
+func TestPagerWrapModeAndPosition(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(5, 4)
+	if err := pager.AppendString("abcdefghij\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.ScrollRight(3)
+
+	pos := pager.Position()
+	if got, want := pos.Column, 3; got != want {
+		t.Fatalf("Position().Column = %d, want %d", got, want)
+	}
+	if got, want := pager.WrapMode(), NoWrap; got != want {
+		t.Fatalf("WrapMode() = %v, want %v", got, want)
+	}
+
+	pager.SetWrapMode(SoftWrap)
+	if got, want := pager.WrapMode(), SoftWrap; got != want {
+		t.Fatalf("WrapMode() after SetWrapMode = %v, want %v", got, want)
+	}
+	if got := pager.Position().Column; got != 0 {
+		t.Fatalf("Position().Column after SoftWrap = %d, want 0", got)
+	}
+}
+
+func TestPagerJumpToLine(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("one\ntwo\nthree\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if !pager.JumpToLine(3) {
+		t.Fatal("JumpToLine(3) = false, want true")
+	}
+	if got, want := pager.Position().Row, 3; got != want {
+		t.Fatalf("Position().Row after JumpToLine = %d, want %d", got, want)
+	}
+	if pager.JumpToLine(4) {
+		t.Fatal("JumpToLine(4) = true, want false")
+	}
+}

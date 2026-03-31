@@ -44,6 +44,13 @@ type Viewer struct {
 	helpOffset int
 }
 
+// Position summarizes the current visible viewport state.
+type Position struct {
+	Row    int
+	Rows   int
+	Column int
+}
+
 // New constructs a viewer for the given document.
 func New(doc *model.Document, cfg Config) *Viewer {
 	if cfg.TabWidth <= 0 {
@@ -57,6 +64,42 @@ func New(doc *model.Document, cfg Config) *Viewer {
 		text: cfg.Text,
 		keys: defaultKeyMap(cfg.KeyGroup),
 	}
+}
+
+// SetWrapMode updates the viewer wrap mode while preserving the current anchor.
+func (v *Viewer) SetWrapMode(mode layout.WrapMode) {
+	if mode != layout.SoftWrap {
+		mode = layout.NoWrap
+	}
+	if v.cfg.WrapMode == mode {
+		return
+	}
+
+	v.ensureLayout()
+	anchor := v.firstVisibleAnchor()
+	if mode == layout.NoWrap {
+		v.colOffset = 0
+		if anchor.LineIndex >= 0 && anchor.LineIndex < len(v.layout.Lines) {
+			starts := v.layout.Lines[anchor.LineIndex].GraphemeCellStarts
+			if anchor.GraphemeIndex >= 0 && anchor.GraphemeIndex < len(starts) {
+				v.colOffset = starts[anchor.GraphemeIndex]
+			}
+		}
+	}
+
+	v.cfg.WrapMode = mode
+	v.relayout()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+		return
+	}
+	v.restoreAnchor(anchor)
+}
+
+// WrapMode reports the current wrap mode.
+func (v *Viewer) WrapMode() layout.WrapMode {
+	return v.cfg.WrapMode
 }
 
 // SetSize updates the viewport size.
@@ -177,28 +220,11 @@ func (v *Viewer) HandleKey(ev *tcell.EventKey) bool {
 
 // ToggleWrap switches between horizontal scrolling and soft wrap modes.
 func (v *Viewer) ToggleWrap() {
-	v.ensureLayout()
-	anchor := v.firstVisibleAnchor()
 	if v.cfg.WrapMode == layout.NoWrap {
-		v.cfg.WrapMode = layout.SoftWrap
-	} else {
-		v.cfg.WrapMode = layout.NoWrap
-		if anchor.LineIndex >= 0 && anchor.LineIndex < len(v.layout.Lines) {
-			starts := v.layout.Lines[anchor.LineIndex].GraphemeCellStarts
-			if anchor.GraphemeIndex >= 0 && anchor.GraphemeIndex < len(starts) {
-				v.colOffset = starts[anchor.GraphemeIndex]
-			} else {
-				v.colOffset = 0
-			}
-		}
-	}
-	v.relayout()
-	if v.follow {
-		v.rowOffset = v.maxRowOffset()
-		v.clampOffsets()
+		v.SetWrapMode(layout.SoftWrap)
 		return
 	}
-	v.restoreAnchor(anchor)
+	v.SetWrapMode(layout.NoWrap)
 }
 
 // ScrollDown moves the viewport down.
@@ -273,6 +299,21 @@ func (v *Viewer) Follow() {
 // Following reports whether follow mode is active.
 func (v *Viewer) Following() bool {
 	return v.follow
+}
+
+// Position reports the current visible row, total row count, and horizontal offset.
+func (v *Viewer) Position() Position {
+	v.ensureLayout()
+
+	row := 0
+	if len(v.layout.Rows) > 0 {
+		row = min(v.rowOffset+1, len(v.layout.Rows))
+	}
+	return Position{
+		Row:    row,
+		Rows:   len(v.layout.Rows),
+		Column: v.colOffset,
+	}
 }
 
 func (v *Viewer) ensureLayout() {
