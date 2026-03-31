@@ -15,6 +15,7 @@
 //   - size it with SetSize
 //   - render it with Draw
 //   - feed input through HandleKey, HandleKeyResult, or direct navigation/search methods
+//   - inspect visible search state with SearchState when host chrome needs it
 //
 // The bundled demo in cmd/goless-demo shows the intended integration model for
 // a full-screen tcell application.

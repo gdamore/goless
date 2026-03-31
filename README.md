@@ -119,7 +119,7 @@ The current exported `Pager` API is controller-oriented.
 - Search: `SearchForward`, `SearchBackward`, `SearchNext`, `SearchPrev`,
   `SearchForwardWithCase`, `SearchBackwardWithCase`, `SetSearchCaseMode`,
   `SearchCaseMode`, `SetSearchMode`, `SearchMode`, `CycleSearchCaseMode`,
-  `CycleSearchMode`, `ClearSearch`
+  `CycleSearchMode`, `SearchState`, `ClearSearch`
 - View state: `Position`
 
 The main config knobs are:
@@ -150,6 +150,9 @@ The built-in pager UI exposes search mode controls directly:
 Embedders are not locked to `F2` or `F3`. They can reserve bundled keys with
 `CaptureKey` and drive mode changes explicitly through `CycleSearchCaseMode`,
 `SetSearchCaseMode`, `CycleSearchMode`, or `SetSearchMode`.
+
+`SearchState` exposes the current committed or preview search query, direction,
+mode, case handling, match count/current position, and any regex compile error.
 
 ## Render Modes
 
