@@ -1171,11 +1171,35 @@ func (v *Viewer) toTCellStyle(style ansi.Style) tcell.Style {
 	tstyle = tstyle.Bold(style.Bold)
 	tstyle = tstyle.Dim(style.Dim)
 	tstyle = tstyle.Italic(style.Italic)
-	tstyle = tstyle.Underline(style.Underline)
+	if style.Underline != ansi.UnderlineStyleNone {
+		ulStyle := toTCellUnderlineStyle(style.Underline)
+		if style.UnderlineColor.Kind == ansi.ColorDefault {
+			tstyle = tstyle.Underline(ulStyle)
+		} else {
+			tstyle = tstyle.Underline(ulStyle, v.cfg.Theme.resolveColor(style.UnderlineColor, true))
+		}
+	}
 	tstyle = tstyle.StrikeThrough(style.Strike)
 	tstyle = tstyle.Blink(style.Blink)
 	tstyle = tstyle.Reverse(style.Reverse)
 	return tstyle
+}
+
+func toTCellUnderlineStyle(style ansi.UnderlineStyle) tcell.UnderlineStyle {
+	switch style {
+	case ansi.UnderlineStyleSolid:
+		return tcell.UnderlineStyleSolid
+	case ansi.UnderlineStyleDouble:
+		return tcell.UnderlineStyleDouble
+	case ansi.UnderlineStyleCurly:
+		return tcell.UnderlineStyleCurly
+	case ansi.UnderlineStyleDotted:
+		return tcell.UnderlineStyleDotted
+	case ansi.UnderlineStyleDashed:
+		return tcell.UnderlineStyleDashed
+	default:
+		return tcell.UnderlineStyleNone
+	}
 }
 
 func (v *Viewer) visualizationStyle(base tcell.Style) tcell.Style {

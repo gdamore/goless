@@ -96,6 +96,55 @@ func TestParserAppliesAndClearsStrikethrough(t *testing.T) {
 	}
 }
 
+func TestParserAppliesUnderlineVariants(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParser(recv)
+
+	input := "a\x1b[4mB\x1b[21mC\x1b[4:3mD\x1b[4:4mE\x1b[4:5mF\x1b[24mG"
+	if _, err := p.Write([]byte(input)); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	if got := recv.events[1].style.Underline; got != UnderlineStyleSolid {
+		t.Fatalf("B underline = %v, want %v", got, UnderlineStyleSolid)
+	}
+	if got := recv.events[2].style.Underline; got != UnderlineStyleDouble {
+		t.Fatalf("C underline = %v, want %v", got, UnderlineStyleDouble)
+	}
+	if got := recv.events[3].style.Underline; got != UnderlineStyleCurly {
+		t.Fatalf("D underline = %v, want %v", got, UnderlineStyleCurly)
+	}
+	if got := recv.events[4].style.Underline; got != UnderlineStyleDotted {
+		t.Fatalf("E underline = %v, want %v", got, UnderlineStyleDotted)
+	}
+	if got := recv.events[5].style.Underline; got != UnderlineStyleDashed {
+		t.Fatalf("F underline = %v, want %v", got, UnderlineStyleDashed)
+	}
+	if got := recv.events[6].style.Underline; got != UnderlineStyleNone {
+		t.Fatalf("G underline = %v, want %v", got, UnderlineStyleNone)
+	}
+}
+
+func TestParserAppliesUnderlineColor(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParser(recv)
+
+	input := "a\x1b[58;2;1;2;3mB\x1b[58:5:208mC\x1b[59mD"
+	if _, err := p.Write([]byte(input)); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	if got, want := recv.events[1].style.UnderlineColor, RGBColor(1, 2, 3); got != want {
+		t.Fatalf("B underline color = %+v, want %+v", got, want)
+	}
+	if got, want := recv.events[2].style.UnderlineColor, IndexedColor(208); got != want {
+		t.Fatalf("C underline color = %+v, want %+v", got, want)
+	}
+	if got, want := recv.events[3].style.UnderlineColor, DefaultColor(); got != want {
+		t.Fatalf("D underline color = %+v, want %+v", got, want)
+	}
+}
+
 func TestParserLiteralShowsSGRWithoutStyling(t *testing.T) {
 	recv := &recordReceiver{}
 	p := NewParserWithMode(recv, RenderLiteral)

@@ -1046,6 +1046,32 @@ func TestPagerOSC8StyleOverrideReplacesBaseStyle(t *testing.T) {
 	}
 }
 
+func TestPagerRendersUnderlineVariantAndColor(t *testing.T) {
+	pager := New(Config{
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		RenderMode: RenderPresentation,
+	})
+	pager.SetSize(1, 1)
+	if err := pager.AppendString("\x1b[4:3;58;2;1;2;3mA\x1b[0m"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 1, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+
+	style := pagerCellStyle(screen, 0, 0)
+	if got, want := style.GetUnderlineStyle(), tcell.UnderlineStyleCurly; got != want {
+		t.Fatalf("underline style = %v, want %v", got, want)
+	}
+	if got, want := style.GetUnderlineColor(), tcolor.NewRGBColor(1, 2, 3); got != want {
+		t.Fatalf("underline color = %v, want %v", got, want)
+	}
+}
+
 func TestPagerVisualizationWideMarkerClipsAfterHorizontalScroll(t *testing.T) {
 	pager := New(Config{
 		TabWidth: 4,
