@@ -17,6 +17,12 @@
 //   - feed input through HandleKey, HandleKeyResult, or direct navigation/search methods
 //   - inspect visible search state with SearchState when host chrome needs it
 //
+// OSC 8 hyperlinks are parsed in presentation-oriented render modes, but they
+// remain inert unless the embedder opts in with HyperlinkHandler. That handler
+// is expected to make the application's trust decision explicitly: keep the
+// link inert, allow it to go live, rewrite the target, and/or restyle the
+// linked span.
+//
 // The bundled demo in cmd/goless-demo shows the intended integration model for
 // a full-screen tcell application.
 package goless

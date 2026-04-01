@@ -18,6 +18,7 @@ still settling.
 ## What It Does Today
 
 - Parses ANSI/ECMA-48 SGR styling and applies it through `tcell`
+- Parses OSC 8 hyperlinks in `RenderHybrid` and `RenderPresentation`, with embedder-controlled live link policy
 - Sanitizes unsupported escape/control sequences instead of letting them affect
   the host terminal
 - Tracks Unicode grapheme clusters with `uniseg`
@@ -36,11 +37,42 @@ still settling.
   visibly or hidden, depending on `RenderMode`
 - Input is rendered only through `tcell`; sequences are not passed through to
   the host terminal
+- Parsed OSC 8 hyperlinks are inert by default. An embedder must opt in with
+  `HyperlinkHandler` before content becomes a live link.
 - There is no shell escape support, editor launch support, or subprocess
   execution support
 
 That is the core contract of the package: applications can display hostile or
 arbitrary text without handing terminal control to the input stream.
+
+### Hyperlink Security
+
+OSC 8 hyperlinks deserve separate attention. A source can display text that
+looks like one destination while the actual hyperlink target points somewhere
+else.
+
+`goless` therefore does not turn parsed OSC 8 sequences into live links on its
+own. Instead, embedders are expected to make an explicit policy decision with
+`HyperlinkHandler`.
+
+That handler receives:
+
+- the original target URL
+- the optional OSC 8 `id=...`
+- the full linked display text
+- the base rendered style
+
+From there, the application can:
+
+- keep the link inert
+- allow it to go live
+- rewrite the target, for example to strip tracking parameters or route through
+  a safe interstitial
+- restyle the linked span
+
+The intended secure default is conservative: if an application renders
+untrusted content and has not made an explicit trust decision, it should leave
+links inert or visibly tagged.
 
 ## Installation
 
@@ -130,6 +162,8 @@ The main config knobs are:
 - `SearchMode`: `SearchSubstring`, `SearchWholeWord`, or `SearchRegex`
 - `Theme`: remap content default colors and ANSI 0-15 without affecting chrome
 - `Visualization`: show tabs, line endings, carriage returns, and EOF with pager-added markers
+- `HyperlinkHandler`: inspect OSC 8 links, decide whether they go live,
+  rewrite targets, and restyle spans
 - `RenderMode`: `RenderHybrid`, `RenderLiteral`, or `RenderPresentation`
 - `KeyGroup`: `LessKeyGroup` or `EmptyKeyGroup`
 - `UnbindKeys` and `KeyBindings`: remove or prepend bindings in normal, help,
@@ -137,8 +171,15 @@ The main config knobs are:
 - `Chrome`: optional frame/title styling plus title alignment and status/prompt style slots
 - `Text`: override help text, status text, prompt text, and UI strings
 
-`Pager.SetTheme`, `Pager.SetVisualization`, and `Pager.SetChrome` can update
-those settings on a running pager instance.
+`Pager.SetTheme`, `Pager.SetVisualization`, `Pager.SetHyperlinkHandler`, and
+`Pager.SetChrome` can update those settings on a running pager instance.
+
+For OSC 8 specifically:
+
+- parsed links are inert unless `HyperlinkHandler` opts into `Live`
+- `HyperlinkHandler` sees both the displayed text and the actual target
+- this is intended to steer embedders toward explicit, auditable link policy
+  instead of silently trusting source-provided hyperlinks
 
 By default, literal search uses smart-case behavior:
 
@@ -183,10 +224,12 @@ For host chrome integration:
 
 - `RenderHybrid`
   Supported styling is applied. Unsupported sequences are shown visibly.
+  Parsed OSC 8 links are available to the embedder hyperlink handler.
 - `RenderLiteral`
   Escape and control sequences are shown literally and do not affect styling.
 - `RenderPresentation`
   Supported styling is applied. Unsupported sequences are consumed and hidden.
+  Parsed OSC 8 links are available to the embedder hyperlink handler.
 
 ## Demo Program
 

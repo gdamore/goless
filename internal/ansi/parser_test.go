@@ -156,11 +156,11 @@ func TestParserPresentationHidesOSC(t *testing.T) {
 	}
 }
 
-func TestParserShowsOSCTerminatedByST(t *testing.T) {
+func TestParserPresentationAppliesOSC8Hyperlink(t *testing.T) {
 	recv := &recordReceiver{}
-	p := NewParser(recv)
+	p := NewParserWithMode(recv, RenderPresentation)
 
-	input := "x\x1b]8;;https://example.com\x1b\\y"
+	input := "x\x1b]8;id=link-1;https://example.com\aY\x1b]8;;\aZ"
 	if _, err := p.Write([]byte(input)); err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
@@ -171,7 +171,67 @@ func TestParserShowsOSCTerminatedByST(t *testing.T) {
 			text.WriteRune(ev.r)
 		}
 	}
-	if got, want := text.String(), "x␛]8;;https://example.com␛\\y"; got != want {
+	if got, want := text.String(), "xYZ"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+
+	if got, want := recv.events[1].style.URL, "https://example.com"; got != want {
+		t.Fatalf("Y url = %q, want %q", got, want)
+	}
+	if got, want := recv.events[1].style.URLID, "link-1"; got != want {
+		t.Fatalf("Y url id = %q, want %q", got, want)
+	}
+	if got := recv.events[2].style.URL; got != "" {
+		t.Fatalf("Z url = %q, want empty", got)
+	}
+}
+
+func TestParserHybridAppliesOSC8Hyperlink(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParserWithMode(recv, RenderHybrid)
+
+	input := "x\x1b]8;id=link-1;https://example.com\aY\x1b]8;;\aZ"
+	if _, err := p.Write([]byte(input)); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+	if got, want := text.String(), "xYZ"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+
+	if got, want := recv.events[1].style.URL, "https://example.com"; got != want {
+		t.Fatalf("Y url = %q, want %q", got, want)
+	}
+	if got, want := recv.events[1].style.URLID, "link-1"; got != want {
+		t.Fatalf("Y url id = %q, want %q", got, want)
+	}
+	if got := recv.events[2].style.URL; got != "" {
+		t.Fatalf("Z url = %q, want empty", got)
+	}
+}
+
+func TestParserShowsOSCTerminatedByST(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParser(recv)
+
+	input := "x\x1b]0;title\x1b\\y"
+	if _, err := p.Write([]byte(input)); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+	if got, want := text.String(), "x␛]0;title␛\\y"; got != want {
 		t.Fatalf("text = %q, want %q", got, want)
 	}
 }

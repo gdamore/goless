@@ -11,6 +11,7 @@ import (
 
 	"github.com/gdamore/goless"
 	"github.com/gdamore/tcell/v3"
+	tcolor "github.com/gdamore/tcell/v3/color"
 )
 
 func main() {
@@ -23,16 +24,18 @@ func main() {
 func run() error {
 	var chromeName string
 	var hidden bool
+	var liveLinks bool
 	var presetName string
 	var renderName string
 	var title string
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-render hybrid|literal|presentation] [-title text] [file]\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-title text] [file]\n")
 	}
 	flag.StringVar(&presetName, "preset", "none", "visual preset: none, dark, light, plain, pretty")
 	flag.StringVar(&chromeName, "chrome", "auto", "chrome override: auto, none, single, rounded")
 	flag.BoolVar(&hidden, "hidden", false, "show tabs, line endings, carriage returns, and EOF markers")
+	flag.BoolVar(&liveLinks, "live-links", false, "enable live OSC 8 hyperlinks in the demo")
 	flag.StringVar(&renderName, "render", "hybrid", "render mode: hybrid, literal, presentation")
 	flag.StringVar(&title, "title", "", "frame title")
 	flag.Parse()
@@ -50,13 +53,14 @@ func run() error {
 		return err
 	}
 	pager := goless.New(goless.Config{
-		TabWidth:      8,
-		WrapMode:      goless.NoWrap,
-		RenderMode:    renderMode,
-		Theme:         preset.Theme,
-		Visualization: demoVisualization(hidden),
-		Chrome:        chromeCfg,
-		ShowStatus:    true,
+		TabWidth:         8,
+		WrapMode:         goless.NoWrap,
+		RenderMode:       renderMode,
+		Theme:            preset.Theme,
+		Visualization:    demoVisualization(hidden),
+		HyperlinkHandler: demoHyperlinkHandler(liveLinks),
+		Chrome:           chromeCfg,
+		ShowStatus:       true,
 	})
 
 	var (
@@ -221,6 +225,18 @@ func demoVisualization(enabled bool) goless.Visualization {
 		ShowNewlines:        true,
 		ShowCarriageReturns: true,
 		ShowEOF:             true,
+	}
+}
+
+func demoHyperlinkHandler(live bool) goless.HyperlinkHandler {
+	return func(info goless.HyperlinkInfo) goless.HyperlinkDecision {
+		return goless.HyperlinkDecision{
+			Live: live,
+			Style: tcell.StyleDefault.
+				Foreground(tcolor.Blue).
+				Underline(true),
+			StyleSet: true,
+		}
 	}
 }
 
