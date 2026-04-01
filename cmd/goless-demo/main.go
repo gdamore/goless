@@ -78,11 +78,16 @@ func run() error {
 	}
 	defer screen.Fini()
 
+	chromeCfg, err := demoChrome(chromeName, title, preset.Chrome)
+	if err != nil {
+		return err
+	}
+
 	viewer := view.New(doc, view.Config{
 		TabWidth:   8,
 		WrapMode:   layout.NoWrap,
 		Theme:      demoTheme(preset.Theme),
-		Chrome:     demoChrome(chromeName, title, preset.Chrome),
+		Chrome:     chromeCfg,
 		ShowStatus: true,
 	})
 
@@ -185,7 +190,7 @@ func demoTheme(theme goless.Theme) view.Theme {
 	}
 }
 
-func demoChrome(name, title string, base goless.Chrome) view.Chrome {
+func demoChrome(name, title string, base goless.Chrome) (view.Chrome, error) {
 	chrome := view.Chrome{
 		TitleAlign:       view.TitleAlign(base.TitleAlign),
 		Title:            base.Title,
@@ -210,16 +215,16 @@ func demoChrome(name, title string, base goless.Chrome) view.Chrome {
 	var frame goless.Frame
 	switch name {
 	case "auto", "":
-		return chrome
+		return chrome, nil
 	case "single":
 		frame = goless.SingleFrame()
 	case "rounded":
 		frame = goless.RoundedFrame()
 	case "none":
 		chrome.Frame = view.Frame{}
-		return chrome
+		return chrome, nil
 	default:
-		return chrome
+		return view.Chrome{}, fmt.Errorf("unknown chrome %q; expected auto, none, single, or rounded", name)
 	}
 
 	chrome.Frame = view.Frame{
@@ -230,7 +235,7 @@ func demoChrome(name, title string, base goless.Chrome) view.Chrome {
 		BottomLeft:  frame.BottomLeft,
 		BottomRight: frame.BottomRight,
 	}
-	return chrome
+	return chrome, nil
 }
 
 func demoRenderMode(name string) (ansi.RenderMode, error) {
