@@ -165,21 +165,18 @@ func (d *Document) lineEnding(offset int64) LineEnding {
 		return LineEndingLF
 	}
 
-	start := offset - 2
-	if start < 0 {
-		start = 0
-	}
-	buf := make([]byte, 2)
-	n, _ := d.store.ReadAt(buf, start)
-	if n <= 0 {
+	var last [1]byte
+	if n, _ := d.store.ReadAt(last[:], offset-1); n != 1 {
 		return LineEndingLF
 	}
-	buf = buf[:n]
-	if len(buf) >= 2 && buf[len(buf)-2] == '\r' && buf[len(buf)-1] == '\n' {
-		return LineEndingCRLF
+	if last[0] == '\n' && offset >= 2 {
+		var prev [1]byte
+		if n, _ := d.store.ReadAt(prev[:], offset-2); n == 1 && prev[0] == '\r' {
+			return LineEndingCRLF
+		}
 	}
 
-	switch buf[len(buf)-1] {
+	switch last[0] {
 	case '\n':
 		return LineEndingLF
 	case '\v':

@@ -111,3 +111,31 @@ func TestDocumentIndexesEmojiZWJGraphemes(t *testing.T) {
 		t.Fatalf("second grapheme = %q, want %q", got, want)
 	}
 }
+
+func TestDocumentTracksFirstByteVTAndFFLineEndings(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		want LineEnding
+	}{
+		{name: "vt", text: "\vfoo", want: LineEndingVT},
+		{name: "ff", text: "\ffoo", want: LineEndingFF},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := NewDocument(4)
+			if err := doc.Append([]byte(tt.text)); err != nil {
+				t.Fatalf("Append failed: %v", err)
+			}
+
+			lines := doc.Lines()
+			if got, want := len(lines), 2; got != want {
+				t.Fatalf("line count = %d, want %d", got, want)
+			}
+			if got := lines[0].Ending; got != tt.want {
+				t.Fatalf("line ending = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

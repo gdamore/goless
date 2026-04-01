@@ -491,6 +491,7 @@ func toInternalVisualization(visual Visualization) iview.Visualization {
 		CarriageReturnGlyph: visual.CarriageReturnGlyph,
 		EOFGlyph:            visual.EOFGlyph,
 		Style:               visual.Style,
+		StyleSet:            visual.StyleSet,
 	}
 }
 
