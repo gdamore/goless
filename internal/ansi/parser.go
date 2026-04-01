@@ -86,13 +86,13 @@ func (p *Parser) Write(data []byte) (int, error) {
 // Flush emits any pending visible fallbacks for incomplete sequences.
 func (p *Parser) Flush() {
 	if p.pendingCR {
-		p.emitControl('\r', p.pendingCROffset)
+		p.emitRawControl('\r', p.pendingCROffset)
 		p.pendingCR = false
 	}
 
 	switch p.mode {
 	case modeUTF:
-		p.emitRune(utf8.RuneError, p.offset)
+		p.emitInvalidBytes(p.buf.Bytes(), p.offset)
 	case modeEsc, modeCSI, modeOSC, modeStr:
 		if p.showsUnsupportedSequences() {
 			p.emitEscapeVisible(nil)
@@ -107,7 +107,7 @@ func (p *Parser) Flush() {
 func (p *Parser) processByte(b byte) {
 	if p.pendingCR {
 		if b != '\n' {
-			p.emitControl('\r', p.pendingCROffset)
+			p.emitRawControl('\r', p.pendingCROffset)
 		}
 		p.pendingCR = false
 	}
@@ -127,9 +127,11 @@ func (p *Parser) stateInit(b byte) {
 		return
 	}
 
-	if b >= 0x80 && b <= 0x9f {
-		p.stateEsc(b - 0x40)
-		return
+	if p.renderMode != RenderLiteral {
+		if esc, ok := c1EscapeByte(b); ok {
+			p.stateEsc(esc)
+			return
+		}
 	}
 
 	switch b {
@@ -138,7 +140,7 @@ func (p *Parser) stateInit(b byte) {
 		p.setStep(modeEsc, p.stateEsc)
 	case '\t':
 		p.emitRune('\t', p.offset)
-	case '\n', '\v', '\f':
+	case '\n':
 		p.receiver.Newline(p.style, p.offset)
 	case '\r':
 		p.pendingCR = true
@@ -157,8 +159,10 @@ func (p *Parser) stateInit(b byte) {
 			p.utfLen = 4
 			p.buf.WriteByte(b)
 			p.setStep(modeUTF, p.stateUTF)
+		case b >= 0x80:
+			p.emitInvalidBytes([]byte{b}, p.offset)
 		default:
-			p.emitControl(b, p.offset)
+			p.emitRawControl(b, p.offset)
 		}
 	}
 }
@@ -287,7 +291,7 @@ func (p *Parser) stateUTF(b byte) {
 		if p.buf.Len() == p.utfLen {
 			r, _ := utf8.DecodeRune(p.buf.Bytes())
 			if r == utf8.RuneError {
-				p.emitRune(utf8.RuneError, p.offset)
+				p.emitInvalidBytes(p.buf.Bytes(), p.offset)
 			} else {
 				p.emitRune(r, p.offset)
 			}
@@ -298,7 +302,7 @@ func (p *Parser) stateUTF(b byte) {
 		return
 	}
 
-	p.emitRune(utf8.RuneError, p.offset)
+	p.emitInvalidBytes(p.buf.Bytes(), p.offset-1)
 	p.buf.Reset()
 	p.utfLen = 0
 	p.setStep(modeInit, p.stateInit)
@@ -313,38 +317,84 @@ func (p *Parser) emitLiteralByte(b byte, offset int64) {
 	switch b {
 	case '\t':
 		p.emitRune('\t', offset)
-	case '\n', '\v', '\f':
+	case '\n':
 		p.receiver.Newline(p.style, offset)
 	default:
 		if b >= ' ' && b < 0x7f {
 			p.emitRune(rune(b), offset)
 			return
 		}
-		p.emitControl(b, offset)
+		if b < ' ' || b == 0x7f {
+			p.emitRawControl(b, offset)
+			return
+		}
+		p.emitInvalidBytes([]byte{b}, offset)
 	}
 }
 
-func (p *Parser) emitControl(b byte, offset int64) {
-	if p.renderMode == RenderPresentation {
+func (p *Parser) emitRawControl(b byte, offset int64) {
+	if p.renderMode != RenderLiteral {
 		return
 	}
 	if r, ok := controlPicture(b); ok {
 		p.emitRune(r, offset)
+	}
+}
+
+func (p *Parser) emitInvalidBytes(data []byte, endOffset int64) {
+	if len(data) == 0 {
 		return
 	}
-	p.emitRune(utf8.RuneError, offset)
+	startOffset := endOffset - int64(len(data)) + 1
+	for i, b := range data {
+		offset := startOffset + int64(i)
+		if p.renderMode == RenderLiteral {
+			p.emitHexByte(b, offset)
+			continue
+		}
+		p.emitRune(utf8.RuneError, offset)
+	}
+}
+
+func (p *Parser) emitHexByte(b byte, offset int64) {
+	const digits = "0123456789abcdef"
+	p.emitRune('\\', offset)
+	p.emitRune('x', offset)
+	p.emitRune(rune(digits[b>>4]), offset)
+	p.emitRune(rune(digits[b&0x0f]), offset)
 }
 
 func (p *Parser) emitEscapeVisible(final []byte) {
-	p.emitControl(0x1b, p.offset)
+	p.emitVisibleByte(0x1b, p.offset)
 	for _, b := range p.buf.Bytes() {
-		p.emitLiteralByte(b, p.offset)
+		p.emitVisibleByte(b, p.offset)
 	}
 	for _, b := range final {
-		p.emitLiteralByte(b, p.offset)
+		p.emitVisibleByte(b, p.offset)
 	}
 	p.buf.Reset()
 	p.setStep(modeInit, p.stateInit)
+}
+
+func (p *Parser) emitVisibleByte(b byte, offset int64) {
+	switch b {
+	case '\t':
+		p.emitRune('\t', offset)
+	case '\n':
+		p.receiver.Newline(p.style, offset)
+	default:
+		if b >= ' ' && b < 0x7f {
+			p.emitRune(rune(b), offset)
+			return
+		}
+		if b < ' ' || b == 0x7f {
+			if r, ok := controlPicture(b); ok {
+				p.emitRune(r, offset)
+				return
+			}
+		}
+		p.emitHexByte(b, offset)
+	}
 }
 
 func (p *Parser) processOSC() bool {
@@ -399,6 +449,15 @@ func controlPicture(b byte) (rune, bool) {
 		return rune(0x2400) + rune(b), true
 	case b == 0x7f:
 		return 0x2421, true
+	default:
+		return 0, false
+	}
+}
+
+func c1EscapeByte(b byte) (byte, bool) {
+	switch b {
+	case 0x90, 0x98, 0x9b, 0x9d, 0x9e, 0x9f:
+		return b - 0x40, true
 	default:
 		return 0, false
 	}
