@@ -584,6 +584,7 @@ func toInternalText(text Text) iview.Text {
 
 func toInternalChrome(chrome Chrome) iview.Chrome {
 	return iview.Chrome{
+		TitleAlign:       toInternalTitleAlign(chrome.TitleAlign),
 		Title:            chrome.Title,
 		BorderStyle:      chrome.BorderStyle,
 		TitleStyle:       chrome.TitleStyle,
@@ -598,6 +599,17 @@ func toInternalChrome(chrome Chrome) iview.Chrome {
 			BottomLeft:  chrome.Frame.BottomLeft,
 			BottomRight: chrome.Frame.BottomRight,
 		},
+	}
+}
+
+func toInternalTitleAlign(align TitleAlign) iview.TitleAlign {
+	switch align {
+	case TitleAlignCenter:
+		return iview.TitleAlignCenter
+	case TitleAlignRight:
+		return iview.TitleAlignRight
+	default:
+		return iview.TitleAlignLeft
 	}
 }
 

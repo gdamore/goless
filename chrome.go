@@ -5,6 +5,18 @@ package goless
 
 import "github.com/gdamore/tcell/v3"
 
+// TitleAlign controls where frame titles are placed on the top border.
+type TitleAlign int
+
+const (
+	// TitleAlignLeft places the title near the left frame edge.
+	TitleAlignLeft TitleAlign = iota
+	// TitleAlignCenter centers the title in the top frame border.
+	TitleAlignCenter
+	// TitleAlignRight places the title near the right frame edge.
+	TitleAlignRight
+)
+
 // Frame defines the glyphs used to draw an optional border around the pager
 // body. An all-zero Frame disables border drawing.
 type Frame struct {
@@ -26,6 +38,8 @@ type Frame struct {
 type Chrome struct {
 	// Title is rendered into the top border area when a frame is enabled.
 	Title string
+	// TitleAlign controls whether the title is placed at the left, center, or right.
+	TitleAlign TitleAlign
 	// Frame selects the glyphs used to draw the optional body border.
 	Frame Frame
 	// BorderStyle controls the style used when drawing the frame glyphs.

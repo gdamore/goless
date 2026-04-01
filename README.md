@@ -133,7 +133,7 @@ The main config knobs are:
 - `KeyGroup`: `LessKeyGroup` or `EmptyKeyGroup`
 - `UnbindKeys` and `KeyBindings`: remove or prepend bindings in normal, help,
   or prompt contexts
-- `Chrome`: optional frame/title styling plus status/prompt style slots
+- `Chrome`: optional frame/title styling plus title alignment and status/prompt style slots
 - `Text`: override help text, status text, prompt text, and UI strings
 
 By default, literal search uses smart-case behavior:
