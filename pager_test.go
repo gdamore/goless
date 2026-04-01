@@ -833,6 +833,38 @@ func TestPagerVisualizationMarkersRemainReachableAtLineEnd(t *testing.T) {
 	}
 }
 
+func TestPagerSetVisualizationReclampsHorizontalScroll(t *testing.T) {
+	pager := New(Config{
+		TabWidth: 4,
+		WrapMode: NoWrap,
+		Visualization: Visualization{
+			ShowNewlines: true,
+			NewlineGlyph: "N",
+		},
+	})
+	pager.SetSize(4, 1)
+	if err := pager.AppendString("abcd\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.ScrollRight(1)
+
+	screen := newPagerMockScreen(t, 4, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if got, want := pagerRowString(screen, 0, 4), "bcdN"; got != want {
+		t.Fatalf("row before disabling visualization = %q, want %q", got, want)
+	}
+
+	pager.SetVisualization(Visualization{})
+	screen.Clear()
+	pager.Draw(screen)
+	if got, want := pagerRowString(screen, 0, 4), "abcd"; got != want {
+		t.Fatalf("row after disabling visualization = %q, want %q", got, want)
+	}
+}
+
 func TestPagerVisualizationStyleDefaultCanBeExplicit(t *testing.T) {
 	pager := New(Config{
 		TabWidth: 4,

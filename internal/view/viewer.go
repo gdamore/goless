@@ -89,6 +89,9 @@ func (v *Viewer) SetTheme(theme Theme) {
 // SetVisualization updates how hidden structure markers are drawn.
 func (v *Viewer) SetVisualization(visual Visualization) {
 	v.cfg.Visualization = visual.withDefaults()
+	v.ensureLayout()
+	v.clampOffsets()
+	v.relayout()
 }
 
 // SetChrome updates frame, title, and prompt/status styling.
