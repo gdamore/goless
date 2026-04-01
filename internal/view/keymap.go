@@ -172,6 +172,9 @@ func (m keyMap) withOverrides(unbind []KeyStroke, bind []KeyBinding) keyMap {
 	var prependHelp []keyBinding
 	var prependPrompt []keyBinding
 	for _, binding := range bind {
+		if !bindingAllowedInContext(binding.Context, binding.Action) {
+			continue
+		}
 		converted := keyBinding{
 			key:    binding.Key,
 			rune:   binding.Rune,
@@ -200,6 +203,20 @@ func (m keyMap) withOverrides(unbind []KeyStroke, bind []KeyBinding) keyMap {
 	}
 
 	return m
+}
+
+func bindingAllowedInContext(ctx KeyContext, a KeyAction) bool {
+	switch ctx {
+	case KeyContextPrompt:
+		switch a {
+		case KeyActionQuit, KeyActionCycleSearchCase, KeyActionCycleSearchMode:
+			return true
+		default:
+			return false
+		}
+	default:
+		return true
+	}
 }
 
 func (m keyMap) normalAction(ev *tcell.EventKey) action {

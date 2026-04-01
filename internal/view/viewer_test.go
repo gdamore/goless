@@ -110,6 +110,26 @@ func TestKeyBindingAnyModifierWildcard(t *testing.T) {
 	}
 }
 
+func TestPromptBindingsRejectUnsupportedActions(t *testing.T) {
+	m := defaultKeyMap(KeyGroupLess).withOverrides(nil, []KeyBinding{
+		{
+			KeyStroke: KeyStroke{Context: KeyContextPrompt, Key: tcell.KeyF5},
+			Action:    KeyActionScrollDown,
+		},
+		{
+			KeyStroke: KeyStroke{Context: KeyContextPrompt, Key: tcell.KeyF6},
+			Action:    KeyActionCycleSearchMode,
+		},
+	})
+
+	if got, want := m.promptAction(tcell.NewEventKey(tcell.KeyF5, "", tcell.ModNone)), actionNone; got != want {
+		t.Fatalf("promptAction(F5) = %v, want %v for unsupported prompt action", got, want)
+	}
+	if got, want := m.promptAction(tcell.NewEventKey(tcell.KeyF6, "", tcell.ModNone)), actionCycleSearchMode; got != want {
+		t.Fatalf("promptAction(F6) = %v, want %v for supported prompt action", got, want)
+	}
+}
+
 func TestToggleWrapToNoWrapRestoresHorizontalAnchor(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("ab界cd")); err != nil {
