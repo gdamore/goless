@@ -979,7 +979,9 @@ func TestPagerRendersOSC8HyperlinkStyleOverride(t *testing.T) {
 				t.Fatalf("handler text = %q, want %q", info.Text, "demo")
 			}
 			return HyperlinkDecision{
-				Style:    tcell.StyleDefault.Foreground(tcolor.Blue).Underline(true),
+				Style: info.Style.
+					Foreground(tcolor.Blue).
+					Underline(true),
 				StyleSet: true,
 			}
 		},
@@ -1003,6 +1005,44 @@ func TestPagerRendersOSC8HyperlinkStyleOverride(t *testing.T) {
 	}
 	if !pagerCellStyle(screen, 0, 0).HasUnderline() {
 		t.Fatal("style override did not enable underline")
+	}
+}
+
+func TestPagerOSC8StyleOverrideReplacesBaseStyle(t *testing.T) {
+	pager := New(Config{
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		RenderMode: RenderPresentation,
+		HyperlinkHandler: func(info HyperlinkInfo) HyperlinkDecision {
+			return HyperlinkDecision{
+				Style:    tcell.StyleDefault.Foreground(tcolor.Blue),
+				StyleSet: true,
+			}
+		},
+	})
+	pager.SetSize(1, 1)
+	if err := pager.AppendString("\x1b[7m\x1b]8;;https://example.com\ad\x1b]8;;\a"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 1, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+
+	style := pagerCellStyle(screen, 0, 0)
+	if fg := style.GetForeground(); fg != tcolor.Blue {
+		t.Fatalf("foreground = %v, want %v", fg, tcolor.Blue)
+	}
+	if style.GetBackground() != tcolor.Default {
+		t.Fatalf("background = %v, want default", style.GetBackground())
+	}
+	if style.GetAttributes() != 0 {
+		t.Fatalf("attributes = %v, want 0", style.GetAttributes())
+	}
+	if style.HasUnderline() {
+		t.Fatal("underline unexpectedly preserved from base style")
 	}
 }
 

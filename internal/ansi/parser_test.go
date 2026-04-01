@@ -216,6 +216,26 @@ func TestParserHybridAppliesOSC8Hyperlink(t *testing.T) {
 	}
 }
 
+func TestParserSGREmptyPreservesOSC8Hyperlink(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParserWithMode(recv, RenderPresentation)
+
+	input := "x\x1b]8;id=link-1;https://example.com\a\x1b[mY\x1b]8;;\aZ"
+	if _, err := p.Write([]byte(input)); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	if got, want := recv.events[1].style.URL, "https://example.com"; got != want {
+		t.Fatalf("Y url = %q, want %q", got, want)
+	}
+	if got, want := recv.events[1].style.URLID, "link-1"; got != want {
+		t.Fatalf("Y url id = %q, want %q", got, want)
+	}
+	if got := recv.events[2].style.URL; got != "" {
+		t.Fatalf("Z url = %q, want empty", got)
+	}
+}
+
 func TestParserShowsOSCTerminatedByST(t *testing.T) {
 	recv := &recordReceiver{}
 	p := NewParser(recv)
