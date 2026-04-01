@@ -1310,6 +1310,37 @@ func TestThemeRemapsDefaultsAndANSI16Only(t *testing.T) {
 	}
 }
 
+func TestDrawUsesThemedDefaultBackgroundForBlankContent(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("hi\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Theme: Theme{
+			DefaultBG: tcolor.Blue,
+		},
+	})
+	v.SetSize(8, 3)
+
+	_, screen := newMockScreen(t, 8, 3)
+	defer screen.Fini()
+
+	v.Draw(screen)
+
+	_, eolStyle, _ := screen.Get(4, 0)
+	if got, want := eolStyle.GetBackground(), tcolor.Blue; got != want {
+		t.Fatalf("blank cell after line bg = %v, want %v", got, want)
+	}
+
+	_, blankRowStyle, _ := screen.Get(0, 2)
+	if got, want := blankRowStyle.GetBackground(), tcolor.Blue; got != want {
+		t.Fatalf("blank row bg = %v, want %v", got, want)
+	}
+}
+
 func TestTruncateToWidthUsesDisplayCellsAndPreservesUTF8(t *testing.T) {
 	got := truncateToWidth("é界b", 2)
 	if !utf8.ValidString(got) {
