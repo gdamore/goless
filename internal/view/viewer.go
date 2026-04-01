@@ -1034,6 +1034,7 @@ func (v *Viewer) toTCellStyle(style ansi.Style) tcell.Style {
 	tstyle = tstyle.Dim(style.Dim)
 	tstyle = tstyle.Italic(style.Italic)
 	tstyle = tstyle.Underline(style.Underline)
+	tstyle = tstyle.StrikeThrough(style.Strike)
 	tstyle = tstyle.Blink(style.Blink)
 	tstyle = tstyle.Reverse(style.Reverse)
 	return tstyle

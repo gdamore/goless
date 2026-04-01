@@ -865,6 +865,23 @@ func TestPagerSetVisualizationReclampsHorizontalScroll(t *testing.T) {
 	}
 }
 
+func TestPagerRendersStrikethroughStyle(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap})
+	pager.SetSize(8, 1)
+	if err := pager.AppendString("\x1b[9mX\x1b[29m\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 8, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if !pagerCellStyle(screen, 0, 0).HasStrikeThrough() {
+		t.Fatal("style at rendered strikethrough cell = not strike-through")
+	}
+}
+
 func TestPagerVisualizationWideMarkerClipsAfterHorizontalScroll(t *testing.T) {
 	pager := New(Config{
 		TabWidth: 4,

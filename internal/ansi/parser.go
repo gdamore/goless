@@ -387,6 +387,8 @@ func (p *Parser) processSGR(body string) {
 			p.style.Italic = true
 		case code == 4:
 			p.style.Underline = true
+		case code == 9:
+			p.style.Strike = true
 		case code == 5:
 			p.style.Blink = true
 		case code == 7:
@@ -398,6 +400,8 @@ func (p *Parser) processSGR(body string) {
 			p.style.Italic = false
 		case code == 24:
 			p.style.Underline = false
+		case code == 29:
+			p.style.Strike = false
 		case code == 25:
 			p.style.Blink = false
 		case code == 27:
