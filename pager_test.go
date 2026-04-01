@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gdamore/tcell/v3"
+	"github.com/gdamore/tcell/v3/vt"
 )
 
 func TestPagerAppendAndLen(t *testing.T) {
@@ -536,6 +537,63 @@ func TestPagerSearchStateShowsInvalidRegexPreview(t *testing.T) {
 	}
 }
 
+func TestPagerTextHooksFormatStatusAndPrompt(t *testing.T) {
+	statusCalled := false
+	promptCalled := false
+	pager := New(Config{
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		ShowStatus: true,
+		Text: Text{
+			StatusLine: func(info StatusInfo) (left, right string) {
+				statusCalled = true
+				if got, want := info.Position.Row, 1; got != want {
+					t.Fatalf("StatusLine position row = %d, want %d", got, want)
+				}
+				return "LEFT", "RIGHT"
+			},
+			PromptLine: func(info PromptInfo) string {
+				promptCalled = true
+				if got, want := info.Kind, PromptSearchForward; got != want {
+					t.Fatalf("PromptLine kind = %v, want %v", got, want)
+				}
+				return "find>" + info.Input
+			},
+		},
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 20, 2)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if !statusCalled {
+		t.Fatal("StatusLine hook was not called")
+	}
+	if got := pagerCellRune(screen, 2, 1); got != 'L' {
+		t.Fatalf("status text rune = %q, want %q", got, 'L')
+	}
+
+	if result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "/", tcell.ModNone)); !result.Handled {
+		t.Fatal("HandleKeyResult(/).Handled = false, want true")
+	}
+	if result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "a", tcell.ModNone)); !result.Handled {
+		t.Fatal("HandleKeyResult(a).Handled = false, want true")
+	}
+	screen.Clear()
+	pager.Draw(screen)
+	if !promptCalled {
+		t.Fatal("PromptLine hook was not called")
+	}
+	if got := pagerCellRune(screen, 1, 1); got != 'f' {
+		t.Fatalf("prompt text rune = %q, want %q", got, 'f')
+	}
+}
+
 func TestPagerSetSearchMode(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
@@ -597,4 +655,25 @@ func TestPagerSearchPreservesWhitespace(t *testing.T) {
 	if !pager.SearchForward(" ") {
 		t.Fatal("SearchForward(space) = false, want true")
 	}
+}
+
+func pagerCellRune(screen tcell.Screen, x, y int) rune {
+	str, _, _ := screen.Get(x, y)
+	if str == "" {
+		return 0
+	}
+	return []rune(str)[0]
+}
+
+func newPagerMockScreen(t *testing.T, width, height int) tcell.Screen {
+	t.Helper()
+	term := vt.NewMockTerm(vt.MockOptSize{X: vt.Col(width), Y: vt.Row(height)})
+	screen, err := tcell.NewTerminfoScreenFromTty(term)
+	if err != nil {
+		t.Fatalf("failed to get mock screen: %v", err)
+	}
+	if err := screen.Init(); err != nil {
+		t.Fatalf("failed to initialize mock screen: %v", err)
+	}
+	return screen
 }

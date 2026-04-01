@@ -25,6 +25,9 @@ type Text struct {
 	StatusPosition func(current, total, column int) string
 	// FollowMode is appended to the status bar while follow mode is active.
 	FollowMode string
+	// StatusLine can override the full left and right status bar text.
+	// When nil, the pager assembles the built-in status line from the fields above.
+	StatusLine func(StatusInfo) (left, right string)
 
 	// SearchEmpty is shown when an empty search is submitted.
 	SearchEmpty string
@@ -48,6 +51,9 @@ type Text struct {
 	LeftOverflowIndicator string
 	// RightOverflowIndicator marks undisplayed content to the right in no-wrap mode.
 	RightOverflowIndicator string
+	// PromptLine can override the full built-in prompt text.
+	// When nil, the pager uses the built-in prefix plus the current input buffer.
+	PromptLine func(PromptInfo) string
 }
 
 // DefaultText returns the built-in pager text bundle.

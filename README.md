@@ -132,8 +132,8 @@ The main config knobs are:
 - `KeyGroup`: `LessKeyGroup` or `EmptyKeyGroup`
 - `UnbindKeys` and `KeyBindings`: remove or prepend bindings in normal, help,
   or prompt contexts
-- `Chrome`: optional frame/title styling
-- `Text`: override help text, status text, and UI strings
+- `Chrome`: optional frame/title styling plus status/prompt style slots
+- `Text`: override help text, status text, prompt text, and UI strings
 
 By default, literal search uses smart-case behavior:
 
@@ -158,6 +158,14 @@ Embedders are not locked to the bundled keys. They can:
 
 `SearchState` exposes the current committed or preview search query, direction,
 mode, case handling, match count/current position, and any regex compile error.
+
+For host chrome integration:
+
+- `Text.StatusLine` can replace the full left/right status bar text using
+  `StatusInfo`
+- `Text.PromptLine` can replace the full built-in prompt text using `PromptInfo`
+- `Chrome.StatusStyle`, `Chrome.PromptStyle`, and `Chrome.PromptErrorStyle`
+  can restyle the built-in bottom bar without replacing pager rendering
 
 ## Render Modes
 
