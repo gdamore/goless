@@ -76,6 +76,26 @@ func TestParserAppliesSGRAndShowsOSC(t *testing.T) {
 	}
 }
 
+func TestParserAppliesAndClearsStrikethrough(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParser(recv)
+
+	input := "a\x1b[9mB\x1b[29mC"
+	if _, err := p.Write([]byte(input)); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	if got, want := len(recv.events), 3; got != want {
+		t.Fatalf("event count = %d, want %d", got, want)
+	}
+	if !recv.events[1].style.Strike {
+		t.Fatal("strikethrough for B = false, want true")
+	}
+	if recv.events[2].style.Strike {
+		t.Fatal("strikethrough for C = true, want false")
+	}
+}
+
 func TestParserLiteralShowsSGRWithoutStyling(t *testing.T) {
 	recv := &recordReceiver{}
 	p := NewParserWithMode(recv, RenderLiteral)

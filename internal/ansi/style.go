@@ -47,6 +47,7 @@ type Style struct {
 	Dim       bool
 	Italic    bool
 	Underline bool
+	Strike    bool
 	Blink     bool
 	Reverse   bool
 }
