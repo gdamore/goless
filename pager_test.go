@@ -802,6 +802,34 @@ func TestPagerSetVisualizationAffectsSubsequentDraw(t *testing.T) {
 	}
 }
 
+func TestPagerVisualizationStyleDefaultCanBeExplicit(t *testing.T) {
+	pager := New(Config{
+		TabWidth: 4,
+		WrapMode: NoWrap,
+		Visualization: Visualization{
+			ShowTabs: true,
+			TabGlyph: ">",
+			Style:    tcell.StyleDefault,
+			StyleSet: true,
+		},
+	})
+	pager.SetSize(8, 1)
+	if err := pager.AppendString("a\t"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 8, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+
+	style := pagerCellStyle(screen, 1, 0)
+	if got, want := style.GetForeground(), tcolor.Default; got != want {
+		t.Fatalf("marker fg = %v, want %v", got, want)
+	}
+}
+
 func TestPagerSetSearchMode(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)

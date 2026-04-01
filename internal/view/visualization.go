@@ -20,6 +20,7 @@ type Visualization struct {
 	CarriageReturnGlyph string
 	EOFGlyph            string
 	Style               tcell.Style
+	StyleSet            bool
 }
 
 func (v Visualization) withDefaults() Visualization {
@@ -35,7 +36,7 @@ func (v Visualization) withDefaults() Visualization {
 	if v.EOFGlyph == "" {
 		v.EOFGlyph = "∎"
 	}
-	if v.Style == tcell.StyleDefault {
+	if !v.StyleSet {
 		v.Style = tcell.StyleDefault.Foreground(tcolor.PaletteColor(8))
 	}
 	return v

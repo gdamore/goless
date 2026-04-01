@@ -137,6 +137,9 @@ The main config knobs are:
 - `Chrome`: optional frame/title styling plus title alignment and status/prompt style slots
 - `Text`: override help text, status text, prompt text, and UI strings
 
+`Pager.SetTheme`, `Pager.SetVisualization`, and `Pager.SetChrome` can update
+those settings on a running pager instance.
+
 By default, literal search uses smart-case behavior:
 
 - lowercase queries search case-insensitively

@@ -29,4 +29,8 @@ type Visualization struct {
 
 	// Style controls how pager-added markers are drawn.
 	Style tcell.Style
+	// StyleSet reports whether Style was set explicitly. When false, pager-added
+	// markers use the default muted marker style. Set StyleSet to true to use
+	// Style even when it is tcell.StyleDefault.
+	StyleSet bool
 }

@@ -1141,12 +1141,5 @@ func stringWidth(s string) int {
 }
 
 func padMarkerGlyph(glyph string, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	glyph = truncateToWidth(glyph, width)
-	if pad := width - stringWidth(glyph); pad > 0 {
-		glyph += strings.Repeat(" ", pad)
-	}
-	return glyph
+	return padRightToWidth(glyph, width)
 }
