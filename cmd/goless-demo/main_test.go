@@ -25,12 +25,18 @@ func TestDemoPreset(t *testing.T) {
 }
 
 func TestDemoChromeUsesPresetAndOverrides(t *testing.T) {
-	chrome := demoChrome("auto", "", goless.PrettyPreset.Chrome)
+	chrome, err := demoChrome("auto", "", goless.PrettyPreset.Chrome)
+	if err != nil {
+		t.Fatalf("demoChrome(auto) failed: %v", err)
+	}
 	if got, want := chrome.Frame.TopLeft, "╭"; got != want {
 		t.Fatalf("demoChrome(auto).Frame.TopLeft = %q, want %q", got, want)
 	}
 
-	chrome = demoChrome("single", "Demo", goless.PrettyPreset.Chrome)
+	chrome, err = demoChrome("single", "Demo", goless.PrettyPreset.Chrome)
+	if err != nil {
+		t.Fatalf("demoChrome(single) failed: %v", err)
+	}
 	if got, want := chrome.Frame.TopLeft, "┌"; got != want {
 		t.Fatalf("demoChrome(single).Frame.TopLeft = %q, want %q", got, want)
 	}
@@ -38,12 +44,19 @@ func TestDemoChromeUsesPresetAndOverrides(t *testing.T) {
 		t.Fatalf("demoChrome(single).Title = %q, want %q", got, want)
 	}
 
-	chrome = demoChrome("none", "", goless.PrettyPreset.Chrome)
+	chrome, err = demoChrome("none", "", goless.PrettyPreset.Chrome)
+	if err != nil {
+		t.Fatalf("demoChrome(none) failed: %v", err)
+	}
 	if got := chrome.Frame.TopLeft; got != "" {
 		t.Fatalf("demoChrome(none).Frame.TopLeft = %q, want empty", got)
 	}
 	if got := chrome.Frame.Horizontal; got != "" {
 		t.Fatalf("demoChrome(none).Frame.Horizontal = %q, want empty", got)
+	}
+
+	if _, err := demoChrome("bogus", "", goless.PrettyPreset.Chrome); err == nil {
+		t.Fatal("demoChrome(bogus) = nil error, want error")
 	}
 }
 

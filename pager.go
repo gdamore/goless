@@ -267,17 +267,7 @@ func (p *Pager) CycleSearchMode() SearchMode {
 
 // SearchState reports the current committed or preview search state.
 func (p *Pager) SearchState() SearchState {
-	state := p.viewer.SearchSnapshot()
-	return SearchState{
-		Query:        state.Query,
-		Forward:      state.Forward,
-		CaseMode:     SearchCaseMode(state.CaseMode),
-		Mode:         SearchMode(state.Mode),
-		MatchCount:   state.MatchCount,
-		CurrentMatch: state.CurrentMatch,
-		CompileError: state.CompileError,
-		Preview:      state.Preview,
-	}
+	return toPublicSearchState(p.viewer.SearchSnapshot())
 }
 
 // SearchForward starts a forward search and reports whether any match exists.
