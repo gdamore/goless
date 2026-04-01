@@ -865,6 +865,33 @@ func TestPagerSetVisualizationReclampsHorizontalScroll(t *testing.T) {
 	}
 }
 
+func TestPagerVisualizationWideMarkerClipsAfterHorizontalScroll(t *testing.T) {
+	pager := New(Config{
+		TabWidth: 4,
+		WrapMode: NoWrap,
+		Visualization: Visualization{
+			ShowNewlines: true,
+			ShowEOF:      true,
+			NewlineGlyph: "界",
+			EOFGlyph:     "E",
+		},
+	})
+	pager.SetSize(2, 1)
+	if err := pager.AppendString("a\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.ScrollRight(2)
+
+	screen := newPagerMockScreen(t, 2, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if got, want := pagerRowString(screen, 0, 2), " E"; got != want {
+		t.Fatalf("row after horizontal scroll = %q, want %q", got, want)
+	}
+}
+
 func TestPagerVisualizationStyleDefaultCanBeExplicit(t *testing.T) {
 	pager := New(Config{
 		TabWidth: 4,
