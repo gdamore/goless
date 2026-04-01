@@ -628,6 +628,8 @@ func toPublicSearchState(state iview.SearchSnapshot) SearchState {
 
 func toPublicPromptKind(kind iview.PromptKind) PromptKind {
 	switch kind {
+	case iview.PromptKindSearchForward:
+		return PromptSearchForward
 	case iview.PromptKindSearchBackward:
 		return PromptSearchBackward
 	case iview.PromptKindCommand:

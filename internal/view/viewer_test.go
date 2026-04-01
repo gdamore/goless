@@ -1214,6 +1214,32 @@ func TestPromptLineFormatterOverridesBuiltInPromptText(t *testing.T) {
 	}
 }
 
+func TestPromptLineFormatterDoesNotDuplicatePromptError(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		SearchMode: SearchRegex,
+		Text: Text{
+			PromptLine: func(info PromptInfo) string {
+				return info.DefaultText + "  " + info.Error
+			},
+		},
+	})
+	v.SetSize(40, 2)
+	v.beginPrompt(promptSearchForward)
+	v.prompt.buffer = []rune("(")
+	v.updatePromptPreview()
+
+	_, screen := newMockScreen(t, 40, 2)
+	defer screen.Fini()
+
+	v.drawPrompt(screen, 1)
+	if got := strings.Count(screenRowString(screen, 1, 40), "regex:error"); got != 1 {
+		t.Fatalf("prompt error count = %d, want 1", got)
+	}
+}
+
 func TestDrawStatusAndPromptUseConfiguredStyles(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alpha\n")); err != nil {
@@ -1569,6 +1595,19 @@ func cellRune(screen tcell.Screen, x, y int) rune {
 		return 0
 	}
 	return []rune(str)[0]
+}
+
+func screenRowString(screen tcell.Screen, y, width int) string {
+	var b strings.Builder
+	for x := 0; x < width; x++ {
+		str, _, _ := screen.Get(x, y)
+		if str == "" {
+			b.WriteRune(' ')
+			continue
+		}
+		b.WriteString(str)
+	}
+	return b.String()
 }
 
 func newMockScreen(t *testing.T, width, height int) (vt.MockTerm, tcell.Screen) {
