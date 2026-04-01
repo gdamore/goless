@@ -153,6 +153,16 @@ func (p *Pager) Refresh() {
 	p.viewer.Refresh()
 }
 
+// SetTheme updates how document content colors are rendered.
+func (p *Pager) SetTheme(theme Theme) {
+	p.viewer.SetTheme(toInternalTheme(theme))
+}
+
+// SetChrome updates frame, title, and prompt/status styling.
+func (p *Pager) SetChrome(chrome Chrome) {
+	p.viewer.SetChrome(toInternalChrome(chrome))
+}
+
 // HandleKey applies a key event and reports whether the caller should exit.
 func (p *Pager) HandleKey(ev *tcell.EventKey) bool {
 	return p.HandleKeyResult(ev).Quit

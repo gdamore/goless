@@ -667,6 +667,72 @@ func TestPagerThemeAffectsContentColorsOnly(t *testing.T) {
 	}
 }
 
+func TestPagerSetThemeAffectsSubsequentDraw(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("plain\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.SetTheme(Theme{
+		DefaultFG: tcolor.Green,
+		DefaultBG: tcolor.Navy,
+	})
+
+	screen := newPagerMockScreen(t, 20, 2)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	_, style, _ := screen.Get(0, 0)
+	if got, want := style.GetForeground(), tcolor.Green; got != want {
+		t.Fatalf("plain fg after SetTheme = %v, want %v", got, want)
+	}
+	if got, want := style.GetBackground(), tcolor.Navy; got != want {
+		t.Fatalf("plain bg after SetTheme = %v, want %v", got, want)
+	}
+}
+
+func TestPagerSetChromeAffectsSubsequentDraw(t *testing.T) {
+	borderStyle := tcell.StyleDefault.Foreground(tcolor.Blue)
+	titleStyle := tcell.StyleDefault.Foreground(tcolor.Fuchsia).Bold(true)
+	statusStyle := tcell.StyleDefault.Foreground(tcolor.White).Background(tcolor.Navy)
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	if err := pager.AppendString("plain\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.SetChrome(Chrome{
+		Title:       "Demo",
+		TitleAlign:  TitleAlignCenter,
+		Frame:       RoundedFrame(),
+		BorderStyle: borderStyle,
+		TitleStyle:  titleStyle,
+		StatusStyle: statusStyle,
+	})
+
+	screen := newPagerMockScreen(t, 20, 3)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if got := pagerCellRune(screen, 0, 0); got != '╭' {
+		t.Fatalf("top-left frame rune after SetChrome = %q, want %q", got, '╭')
+	}
+	if got, want := pagerCellStyle(screen, 0, 0).GetForeground(), borderStyle.GetForeground(); got != want {
+		t.Fatalf("border fg after SetChrome = %v, want %v", got, want)
+	}
+	titleX := pagerFindRune(screen, 0, 'D', 20)
+	if titleX < 0 {
+		t.Fatal("title rune after SetChrome not found")
+	}
+	if got, want := pagerCellStyle(screen, titleX, 0).GetForeground(), titleStyle.GetForeground(); got != want {
+		t.Fatalf("title fg after SetChrome = %v, want %v", got, want)
+	}
+	if got, want := pagerCellStyle(screen, 0, 2).GetBackground(), statusStyle.GetBackground(); got != want {
+		t.Fatalf("status bg after SetChrome = %v, want %v", got, want)
+	}
+}
+
 func TestPagerSetSearchMode(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
@@ -741,6 +807,15 @@ func pagerCellRune(screen tcell.Screen, x, y int) rune {
 func pagerCellStyle(screen tcell.Screen, x, y int) tcell.Style {
 	_, style, _ := screen.Get(x, y)
 	return style
+}
+
+func pagerFindRune(screen tcell.Screen, y int, want rune, width int) int {
+	for x := 0; x < width; x++ {
+		if pagerCellRune(screen, x, y) == want {
+			return x
+		}
+	}
+	return -1
 }
 
 func newPagerMockScreen(t *testing.T, width, height int) tcell.Screen {

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/gdamore/goless"
-	tcolor "github.com/gdamore/tcell/v3/color"
 )
 
 func TestDemoPreset(t *testing.T) {
@@ -60,16 +59,19 @@ func TestDemoChromeUsesPresetAndOverrides(t *testing.T) {
 	}
 }
 
-func TestDemoThemeCopiesPresetTheme(t *testing.T) {
-	theme := demoTheme(goless.Theme{
-		DefaultFG: tcolor.Red,
-		DefaultBG: tcolor.Blue,
-		ANSI:      [16]tcolor.Color{1: tcolor.Aqua},
-	})
-	if got, want := theme.DefaultFG, tcolor.Red; got != want {
-		t.Fatalf("demoTheme().DefaultFG = %v, want %v", got, want)
+func TestNextDemoPresetName(t *testing.T) {
+	cases := map[string]string{
+		"":       "dark",
+		"dark":   "light",
+		"light":  "plain",
+		"plain":  "pretty",
+		"pretty": "none",
+		"none":   "dark",
+		"bogus":  "dark",
 	}
-	if got, want := theme.ANSI[1], tcolor.Aqua; got != want {
-		t.Fatalf("demoTheme().ANSI[1] = %v, want %v", got, want)
+	for current, want := range cases {
+		if got := nextDemoPresetName(current); got != want {
+			t.Fatalf("nextDemoPresetName(%q) = %q, want %q", current, got, want)
+		}
 	}
 }

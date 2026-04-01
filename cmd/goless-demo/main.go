@@ -10,10 +10,6 @@ import (
 	"os"
 
 	"github.com/gdamore/goless"
-	"github.com/gdamore/goless/internal/ansi"
-	"github.com/gdamore/goless/internal/layout"
-	"github.com/gdamore/goless/internal/model"
-	"github.com/gdamore/goless/internal/view"
 	"github.com/gdamore/tcell/v3"
 )
 
@@ -47,7 +43,18 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	doc := model.NewDocumentWithMode(32*1024, renderMode)
+	chromeCfg, err := demoChrome(chromeName, title, preset.Chrome)
+	if err != nil {
+		return err
+	}
+	pager := goless.New(goless.Config{
+		TabWidth:   8,
+		WrapMode:   goless.NoWrap,
+		RenderMode: renderMode,
+		Theme:      preset.Theme,
+		Chrome:     chromeCfg,
+		ShowStatus: true,
+	})
 
 	var (
 		input io.Reader = os.Stdin
@@ -78,43 +85,43 @@ func run() error {
 	}
 	defer screen.Fini()
 
-	chromeCfg, err := demoChrome(chromeName, title, preset.Chrome)
-	if err != nil {
-		return err
-	}
-
-	viewer := view.New(doc, view.Config{
-		TabWidth:   8,
-		WrapMode:   layout.NoWrap,
-		Theme:      demoTheme(preset.Theme),
-		Chrome:     chromeCfg,
-		ShowStatus: true,
-	})
-
 	width, height := screen.Size()
 	if width <= 0 || height <= 0 {
 		screen.Sync()
 		width, height = screen.Size()
 	}
-	viewer.SetSize(width, height)
-	viewer.Draw(screen)
+	pager.SetSize(width, height)
+	pager.Draw(screen)
 
 	readResult := make(chan error, 1)
-	go readIntoDocument(doc, input, screen.EventQ(), readResult)
+	go readIntoPager(pager, input, screen.EventQ(), readResult)
 
 	for {
 		ev := <-screen.EventQ()
 		switch event := ev.(type) {
 		case *tcell.EventResize:
 			width, height = event.Size()
-			viewer.SetSize(width, height)
+			pager.SetSize(width, height)
 			screen.Sync()
 		case *tcell.EventKey:
-			if viewer.HandleKey(event) {
+			if event.Key() == tcell.KeyF4 {
+				presetName = nextDemoPresetName(presetName)
+				preset, err = demoPreset(presetName)
+				if err != nil {
+					return err
+				}
+				chromeCfg, err = demoChrome(chromeName, title, preset.Chrome)
+				if err != nil {
+					return err
+				}
+				pager.SetTheme(preset.Theme)
+				pager.SetChrome(chromeCfg)
+				break
+			}
+			if pager.HandleKey(event) {
 				return nil
 			}
 		case *tcell.EventInterrupt:
-			viewer.Refresh()
 			select {
 			case err := <-readResult:
 				if err != nil {
@@ -123,16 +130,16 @@ func run() error {
 			default:
 			}
 		}
-		viewer.Draw(screen)
+		pager.Draw(screen)
 	}
 }
 
-func appendFromReader(doc *model.Document, r io.Reader, onChunk func()) error {
+func appendFromReader(pager *goless.Pager, r io.Reader, onChunk func()) error {
 	buf := make([]byte, 32*1024)
 	for {
 		n, err := r.Read(buf)
 		if n > 0 {
-			if appendErr := doc.Append(buf[:n]); appendErr != nil {
+			if appendErr := pager.Append(buf[:n]); appendErr != nil {
 				return appendErr
 			}
 			if onChunk != nil {
@@ -148,11 +155,11 @@ func appendFromReader(doc *model.Document, r io.Reader, onChunk func()) error {
 	}
 }
 
-func readIntoDocument(doc *model.Document, r io.Reader, eventQ chan tcell.Event, result chan<- error) {
-	err := appendFromReader(doc, r, func() {
+func readIntoPager(pager *goless.Pager, r io.Reader, eventQ chan tcell.Event, result chan<- error) {
+	err := appendFromReader(pager, r, func() {
 		eventQ <- tcell.NewEventInterrupt(nil)
 	})
-	doc.Flush()
+	pager.Flush()
 	result <- err
 	eventQ <- tcell.NewEventInterrupt(nil)
 }
@@ -182,24 +189,31 @@ func demoPreset(name string) (goless.Preset, error) {
 	}
 }
 
-func demoTheme(theme goless.Theme) view.Theme {
-	return view.Theme{
-		DefaultFG: theme.DefaultFG,
-		DefaultBG: theme.DefaultBG,
-		ANSI:      theme.ANSI,
+func nextDemoPresetName(current string) string {
+	switch current {
+	case "dark":
+		return "light"
+	case "light":
+		return "plain"
+	case "plain":
+		return "pretty"
+	case "pretty":
+		return "none"
+	default:
+		return "dark"
 	}
 }
 
-func demoChrome(name, title string, base goless.Chrome) (view.Chrome, error) {
-	chrome := view.Chrome{
-		TitleAlign:       view.TitleAlign(base.TitleAlign),
+func demoChrome(name, title string, base goless.Chrome) (goless.Chrome, error) {
+	chrome := goless.Chrome{
+		TitleAlign:       base.TitleAlign,
 		Title:            base.Title,
 		BorderStyle:      base.BorderStyle,
 		TitleStyle:       base.TitleStyle,
 		StatusStyle:      base.StatusStyle,
 		PromptStyle:      base.PromptStyle,
 		PromptErrorStyle: base.PromptErrorStyle,
-		Frame: view.Frame{
+		Frame: goless.Frame{
 			Horizontal:  base.Frame.Horizontal,
 			Vertical:    base.Frame.Vertical,
 			TopLeft:     base.Frame.TopLeft,
@@ -221,13 +235,13 @@ func demoChrome(name, title string, base goless.Chrome) (view.Chrome, error) {
 	case "rounded":
 		frame = goless.RoundedFrame()
 	case "none":
-		chrome.Frame = view.Frame{}
+		chrome.Frame = goless.Frame{}
 		return chrome, nil
 	default:
-		return view.Chrome{}, fmt.Errorf("unknown chrome %q; expected auto, none, single, or rounded", name)
+		return goless.Chrome{}, fmt.Errorf("unknown chrome %q; expected auto, none, single, or rounded", name)
 	}
 
-	chrome.Frame = view.Frame{
+	chrome.Frame = goless.Frame{
 		Horizontal:  frame.Horizontal,
 		Vertical:    frame.Vertical,
 		TopLeft:     frame.TopLeft,
@@ -238,15 +252,15 @@ func demoChrome(name, title string, base goless.Chrome) (view.Chrome, error) {
 	return chrome, nil
 }
 
-func demoRenderMode(name string) (ansi.RenderMode, error) {
+func demoRenderMode(name string) (goless.RenderMode, error) {
 	switch name {
 	case "literal":
-		return ansi.RenderLiteral, nil
+		return goless.RenderLiteral, nil
 	case "presentation":
-		return ansi.RenderPresentation, nil
+		return goless.RenderPresentation, nil
 	case "hybrid", "":
-		return ansi.RenderHybrid, nil
+		return goless.RenderHybrid, nil
 	default:
-		return ansi.RenderHybrid, fmt.Errorf("unknown render mode %q; expected hybrid, literal, or presentation", name)
+		return goless.RenderHybrid, fmt.Errorf("unknown render mode %q; expected hybrid, literal, or presentation", name)
 	}
 }

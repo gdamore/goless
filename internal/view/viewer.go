@@ -79,6 +79,26 @@ func New(doc *model.Document, cfg Config) *Viewer {
 	}
 }
 
+// SetTheme updates how document content colors are rendered.
+func (v *Viewer) SetTheme(theme Theme) {
+	v.cfg.Theme = theme
+}
+
+// SetChrome updates frame, title, and prompt/status styling.
+func (v *Viewer) SetChrome(chrome Chrome) {
+	v.ensureLayout()
+	anchor := v.firstVisibleAnchor()
+	v.cfg.Chrome = chrome.withDefaults()
+	v.relayout()
+	v.clampHelpOffset()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+		return
+	}
+	v.restoreAnchor(anchor)
+}
+
 // SetSearchCaseMode updates the default case behavior for new and active searches.
 func (v *Viewer) SetSearchCaseMode(mode SearchCaseMode) {
 	mode = normalizeSearchCaseMode(mode)

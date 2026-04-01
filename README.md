@@ -215,6 +215,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `n` and `N` to repeat search
 - `F2` to cycle search case mode in the bundled key group
 - `F3` to cycle substring, whole-word, and regex matching in the bundled key group
+- `F4` to cycle visual presets in the demo program
 - `:` then a number to jump to a line
 - `:set searchcase smart|case|nocase` to set search mode directly
 - `:set searchmode sub|word|regex` to set search mode directly
