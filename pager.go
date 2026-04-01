@@ -32,6 +32,7 @@ type Config struct {
 	WrapMode    WrapMode                   // WrapMode selects horizontal scrolling or soft wrapping.
 	SearchCase  SearchCaseMode             // SearchCase selects smart-case, case-sensitive, or case-insensitive literal search behavior.
 	SearchMode  SearchMode                 // SearchMode selects substring, whole-word, or regex search behavior.
+	Theme       Theme                      // Theme remaps content default colors and ANSI 0-15 without affecting chrome.
 	KeyGroup    KeyGroup                   // KeyGroup selects a bundled set of key bindings.
 	UnbindKeys  []KeyStroke                // UnbindKeys removes exact bindings from the selected key group.
 	KeyBindings []KeyBinding               // KeyBindings prepend custom bindings ahead of bundled defaults.
@@ -79,6 +80,7 @@ func New(cfg Config) *Pager {
 			WrapMode:   toInternalWrapMode(cfg.WrapMode),
 			SearchCase: toInternalSearchCaseMode(cfg.SearchCase),
 			SearchMode: toInternalSearchMode(cfg.SearchMode),
+			Theme:      toInternalTheme(cfg.Theme),
 			KeyGroup:   toInternalKeyGroup(cfg.KeyGroup),
 			KeyUnbind:  toInternalKeyStrokes(cfg.UnbindKeys),
 			KeyBind:    toInternalKeyBindings(cfg.KeyBindings),
@@ -461,6 +463,14 @@ func toInternalKeyBindings(bindings []KeyBinding) []iview.KeyBinding {
 		})
 	}
 	return result
+}
+
+func toInternalTheme(theme Theme) iview.Theme {
+	return iview.Theme{
+		DefaultFG: theme.DefaultFG,
+		DefaultBG: theme.DefaultBG,
+		ANSI:      theme.ANSI,
+	}
 }
 
 func toInternalRenderMode(mode RenderMode) ansi.RenderMode {

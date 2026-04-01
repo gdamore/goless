@@ -20,6 +20,7 @@ type Config struct {
 	WrapMode   layout.WrapMode
 	SearchCase SearchCaseMode
 	SearchMode SearchMode
+	Theme      Theme
 	KeyGroup   KeyGroup
 	KeyUnbind  []KeyStroke
 	KeyBind    []KeyBinding
@@ -522,7 +523,7 @@ func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow
 		}
 		grapheme := line.Graphemes[segment.LogicalGraphemeIndex]
 		ansiStyle := styleForGrapheme(line, grapheme.RuneStart)
-		cellStyle := toTCellStyle(ansiStyle)
+		cellStyle := v.toTCellStyle(ansiStyle)
 		matched, current := v.graphemeMatched(line, row.LineIndex, grapheme)
 		if matched {
 			cellStyle = applyMatchCellStyle(cellStyle, current)
@@ -920,10 +921,10 @@ func applyMatchCellStyle(style tcell.Style, current bool) tcell.Style {
 	return style
 }
 
-func toTCellStyle(style ansi.Style) tcell.Style {
+func (v *Viewer) toTCellStyle(style ansi.Style) tcell.Style {
 	tstyle := tcell.StyleDefault
-	tstyle = tstyle.Foreground(toTCellColor(style.Fg))
-	tstyle = tstyle.Background(toTCellColor(style.Bg))
+	tstyle = tstyle.Foreground(v.cfg.Theme.resolveColor(style.Fg, true))
+	tstyle = tstyle.Background(v.cfg.Theme.resolveColor(style.Bg, false))
 	tstyle = tstyle.Bold(style.Bold)
 	tstyle = tstyle.Dim(style.Dim)
 	tstyle = tstyle.Italic(style.Italic)
@@ -959,17 +960,6 @@ var (
 
 	statusBarStyle = tcell.StyleDefault.Foreground(tcolor.PaletteColor(15)).Background(tcolor.PaletteColor(2))
 )
-
-func toTCellColor(c ansi.Color) tcolor.Color {
-	switch c.Kind {
-	case ansi.ColorIndex:
-		return tcolor.PaletteColor(int(c.Index))
-	case ansi.ColorRGB:
-		return tcolor.NewRGBColor(int32(c.R), int32(c.G), int32(c.B))
-	default:
-		return tcolor.Default
-	}
-}
 
 func truncateToWidth(s string, width int) string {
 	if width <= 0 {

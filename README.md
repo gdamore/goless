@@ -128,6 +128,7 @@ The main config knobs are:
 - `SearchCase`: `SearchSmartCase`, `SearchCaseSensitive`, or
   `SearchCaseInsensitive`
 - `SearchMode`: `SearchSubstring`, `SearchWholeWord`, or `SearchRegex`
+- `Theme`: remap content default colors and ANSI 0-15 without affecting chrome
 - `RenderMode`: `RenderHybrid`, `RenderLiteral`, or `RenderPresentation`
 - `KeyGroup`: `LessKeyGroup` or `EmptyKeyGroup`
 - `UnbindKeys` and `KeyBindings`: remove or prepend bindings in normal, help,
@@ -166,6 +167,8 @@ For host chrome integration:
 - `Text.PromptLine` can replace the full built-in prompt text using `PromptInfo`
 - `Chrome.StatusStyle`, `Chrome.PromptStyle`, and `Chrome.PromptErrorStyle`
   can restyle the built-in bottom bar without replacing pager rendering
+- `Theme` only affects document content. Explicit RGB colors and indexed colors
+  above 15 are preserved exactly.
 
 ## Render Modes
 

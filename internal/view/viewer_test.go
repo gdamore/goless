@@ -9,6 +9,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"github.com/gdamore/goless/internal/ansi"
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/tcell/v3"
@@ -1273,6 +1274,39 @@ func TestDrawStatusAndPromptUseConfiguredStyles(t *testing.T) {
 	}
 	if got, want := gotErrorStyle.GetBackground(), promptErrorStyle.GetBackground(); got != want {
 		t.Fatalf("prompt error bg = %v, want %v", got, want)
+	}
+}
+
+func TestThemeRemapsDefaultsAndANSI16Only(t *testing.T) {
+	v := New(model.NewDocument(4), Config{
+		Theme: Theme{
+			DefaultFG: tcolor.Red,
+			DefaultBG: tcolor.Blue,
+			ANSI: [16]tcolor.Color{
+				1: tcolor.Aqua,
+			},
+		},
+	})
+
+	defaultStyle := v.toTCellStyle(ansi.DefaultStyle())
+	if got, want := defaultStyle.GetForeground(), tcolor.Red; got != want {
+		t.Fatalf("default fg = %v, want %v", got, want)
+	}
+	if got, want := defaultStyle.GetBackground(), tcolor.Blue; got != want {
+		t.Fatalf("default bg = %v, want %v", got, want)
+	}
+
+	indexedStyle := v.toTCellStyle(ansi.Style{Fg: ansi.IndexedColor(1), Bg: ansi.IndexedColor(16)})
+	if got, want := indexedStyle.GetForeground(), tcolor.Aqua; got != want {
+		t.Fatalf("indexed fg = %v, want %v", got, want)
+	}
+	if got, want := indexedStyle.GetBackground(), tcolor.PaletteColor(16); got != want {
+		t.Fatalf("indexed bg = %v, want %v", got, want)
+	}
+
+	rgbStyle := v.toTCellStyle(ansi.Style{Fg: ansi.RGBColor(1, 2, 3)})
+	if got, want := rgbStyle.GetForeground(), tcolor.NewRGBColor(1, 2, 3); got != want {
+		t.Fatalf("rgb fg = %v, want %v", got, want)
 	}
 }
 
