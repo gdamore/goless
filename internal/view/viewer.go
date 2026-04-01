@@ -493,9 +493,10 @@ func (v *Viewer) maxColOffset() int {
 	}
 
 	maxCells := 0
-	for _, line := range v.layout.Lines {
-		if line.TotalCells > maxCells {
-			maxCells = line.TotalCells
+	for i, line := range v.layout.Lines {
+		totalCells := line.TotalCells + v.trailingMarkerCellWidth(i)
+		if totalCells > maxCells {
+			maxCells = totalCells
 		}
 	}
 	return max(maxCells-max(v.contentWidth(), 1), 0)
@@ -600,11 +601,22 @@ func (v *Viewer) drawTrailingMarkers(screen tcell.Screen, baseX, y int, row layo
 		return
 	}
 	width := v.contentWidth()
-	if row.RenderedCellWidth >= width {
+	if width <= 0 {
+		return
+	}
+	start := v.layout.Lines[row.LineIndex].TotalCells - row.SourceCellStart
+	if start >= width {
+		return
+	}
+	if start < 0 {
+		markers = trimLeftToWidth(markers, -start)
+		start = 0
+	}
+	if markers == "" {
 		return
 	}
 	style := v.visualizationStyle(v.toTCellStyle(ansi.DefaultStyle()))
-	screen.PutStrStyled(baseX+row.RenderedCellWidth, y, truncateToWidth(markers, width-row.RenderedCellWidth), style)
+	screen.PutStrStyled(baseX+start, y, truncateToWidth(markers, width-start), style)
 }
 
 func (v *Viewer) trailingMarkers(row layout.VisualRow, line model.Line) string {
@@ -614,7 +626,10 @@ func (v *Viewer) trailingMarkers(row layout.VisualRow, line model.Line) string {
 	if v.layout.Lines[row.LineIndex].TotalCells != row.SourceCellEnd {
 		return ""
 	}
+	return v.lineEndMarkers(row.LineIndex, line)
+}
 
+func (v *Viewer) lineEndMarkers(lineIndex int, line model.Line) string {
 	var marker strings.Builder
 	if line.Ending == model.LineEndingCRLF && v.cfg.Visualization.ShowCarriageReturns {
 		marker.WriteString(v.cfg.Visualization.CarriageReturnGlyph)
@@ -622,10 +637,17 @@ func (v *Viewer) trailingMarkers(row layout.VisualRow, line model.Line) string {
 	if line.Ending != model.LineEndingNone && v.cfg.Visualization.ShowNewlines {
 		marker.WriteString(v.cfg.Visualization.NewlineGlyph)
 	}
-	if v.cfg.Visualization.ShowEOF && row.LineIndex == len(v.lines)-1 {
+	if v.cfg.Visualization.ShowEOF && lineIndex == len(v.lines)-1 {
 		marker.WriteString(v.cfg.Visualization.EOFGlyph)
 	}
 	return marker.String()
+}
+
+func (v *Viewer) trailingMarkerCellWidth(lineIndex int) int {
+	if lineIndex < 0 || lineIndex >= len(v.lines) {
+		return 0
+	}
+	return stringWidth(v.lineEndMarkers(lineIndex, v.lines[lineIndex]))
 }
 
 func (v *Viewer) drawFrame(screen tcell.Screen, title string) {
@@ -1080,6 +1102,25 @@ func truncateToWidth(s string, width int) string {
 		total += clusterWidth
 	}
 	return builder.String()
+}
+
+func trimLeftToWidth(s string, skip int) string {
+	if skip <= 0 {
+		return s
+	}
+
+	gr := uniseg.NewGraphemes(s)
+	consumed := 0
+	for gr.Next() {
+		cluster := gr.Str()
+		clusterWidth := uniseg.StringWidth(cluster)
+		if consumed+clusterWidth > skip {
+			start, _ := gr.Positions()
+			return s[start:]
+		}
+		consumed += clusterWidth
+	}
+	return ""
 }
 
 func frameLine(width int, left, fill, right string) string {
