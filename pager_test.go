@@ -882,6 +882,130 @@ func TestPagerRendersStrikethroughStyle(t *testing.T) {
 	}
 }
 
+func TestPagerDoesNotRenderOSC8HyperlinkWithoutHandler(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, RenderMode: RenderPresentation})
+	pager.SetSize(8, 1)
+	if err := pager.AppendString("x\x1b]8;id=demo;https://example.com\aY\x1b]8;;\aZ"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 8, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+
+	if got, want := pagerRowString(screen, 0, 3), "xYZ"; got != want {
+		t.Fatalf("rendered text = %q, want %q", got, want)
+	}
+	if id, url := pagerCellStyle(screen, 2, 0).GetUrl(); id != "" || url != "" {
+		t.Fatalf("trailing cell hyperlink = (%q, %q), want empty", id, url)
+	}
+	if id, url := pagerCellStyle(screen, 1, 0).GetUrl(); id != "" || url != "" {
+		t.Fatalf("hyperlink unexpectedly live = (%q, %q)", id, url)
+	}
+}
+
+func TestPagerDoesNotRenderOSC8EscapeSequenceInHybridWithoutHandler(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, RenderMode: RenderHybrid})
+	pager.SetSize(64, 1)
+	if err := pager.AppendString("See \x1b]8;id=sample;https://github.com/gdamore/goless\agoless on GitHub\x1b]8;;\a for project updates."); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 64, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+
+	if got, want := pagerRowString(screen, 0, 41), "See goless on GitHub for project updates."; got != want {
+		t.Fatalf("rendered text = %q, want %q", got, want)
+	}
+	if strings.Contains(pagerRowString(screen, 0, 64), "␛]8") {
+		t.Fatal("OSC 8 escape sequence rendered visibly in hybrid mode")
+	}
+	if id, url := pagerCellStyle(screen, 4, 0).GetUrl(); id != "" || url != "" {
+		t.Fatalf("link unexpectedly live in default hybrid mode = (%q, %q)", id, url)
+	}
+}
+
+func TestPagerRendersOSC8HyperlinkWithHandler(t *testing.T) {
+	pager := New(Config{
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		RenderMode: RenderHybrid,
+		HyperlinkHandler: func(info HyperlinkInfo) HyperlinkDecision {
+			if info.Target != "https://example.com" || info.Text != "Y" {
+				t.Fatalf("handler info = %+v", info)
+			}
+			return HyperlinkDecision{
+				Live:   true,
+				Target: "https://safe.example.com/path",
+			}
+		},
+	})
+	pager.SetSize(8, 1)
+	if err := pager.AppendString("x\x1b]8;id=demo;https://example.com\aY\x1b]8;;\aZ"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 8, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+
+	if got, want := pagerRowString(screen, 0, 3), "xYZ"; got != want {
+		t.Fatalf("rendered text = %q, want %q", got, want)
+	}
+
+	id, url := pagerCellStyle(screen, 1, 0).GetUrl()
+	if got, want := url, "https://safe.example.com/path"; got != want {
+		t.Fatalf("hyperlink url = %q, want %q", got, want)
+	}
+	if got, want := id, "demo"; got != want {
+		t.Fatalf("hyperlink id = %q, want %q", got, want)
+	}
+}
+
+func TestPagerRendersOSC8HyperlinkStyleOverride(t *testing.T) {
+	pager := New(Config{
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		RenderMode: RenderPresentation,
+		HyperlinkHandler: func(info HyperlinkInfo) HyperlinkDecision {
+			if info.Text != "demo" {
+				t.Fatalf("handler text = %q, want %q", info.Text, "demo")
+			}
+			return HyperlinkDecision{
+				Style:    tcell.StyleDefault.Foreground(tcolor.Blue).Underline(true),
+				StyleSet: true,
+			}
+		},
+	})
+	pager.SetSize(4, 1)
+	if err := pager.AppendString("\x1b]8;;https://example.com\ademo\x1b]8;;\a"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 4, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+
+	if got, want := pagerRowString(screen, 0, 4), "demo"; got != want {
+		t.Fatalf("rendered text = %q, want %q", got, want)
+	}
+	if fg := pagerCellStyle(screen, 0, 0).GetForeground(); fg != tcolor.Blue {
+		t.Fatalf("foreground = %v, want %v", fg, tcolor.Blue)
+	}
+	if !pagerCellStyle(screen, 0, 0).HasUnderline() {
+		t.Fatal("style override did not enable underline")
+	}
+}
+
 func TestPagerVisualizationWideMarkerClipsAfterHorizontalScroll(t *testing.T) {
 	pager := New(Config{
 		TabWidth: 4,

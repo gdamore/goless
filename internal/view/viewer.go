@@ -16,18 +16,19 @@ import (
 
 // Config controls viewer behavior.
 type Config struct {
-	TabWidth      int
-	WrapMode      layout.WrapMode
-	SearchCase    SearchCaseMode
-	SearchMode    SearchMode
-	Theme         Theme
-	Visualization Visualization
-	KeyGroup      KeyGroup
-	KeyUnbind     []KeyStroke
-	KeyBind       []KeyBinding
-	Chrome        Chrome
-	ShowStatus    bool
-	Text          Text
+	TabWidth         int
+	WrapMode         layout.WrapMode
+	SearchCase       SearchCaseMode
+	SearchMode       SearchMode
+	Theme            Theme
+	Visualization    Visualization
+	HyperlinkHandler HyperlinkHandler
+	KeyGroup         KeyGroup
+	KeyUnbind        []KeyStroke
+	KeyBind          []KeyBinding
+	Chrome           Chrome
+	ShowStatus       bool
+	Text             Text
 }
 
 // Viewer is a minimal document viewer built on the model and layout packages.
@@ -92,6 +93,11 @@ func (v *Viewer) SetVisualization(visual Visualization) {
 	v.ensureLayout()
 	v.clampOffsets()
 	v.relayout()
+}
+
+// SetHyperlinkHandler updates how parsed OSC 8 hyperlinks are rendered.
+func (v *Viewer) SetHyperlinkHandler(handler HyperlinkHandler) {
+	v.cfg.HyperlinkHandler = handler
 }
 
 // SetChrome updates frame, title, and prompt/status styling.
@@ -548,6 +554,7 @@ func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow
 		return
 	}
 	line := v.lines[row.LineIndex]
+	hyperlinks := v.resolveRowHyperlinks(row, line)
 	for _, segment := range row.Segments {
 		if segment.LogicalGraphemeIndex < 0 || segment.LogicalGraphemeIndex >= len(line.Graphemes) {
 			continue
@@ -555,6 +562,9 @@ func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow
 		grapheme := line.Graphemes[segment.LogicalGraphemeIndex]
 		ansiStyle := styleForGrapheme(line, grapheme.RuneStart)
 		cellStyle := v.toTCellStyle(ansiStyle)
+		if hyperlink, ok := hyperlinks.byGrapheme[segment.LogicalGraphemeIndex]; ok {
+			cellStyle = applyHyperlinkDecisionStyle(cellStyle, hyperlink.decision, hyperlink.span)
+		}
 		matched, current := v.graphemeMatched(line, row.LineIndex, grapheme)
 		if matched {
 			cellStyle = applyMatchCellStyle(cellStyle, current)
@@ -582,8 +592,122 @@ func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow
 
 		screen.Put(x, y, grapheme.Text, cellStyle)
 	}
-
 	v.drawTrailingMarkers(screen, baseX, y, row, line)
+}
+
+type hyperlinkSpan struct {
+	startGrapheme   int
+	endGrapheme     int
+	sourceCellStart int
+	sourceCellEnd   int
+	target          string
+	id              string
+	text            string
+	baseStyle       tcell.Style
+}
+
+type resolvedHyperlink struct {
+	span     hyperlinkSpan
+	decision HyperlinkDecision
+}
+
+type rowHyperlinks struct {
+	byGrapheme map[int]resolvedHyperlink
+}
+
+func (v *Viewer) resolveRowHyperlinks(row layout.VisualRow, line model.Line) rowHyperlinks {
+	if v.cfg.HyperlinkHandler == nil || row.LineIndex < 0 || row.LineIndex >= len(v.layout.Lines) {
+		return rowHyperlinks{}
+	}
+
+	result := rowHyperlinks{
+		byGrapheme: make(map[int]resolvedHyperlink),
+	}
+
+	for _, span := range v.hyperlinkSpans(row.LineIndex, line) {
+		decision := v.cfg.HyperlinkHandler(HyperlinkInfo{
+			Target: span.target,
+			ID:     span.id,
+			Text:   span.text,
+			Style:  span.baseStyle,
+		})
+		resolved := resolvedHyperlink{
+			span:     span,
+			decision: decision,
+		}
+		for i := span.startGrapheme; i < span.endGrapheme; i++ {
+			result.byGrapheme[i] = resolved
+		}
+	}
+	return result
+}
+
+func (v *Viewer) hyperlinkSpans(lineIndex int, line model.Line) []hyperlinkSpan {
+	if lineIndex < 0 || lineIndex >= len(v.layout.Lines) || len(line.Graphemes) == 0 {
+		return nil
+	}
+	layoutLine := v.layout.Lines[lineIndex]
+	spans := make([]hyperlinkSpan, 0)
+	for i := 0; i < len(line.Graphemes); {
+		style := styleForGrapheme(line, line.Graphemes[i].RuneStart)
+		if style.URL == "" {
+			i++
+			continue
+		}
+		start := i
+		for i < len(line.Graphemes) {
+			nextStyle := styleForGrapheme(line, line.Graphemes[i].RuneStart)
+			if nextStyle.URL != style.URL || nextStyle.URLID != style.URLID {
+				break
+			}
+			i++
+		}
+		end := i
+		startByte := line.Graphemes[start].ByteStart
+		endByte := line.Graphemes[end-1].ByteEnd
+		spans = append(spans, hyperlinkSpan{
+			startGrapheme:   start,
+			endGrapheme:     end,
+			sourceCellStart: layoutLine.GraphemeCellStarts[start],
+			sourceCellEnd:   layoutLine.GraphemeCellEnds[end-1],
+			target:          style.URL,
+			id:              style.URLID,
+			text:            line.Text[startByte:endByte],
+			baseStyle:       v.toTCellStyle(style),
+		})
+	}
+	return spans
+}
+
+func applyHyperlinkDecisionStyle(style tcell.Style, decision HyperlinkDecision, span hyperlinkSpan) tcell.Style {
+	if decision.StyleSet {
+		overlay := decision.Style
+		if overlay.GetForeground() != tcolor.Default {
+			style = style.Foreground(overlay.GetForeground())
+		}
+		if overlay.GetBackground() != tcolor.Default {
+			style = style.Background(overlay.GetBackground())
+		}
+		style = style.Attributes(style.GetAttributes() | overlay.GetAttributes())
+		if overlay.GetUnderlineStyle() != tcell.UnderlineStyleNone || overlay.GetUnderlineColor() != tcolor.Default {
+			style = style.Underline(overlay.GetUnderlineStyle(), overlay.GetUnderlineColor())
+		}
+	}
+	if !decision.Live {
+		return style.Url("").UrlId("")
+	}
+	target := decision.Target
+	if target == "" {
+		target = span.target
+	}
+	if target == "" {
+		return style.Url("").UrlId("")
+	}
+	style = style.Url(target)
+	if span.id != "" {
+		style = style.UrlId(span.id)
+	}
+	return style
 }
 
 func (v *Viewer) visualizedSegment(row layout.VisualRow, line model.Line, segment layout.VisualSegment, grapheme model.Grapheme, baseStyle tcell.Style) (string, tcell.Style, bool) {

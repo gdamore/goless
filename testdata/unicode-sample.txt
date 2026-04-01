@@ -45,5 +45,9 @@ ANSI styles:
 OSC should be ignored:
 ]0;this title should not appearvisible text after OSC
 
+OSC 8 hyperlink:
+See ]8;id=sample;https://github.com/gdamore/golessgoless on GitHub]8;; for project updates.
+And ]8;id=sample-http;http://example.com/demoexample over http]8;; for contrast.
+
 Long line for wrap/scroll testing:
 0123456789 abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 😀界שלום tabs->	end

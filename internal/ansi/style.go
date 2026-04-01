@@ -50,6 +50,8 @@ type Style struct {
 	Strike    bool
 	Blink     bool
 	Reverse   bool
+	URL       string
+	URLID     string
 }
 
 // DefaultStyle returns the initial style state.

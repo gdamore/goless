@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gdamore/goless"
+	tcolor "github.com/gdamore/tcell/v3/color"
 )
 
 func TestDemoPreset(t *testing.T) {
@@ -85,5 +86,30 @@ func TestDemoVisualization(t *testing.T) {
 	enabled := demoVisualization(true)
 	if !enabled.ShowTabs || !enabled.ShowNewlines || !enabled.ShowCarriageReturns || !enabled.ShowEOF {
 		t.Fatal("demoVisualization(true) did not enable all markers")
+	}
+}
+
+func TestDemoHyperlinkHandler(t *testing.T) {
+	handler := demoHyperlinkHandler(false)
+	decision := handler(goless.HyperlinkInfo{
+		Target: "https://example.com",
+		Text:   "example",
+	})
+	if decision.Live {
+		t.Fatal("demo hyperlink handler unexpectedly enabled live links")
+	}
+	if !decision.StyleSet {
+		t.Fatal("demo hyperlink handler did not set style")
+	}
+	if got, want := decision.Style.GetForeground(), tcolor.Blue; got != want {
+		t.Fatalf("demo hyperlink foreground = %v, want %v", got, want)
+	}
+
+	live := demoHyperlinkHandler(true)(goless.HyperlinkInfo{
+		Target: "http://example.com",
+		Text:   "example",
+	})
+	if !live.Live {
+		t.Fatal("demo live hyperlink handler left link inert")
 	}
 }

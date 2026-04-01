@@ -216,14 +216,16 @@ func (p *Parser) stateCSI(b byte) {
 func (p *Parser) stateOSC(b byte) {
 	switch b {
 	case 0x07:
-		if p.showsUnsupportedSequences() {
+		handled := p.handlesOSC() && p.processOSC()
+		if p.showsUnsupportedSequences() && !handled {
 			p.emitEscapeVisible([]byte{0x07})
 			return
 		}
 		p.buf.Reset()
 		p.setStep(modeInit, p.stateInit)
 	case 0x9c:
-		if p.showsUnsupportedSequences() {
+		handled := p.handlesOSC() && p.processOSC()
+		if p.showsUnsupportedSequences() && !handled {
 			p.emitEscapeVisible([]byte{0x1b, '\\'})
 			return
 		}
@@ -233,7 +235,8 @@ func (p *Parser) stateOSC(b byte) {
 		buf := p.buf.Bytes()
 		if len(buf) > 0 && buf[len(buf)-1] == 0x1b {
 			p.buf.Truncate(p.buf.Len() - 1)
-			if p.showsUnsupportedSequences() {
+			handled := p.handlesOSC() && p.processOSC()
+			if p.showsUnsupportedSequences() && !handled {
 				p.emitEscapeVisible([]byte{0x1b, '\\'})
 				return
 			}
@@ -344,8 +347,50 @@ func (p *Parser) emitEscapeVisible(final []byte) {
 	p.setStep(modeInit, p.stateInit)
 }
 
+func (p *Parser) processOSC() bool {
+	body := p.buf.String()
+	if body == "" || body[0] != ']' {
+		return false
+	}
+	body = body[1:]
+	cmd, data, ok := strings.Cut(body, ";")
+	if !ok {
+		return false
+	}
+	if cmd != "8" {
+		return false
+	}
+	p.processHyperlink(data)
+	return true
+}
+
+func (p *Parser) processHyperlink(data string) {
+	params, uri, ok := strings.Cut(data, ";")
+	if !ok {
+		return
+	}
+	if uri == "" {
+		p.style.URL = ""
+		p.style.URLID = ""
+		return
+	}
+
+	id := ""
+	for pair := range strings.SplitSeq(params, ":") {
+		if val, ok := strings.CutPrefix(pair, "id="); ok {
+			id = val
+		}
+	}
+	p.style.URL = uri
+	p.style.URLID = id
+}
+
 func (p *Parser) showsUnsupportedSequences() bool {
 	return p.renderMode != RenderPresentation
+}
+
+func (p *Parser) handlesOSC() bool {
+	return p.renderMode != RenderLiteral
 }
 
 func controlPicture(b byte) (rune, bool) {
@@ -378,7 +423,11 @@ func (p *Parser) processSGR(body string) {
 
 		switch {
 		case code == 0:
+			url := p.style.URL
+			urlID := p.style.URLID
 			p.style = DefaultStyle()
+			p.style.URL = url
+			p.style.URLID = urlID
 		case code == 1:
 			p.style.Bold = true
 		case code == 2:
