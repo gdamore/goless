@@ -802,6 +802,37 @@ func TestPagerSetVisualizationAffectsSubsequentDraw(t *testing.T) {
 	}
 }
 
+func TestPagerVisualizationMarkersRemainReachableAtLineEnd(t *testing.T) {
+	pager := New(Config{
+		TabWidth: 4,
+		WrapMode: NoWrap,
+		Visualization: Visualization{
+			ShowNewlines: true,
+			NewlineGlyph: "N",
+		},
+	})
+	pager.SetSize(4, 1)
+	if err := pager.AppendString("abcd\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 4, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if got, want := pagerRowString(screen, 0, 4), "abcd"; got != want {
+		t.Fatalf("row before horizontal scroll = %q, want %q", got, want)
+	}
+
+	pager.ScrollRight(1)
+	screen.Clear()
+	pager.Draw(screen)
+	if got, want := pagerRowString(screen, 0, 4), "bcdN"; got != want {
+		t.Fatalf("row after horizontal scroll = %q, want %q", got, want)
+	}
+}
+
 func TestPagerVisualizationStyleDefaultCanBeExplicit(t *testing.T) {
 	pager := New(Config{
 		TabWidth: 4,
