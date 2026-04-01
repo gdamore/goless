@@ -892,6 +892,33 @@ func TestPagerVisualizationWideMarkerClipsAfterHorizontalScroll(t *testing.T) {
 	}
 }
 
+func TestPagerVisualizationWideMarkerBoundaryScrollPreservesNextMarker(t *testing.T) {
+	pager := New(Config{
+		TabWidth: 4,
+		WrapMode: NoWrap,
+		Visualization: Visualization{
+			ShowNewlines: true,
+			ShowEOF:      true,
+			NewlineGlyph: "界",
+			EOFGlyph:     "E",
+		},
+	})
+	pager.SetSize(1, 1)
+	if err := pager.AppendString("a\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.ScrollRight(3)
+
+	screen := newPagerMockScreen(t, 1, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if got, want := pagerRowString(screen, 0, 1), "E"; got != want {
+		t.Fatalf("row after boundary scroll = %q, want %q", got, want)
+	}
+}
+
 func TestPagerVisualizationStyleDefaultCanBeExplicit(t *testing.T) {
 	pager := New(Config{
 		TabWidth: 4,
