@@ -104,6 +104,9 @@ func TestDemoHyperlinkHandler(t *testing.T) {
 	if got, want := decision.Style.GetForeground(), tcolor.Blue; got != want {
 		t.Fatalf("demo hyperlink foreground = %v, want %v", got, want)
 	}
+	if got, want := decision.Style.GetBackground(), tcolor.Default; got != want {
+		t.Fatalf("demo hyperlink background = %v, want %v", got, want)
+	}
 
 	live := demoHyperlinkHandler(true)(goless.HyperlinkInfo{
 		Target: "http://example.com",

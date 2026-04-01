@@ -231,10 +231,10 @@ func demoVisualization(enabled bool) goless.Visualization {
 func demoHyperlinkHandler(live bool) goless.HyperlinkHandler {
 	return func(info goless.HyperlinkInfo) goless.HyperlinkDecision {
 		return goless.HyperlinkDecision{
-			Live: live,
-			Style: tcell.StyleDefault.
+			Style: info.Style.
 				Foreground(tcolor.Blue).
 				Underline(true),
+			Live:     live,
 			StyleSet: true,
 		}
 	}

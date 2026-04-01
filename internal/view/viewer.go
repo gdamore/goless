@@ -265,12 +265,13 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 	v.drawFrame(screen, v.cfg.Chrome.Title)
 
 	bodyX, bodyY, _, bodyHeight := v.contentRect()
+	lineHyperlinks := v.resolveVisibleHyperlinks()
 	for y := 0; y < bodyHeight; y++ {
 		rowIndex := v.rowOffset + y
 		if rowIndex >= len(v.layout.Rows) {
 			break
 		}
-		v.drawRow(screen, bodyX, bodyY+y, v.layout.Rows[rowIndex])
+		v.drawRow(screen, bodyX, bodyY+y, v.layout.Rows[rowIndex], lineHyperlinks)
 	}
 
 	if v.height > 0 {
@@ -549,12 +550,12 @@ func (v *Viewer) revealAnchor(anchor layout.Anchor) {
 	v.clampOffsets()
 }
 
-func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow) {
+func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow, lineHyperlinks map[int]rowHyperlinks) {
 	if row.LineIndex < 0 || row.LineIndex >= len(v.lines) {
 		return
 	}
 	line := v.lines[row.LineIndex]
-	hyperlinks := v.resolveRowHyperlinks(row, line)
+	hyperlinks := lineHyperlinks[row.LineIndex]
 	for _, segment := range row.Segments {
 		if segment.LogicalGraphemeIndex < 0 || segment.LogicalGraphemeIndex >= len(line.Graphemes) {
 			continue
@@ -615,8 +616,31 @@ type rowHyperlinks struct {
 	byGrapheme map[int]resolvedHyperlink
 }
 
-func (v *Viewer) resolveRowHyperlinks(row layout.VisualRow, line model.Line) rowHyperlinks {
-	if v.cfg.HyperlinkHandler == nil || row.LineIndex < 0 || row.LineIndex >= len(v.layout.Lines) {
+func (v *Viewer) resolveVisibleHyperlinks() map[int]rowHyperlinks {
+	if v.cfg.HyperlinkHandler == nil {
+		return nil
+	}
+	result := make(map[int]rowHyperlinks)
+	bodyHeight := max(v.bodyHeight(), 0)
+	for y := 0; y < bodyHeight; y++ {
+		rowIndex := v.rowOffset + y
+		if rowIndex >= len(v.layout.Rows) {
+			break
+		}
+		lineIndex := v.layout.Rows[rowIndex].LineIndex
+		if lineIndex < 0 || lineIndex >= len(v.lines) {
+			continue
+		}
+		if _, ok := result[lineIndex]; ok {
+			continue
+		}
+		result[lineIndex] = v.resolveLineHyperlinks(lineIndex, v.lines[lineIndex])
+	}
+	return result
+}
+
+func (v *Viewer) resolveLineHyperlinks(lineIndex int, line model.Line) rowHyperlinks {
+	if v.cfg.HyperlinkHandler == nil || lineIndex < 0 || lineIndex >= len(v.layout.Lines) {
 		return rowHyperlinks{}
 	}
 
@@ -624,7 +648,7 @@ func (v *Viewer) resolveRowHyperlinks(row layout.VisualRow, line model.Line) row
 		byGrapheme: make(map[int]resolvedHyperlink),
 	}
 
-	for _, span := range v.hyperlinkSpans(row.LineIndex, line) {
+	for _, span := range v.hyperlinkSpans(lineIndex, line) {
 		decision := v.cfg.HyperlinkHandler(HyperlinkInfo{
 			Target: span.target,
 			ID:     span.id,
@@ -681,17 +705,7 @@ func (v *Viewer) hyperlinkSpans(lineIndex int, line model.Line) []hyperlinkSpan 
 
 func applyHyperlinkDecisionStyle(style tcell.Style, decision HyperlinkDecision, span hyperlinkSpan) tcell.Style {
 	if decision.StyleSet {
-		overlay := decision.Style
-		if overlay.GetForeground() != tcolor.Default {
-			style = style.Foreground(overlay.GetForeground())
-		}
-		if overlay.GetBackground() != tcolor.Default {
-			style = style.Background(overlay.GetBackground())
-		}
-		style = style.Attributes(style.GetAttributes() | overlay.GetAttributes())
-		if overlay.GetUnderlineStyle() != tcell.UnderlineStyleNone || overlay.GetUnderlineColor() != tcolor.Default {
-			style = style.Underline(overlay.GetUnderlineStyle(), overlay.GetUnderlineColor())
-		}
+		style = decision.Style
 	}
 	if !decision.Live {
 		return style.Url("").UrlId("")

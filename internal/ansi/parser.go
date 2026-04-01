@@ -406,7 +406,11 @@ func controlPicture(b byte) (rune, bool) {
 
 func (p *Parser) processSGR(body string) {
 	if body == "" {
+		url := p.style.URL
+		urlID := p.style.URLID
 		p.style = DefaultStyle()
+		p.style.URL = url
+		p.style.URLID = urlID
 		return
 	}
 
