@@ -169,6 +169,8 @@ For host chrome integration:
   can restyle the built-in bottom bar without replacing pager rendering
 - `Theme` only affects document content. Explicit RGB colors and indexed colors
   above 15 are preserved exactly.
+- Built-in preset bundles are available as `DarkPreset`, `LightPreset`,
+  `PlainPreset`, and `PrettyPreset`
 
 ## Render Modes
 
@@ -195,7 +197,8 @@ printf 'hello\n\033[31mworld\033[0m\n' | go run ./cmd/goless-demo
 
 Demo flags:
 
-- `-chrome none|single|rounded`
+- `-preset none|dark|light|plain|pretty`
+- `-chrome auto|none|single|rounded`
 - `-render hybrid|literal|presentation`
 - `-title text`
 

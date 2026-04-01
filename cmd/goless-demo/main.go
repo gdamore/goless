@@ -26,18 +26,24 @@ func main() {
 
 func run() error {
 	var chromeName string
+	var presetName string
 	var renderName string
 	var title string
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-chrome none|single|rounded] [-render hybrid|literal|presentation] [-title text] [file]\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-render hybrid|literal|presentation] [-title text] [file]\n")
 	}
-	flag.StringVar(&chromeName, "chrome", "none", "chrome style: none, single, rounded")
+	flag.StringVar(&presetName, "preset", "none", "visual preset: none, dark, light, plain, pretty")
+	flag.StringVar(&chromeName, "chrome", "auto", "chrome override: auto, none, single, rounded")
 	flag.StringVar(&renderName, "render", "hybrid", "render mode: hybrid, literal, presentation")
 	flag.StringVar(&title, "title", "", "frame title")
 	flag.Parse()
 
 	renderMode, err := demoRenderMode(renderName)
+	if err != nil {
+		return err
+	}
+	preset, err := demoPreset(presetName)
 	if err != nil {
 		return err
 	}
@@ -75,7 +81,8 @@ func run() error {
 	viewer := view.New(doc, view.Config{
 		TabWidth:   8,
 		WrapMode:   layout.NoWrap,
-		Chrome:     demoChrome(chromeName, title),
+		Theme:      demoTheme(preset.Theme),
+		Chrome:     demoChrome(chromeName, title, preset.Chrome),
 		ShowStatus: true,
 	})
 
@@ -153,16 +160,63 @@ func stdinIsTerminal() bool {
 	return info.Mode()&os.ModeCharDevice != 0
 }
 
-func demoChrome(name, title string) view.Chrome {
-	chrome := view.Chrome{Title: title}
+func demoPreset(name string) (goless.Preset, error) {
+	switch name {
+	case "dark":
+		return goless.DarkPreset, nil
+	case "light":
+		return goless.LightPreset, nil
+	case "plain":
+		return goless.PlainPreset, nil
+	case "pretty":
+		return goless.PrettyPreset, nil
+	case "none", "":
+		return goless.Preset{}, nil
+	default:
+		return goless.Preset{}, fmt.Errorf("unknown preset %q; expected none, dark, light, plain, or pretty", name)
+	}
+}
+
+func demoTheme(theme goless.Theme) view.Theme {
+	return view.Theme{
+		DefaultFG: theme.DefaultFG,
+		DefaultBG: theme.DefaultBG,
+		ANSI:      theme.ANSI,
+	}
+}
+
+func demoChrome(name, title string, base goless.Chrome) view.Chrome {
+	chrome := view.Chrome{
+		TitleAlign:       view.TitleAlign(base.TitleAlign),
+		Title:            base.Title,
+		BorderStyle:      base.BorderStyle,
+		TitleStyle:       base.TitleStyle,
+		StatusStyle:      base.StatusStyle,
+		PromptStyle:      base.PromptStyle,
+		PromptErrorStyle: base.PromptErrorStyle,
+		Frame: view.Frame{
+			Horizontal:  base.Frame.Horizontal,
+			Vertical:    base.Frame.Vertical,
+			TopLeft:     base.Frame.TopLeft,
+			TopRight:    base.Frame.TopRight,
+			BottomLeft:  base.Frame.BottomLeft,
+			BottomRight: base.Frame.BottomRight,
+		},
+	}
+	if title != "" {
+		chrome.Title = title
+	}
 
 	var frame goless.Frame
 	switch name {
+	case "auto", "":
+		return chrome
 	case "single":
 		frame = goless.SingleFrame()
 	case "rounded":
 		frame = goless.RoundedFrame()
-	case "none", "":
+	case "none":
+		chrome.Frame = view.Frame{}
 		return chrome
 	default:
 		return chrome
