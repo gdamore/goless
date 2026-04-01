@@ -26,6 +26,8 @@ const (
 	// HelpKeyContext applies while the built-in help view is visible.
 	HelpKeyContext
 	// PromptKeyContext applies while a /, ?, or : prompt is open.
+	// Only KeyActionQuit, KeyActionCycleSearchCase, and KeyActionCycleSearchMode
+	// are currently supported in this context.
 	PromptKeyContext
 )
 
@@ -93,5 +95,6 @@ type KeyStroke struct {
 type KeyBinding struct {
 	KeyStroke
 	// Action selects which pager behavior the key triggers.
+	// Not every action is valid in every KeyContext.
 	Action KeyAction
 }
