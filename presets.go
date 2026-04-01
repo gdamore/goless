@@ -69,11 +69,11 @@ var DarkPreset = Preset{
 	Chrome: Chrome{
 		Frame:            SingleFrame(),
 		TitleAlign:       TitleAlignCenter,
-		BorderStyle:      tcell.StyleDefault.Foreground(solarizedBase01),
-		TitleStyle:       tcell.StyleDefault.Foreground(solarizedBlue).Bold(true),
-		StatusStyle:      tcell.StyleDefault.Foreground(solarizedBase3).Background(solarizedBase01),
-		PromptStyle:      tcell.StyleDefault.Foreground(solarizedBase3).Background(solarizedBase02),
-		PromptErrorStyle: tcell.StyleDefault.Foreground(solarizedRed).Background(solarizedBase02).Bold(true),
+		BorderStyle:      tcell.StyleDefault.Foreground(solarizedBase01).Background(solarizedBase03),
+		TitleStyle:       tcell.StyleDefault.Foreground(solarizedBlue).Background(solarizedBase03).Bold(true),
+		StatusStyle:      tcell.StyleDefault.Foreground(solarizedBase3).Background(solarizedBase03),
+		PromptStyle:      tcell.StyleDefault.Foreground(solarizedBase3).Background(solarizedBase03),
+		PromptErrorStyle: tcell.StyleDefault.Foreground(solarizedRed).Background(solarizedBase03).Bold(true),
 	},
 }
 
