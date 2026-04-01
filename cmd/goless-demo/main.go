@@ -22,15 +22,17 @@ func main() {
 
 func run() error {
 	var chromeName string
+	var hidden bool
 	var presetName string
 	var renderName string
 	var title string
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-render hybrid|literal|presentation] [-title text] [file]\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-render hybrid|literal|presentation] [-title text] [file]\n")
 	}
 	flag.StringVar(&presetName, "preset", "none", "visual preset: none, dark, light, plain, pretty")
 	flag.StringVar(&chromeName, "chrome", "auto", "chrome override: auto, none, single, rounded")
+	flag.BoolVar(&hidden, "hidden", false, "show tabs, line endings, carriage returns, and EOF markers")
 	flag.StringVar(&renderName, "render", "hybrid", "render mode: hybrid, literal, presentation")
 	flag.StringVar(&title, "title", "", "frame title")
 	flag.Parse()
@@ -48,12 +50,13 @@ func run() error {
 		return err
 	}
 	pager := goless.New(goless.Config{
-		TabWidth:   8,
-		WrapMode:   goless.NoWrap,
-		RenderMode: renderMode,
-		Theme:      preset.Theme,
-		Chrome:     chromeCfg,
-		ShowStatus: true,
+		TabWidth:      8,
+		WrapMode:      goless.NoWrap,
+		RenderMode:    renderMode,
+		Theme:         preset.Theme,
+		Visualization: demoVisualization(hidden),
+		Chrome:        chromeCfg,
+		ShowStatus:    true,
 	})
 
 	var (
@@ -116,6 +119,11 @@ func run() error {
 				}
 				pager.SetTheme(preset.Theme)
 				pager.SetChrome(chromeCfg)
+				break
+			}
+			if event.Key() == tcell.KeyF5 {
+				hidden = !hidden
+				pager.SetVisualization(demoVisualization(hidden))
 				break
 			}
 			if pager.HandleKey(event) {
@@ -201,6 +209,18 @@ func nextDemoPresetName(current string) string {
 		return "none"
 	default:
 		return "dark"
+	}
+}
+
+func demoVisualization(enabled bool) goless.Visualization {
+	if !enabled {
+		return goless.Visualization{}
+	}
+	return goless.Visualization{
+		ShowTabs:            true,
+		ShowNewlines:        true,
+		ShowCarriageReturns: true,
+		ShowEOF:             true,
 	}
 }
 

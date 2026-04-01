@@ -75,3 +75,15 @@ func TestNextDemoPresetName(t *testing.T) {
 		}
 	}
 }
+
+func TestDemoVisualization(t *testing.T) {
+	disabled := demoVisualization(false)
+	if disabled.ShowTabs || disabled.ShowNewlines || disabled.ShowCarriageReturns || disabled.ShowEOF {
+		t.Fatal("demoVisualization(false) unexpectedly enabled markers")
+	}
+
+	enabled := demoVisualization(true)
+	if !enabled.ShowTabs || !enabled.ShowNewlines || !enabled.ShowCarriageReturns || !enabled.ShowEOF {
+		t.Fatal("demoVisualization(true) did not enable all markers")
+	}
+}
