@@ -19,6 +19,21 @@ func TestDarkPresetUsesSolarizedDarkDefaults(t *testing.T) {
 	if got, want := DarkPreset.Chrome.TitleAlign, TitleAlignCenter; got != want {
 		t.Fatalf("DarkPreset.Chrome.TitleAlign = %v, want %v", got, want)
 	}
+	if got, want := DarkPreset.Chrome.BorderStyle.GetBackground(), DarkPreset.Theme.DefaultBG; got != want {
+		t.Fatalf("DarkPreset.Chrome.BorderStyle background = %v, want %v", got, want)
+	}
+	if got, want := DarkPreset.Chrome.TitleStyle.GetBackground(), DarkPreset.Theme.DefaultBG; got != want {
+		t.Fatalf("DarkPreset.Chrome.TitleStyle background = %v, want %v", got, want)
+	}
+	if got, want := DarkPreset.Chrome.StatusStyle.GetBackground(), DarkPreset.Theme.DefaultBG; got != want {
+		t.Fatalf("DarkPreset.Chrome.StatusStyle background = %v, want %v", got, want)
+	}
+	if got, want := DarkPreset.Chrome.PromptStyle.GetBackground(), DarkPreset.Theme.DefaultBG; got != want {
+		t.Fatalf("DarkPreset.Chrome.PromptStyle background = %v, want %v", got, want)
+	}
+	if got, want := DarkPreset.Chrome.PromptErrorStyle.GetBackground(), DarkPreset.Theme.DefaultBG; got != want {
+		t.Fatalf("DarkPreset.Chrome.PromptErrorStyle background = %v, want %v", got, want)
+	}
 }
 
 func TestLightPresetUsesSolarizedLightDefaults(t *testing.T) {
