@@ -577,7 +577,7 @@ func (v *Viewer) drawFrame(screen tcell.Screen, title string) {
 	bottom := frameLine(v.width, frame.BottomLeft, frame.Horizontal, frame.BottomRight)
 	screen.PutStrStyled(0, topY, top, borderStyle)
 	screen.PutStrStyled(0, bottomY, bottom, borderStyle)
-	if label, x := frameTitleLabel(title, v.width); label != "" {
+	if label, x := frameTitleLabel(title, v.width, v.cfg.Chrome.TitleAlign); label != "" {
 		screen.PutStrStyled(x, topY, label, titleStyle)
 	}
 
@@ -1009,7 +1009,7 @@ func fallback(values ...string) string {
 	return ""
 }
 
-func frameTitleLabel(title string, width int) (label string, x int) {
+func frameTitleLabel(title string, width int, align TitleAlign) (label string, x int) {
 	if title == "" || width <= 2 {
 		return "", 0
 	}
@@ -1017,7 +1017,19 @@ func frameTitleLabel(title string, width int) (label string, x int) {
 	if stringWidth(label) > width-2 {
 		label = truncateToWidth(label, width-2)
 	}
-	return label, 1
+	labelWidth := stringWidth(label)
+	switch align {
+	case TitleAlignCenter:
+		x = max((width-labelWidth)/2, 1)
+	case TitleAlignRight:
+		x = max(width-1-labelWidth, 1)
+	default:
+		x = 1
+	}
+	if x+labelWidth > width-1 {
+		x = max(width-1-labelWidth, 1)
+	}
+	return label, x
 }
 
 func padRightToWidth(s string, width int) string {

@@ -1408,6 +1408,97 @@ func TestDrawFrameUsesBorderAndTitleStyles(t *testing.T) {
 	}
 }
 
+func TestDrawFrameTitleAlignment(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("hi\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	testCases := []struct {
+		name  string
+		align TitleAlign
+		x     int
+	}{
+		{name: "left", align: TitleAlignLeft, x: 2},
+		{name: "center", align: TitleAlignCenter, x: 3},
+		{name: "right", align: TitleAlignRight, x: 5},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := New(doc, Config{
+				TabWidth: 4,
+				WrapMode: layout.NoWrap,
+				Chrome: Chrome{
+					Title:      "Doc",
+					TitleAlign: tc.align,
+					Frame: Frame{
+						Horizontal:  "─",
+						Vertical:    "│",
+						TopLeft:     "┌",
+						TopRight:    "┐",
+						BottomLeft:  "└",
+						BottomRight: "┘",
+					},
+				},
+			})
+			v.SetSize(10, 4)
+
+			_, screen := newMockScreen(t, 10, 4)
+			defer screen.Fini()
+
+			v.Draw(screen)
+
+			if got := cellRune(screen, tc.x, 0); got != 'D' {
+				t.Fatalf("title rune at x=%d = %q, want %q", tc.x, got, 'D')
+			}
+		})
+	}
+}
+
+func TestHelpFrameTitleUsesConfiguredAlignment(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("hi\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	title := "Help"
+	if label, x := frameTitleLabel(title, 10, TitleAlignRight); label == "" || x != 3 {
+		t.Fatalf("frameTitleLabel(Help, right) = (%q, %d), want non-empty label at x=3", label, x)
+	}
+
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Text: Text{
+			HelpTitle: title,
+		},
+		Chrome: Chrome{
+			TitleAlign: TitleAlignRight,
+			Frame: Frame{
+				Horizontal:  "─",
+				Vertical:    "│",
+				TopLeft:     "┌",
+				TopRight:    "┐",
+				BottomLeft:  "└",
+				BottomRight: "┘",
+			},
+		},
+	})
+	v.SetSize(10, 4)
+	v.mode = modeHelp
+
+	_, screen := newMockScreen(t, 10, 4)
+	defer screen.Fini()
+
+	v.text.HelpClose = ""
+	v.Draw(screen)
+
+	if got := cellRune(screen, 4, 0); got != 'H' {
+		t.Fatalf("help title rune at x=4 = %q, want %q", got, 'H')
+	}
+}
+
 func keyRune(s string) *tcell.EventKey {
 	return tcell.NewEventKey(tcell.KeyRune, s, tcell.ModNone)
 }

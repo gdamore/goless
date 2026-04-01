@@ -8,6 +8,15 @@ import (
 	tcolor "github.com/gdamore/tcell/v3/color"
 )
 
+// TitleAlign controls where frame titles are placed on the top border.
+type TitleAlign int
+
+const (
+	TitleAlignLeft TitleAlign = iota
+	TitleAlignCenter
+	TitleAlignRight
+)
+
 // Frame defines the glyphs used to draw an optional border around the viewer
 // body. An all-zero Frame disables border drawing.
 type Frame struct {
@@ -25,6 +34,7 @@ func (f Frame) enabled() bool {
 
 // Chrome configures optional decorative chrome around the viewer body.
 type Chrome struct {
+	TitleAlign       TitleAlign
 	Title            string
 	Frame            Frame
 	BorderStyle      tcell.Style
