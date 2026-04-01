@@ -129,6 +129,7 @@ The main config knobs are:
   `SearchCaseInsensitive`
 - `SearchMode`: `SearchSubstring`, `SearchWholeWord`, or `SearchRegex`
 - `Theme`: remap content default colors and ANSI 0-15 without affecting chrome
+- `Visualization`: show tabs, line endings, carriage returns, and EOF with pager-added markers
 - `RenderMode`: `RenderHybrid`, `RenderLiteral`, or `RenderPresentation`
 - `KeyGroup`: `LessKeyGroup` or `EmptyKeyGroup`
 - `UnbindKeys` and `KeyBindings`: remove or prepend bindings in normal, help,
@@ -171,6 +172,7 @@ For host chrome integration:
   above 15 are preserved exactly.
 - In `Theme`, zero means "leave this mapping alone"; `color.Reset` means
   "explicitly use the terminal default here".
+- `Visualization` controls hidden-character overlays separately from `Theme`.
 - Built-in preset bundles are available as `DarkPreset`, `LightPreset`,
   `PlainPreset`, and `PrettyPreset`
 
@@ -201,6 +203,7 @@ Demo flags:
 
 - `-preset none|dark|light|plain|pretty`
 - `-chrome auto|none|single|rounded`
+- `-hidden`
 - `-render hybrid|literal|presentation`
 - `-title text`
 
@@ -216,6 +219,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `F2` to cycle search case mode in the bundled key group
 - `F3` to cycle substring, whole-word, and regex matching in the bundled key group
 - `F4` to cycle visual presets in the demo program
+- `F5` to toggle hidden-character markers in the demo program
 - `:` then a number to jump to a line
 - `:set searchcase smart|case|nocase` to set search mode directly
 - `:set searchmode sub|word|regex` to set search mode directly

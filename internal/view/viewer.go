@@ -16,17 +16,18 @@ import (
 
 // Config controls viewer behavior.
 type Config struct {
-	TabWidth   int
-	WrapMode   layout.WrapMode
-	SearchCase SearchCaseMode
-	SearchMode SearchMode
-	Theme      Theme
-	KeyGroup   KeyGroup
-	KeyUnbind  []KeyStroke
-	KeyBind    []KeyBinding
-	Chrome     Chrome
-	ShowStatus bool
-	Text       Text
+	TabWidth      int
+	WrapMode      layout.WrapMode
+	SearchCase    SearchCaseMode
+	SearchMode    SearchMode
+	Theme         Theme
+	Visualization Visualization
+	KeyGroup      KeyGroup
+	KeyUnbind     []KeyStroke
+	KeyBind       []KeyBinding
+	Chrome        Chrome
+	ShowStatus    bool
+	Text          Text
 }
 
 // Viewer is a minimal document viewer built on the model and layout packages.
@@ -69,6 +70,7 @@ func New(doc *model.Document, cfg Config) *Viewer {
 	}
 	cfg.SearchCase = normalizeSearchCaseMode(cfg.SearchCase)
 	cfg.SearchMode = normalizeSearchMode(cfg.SearchMode)
+	cfg.Visualization = cfg.Visualization.withDefaults()
 	cfg.Chrome = cfg.Chrome.withDefaults()
 	cfg.Text = cfg.Text.withDefaults()
 	return &Viewer{
@@ -82,6 +84,11 @@ func New(doc *model.Document, cfg Config) *Viewer {
 // SetTheme updates how document content colors are rendered.
 func (v *Viewer) SetTheme(theme Theme) {
 	v.cfg.Theme = theme
+}
+
+// SetVisualization updates how hidden structure markers are drawn.
+func (v *Viewer) SetVisualization(visual Visualization) {
+	v.cfg.Visualization = visual.withDefaults()
 }
 
 // SetChrome updates frame, title, and prompt/status styling.
@@ -554,6 +561,11 @@ func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow
 		}
 		x += baseX
 
+		if display, style, ok := v.visualizedSegment(row, line, segment, grapheme, cellStyle); ok {
+			screen.PutStrStyled(x, y, display, style)
+			continue
+		}
+
 		if segment.Display != "" {
 			screen.PutStrStyled(x, y, segment.Display, cellStyle)
 			continue
@@ -566,6 +578,54 @@ func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow
 
 		screen.Put(x, y, grapheme.Text, cellStyle)
 	}
+
+	v.drawTrailingMarkers(screen, baseX, y, row, line)
+}
+
+func (v *Viewer) visualizedSegment(row layout.VisualRow, line model.Line, segment layout.VisualSegment, grapheme model.Grapheme, baseStyle tcell.Style) (string, tcell.Style, bool) {
+	if grapheme.Text == "\t" && v.cfg.Visualization.ShowTabs && segment.Display == "" {
+		width := segment.RenderedCellTo - segment.RenderedCellFrom
+		return padMarkerGlyph(v.cfg.Visualization.TabGlyph, width), v.visualizationStyle(baseStyle), true
+	}
+	if grapheme.Text == "\u240d" && v.cfg.Visualization.ShowCarriageReturns {
+		width := max(segment.RenderedCellTo-segment.RenderedCellFrom, 1)
+		return padMarkerGlyph(v.cfg.Visualization.CarriageReturnGlyph, width), v.visualizationStyle(baseStyle), true
+	}
+	return "", tcell.StyleDefault, false
+}
+
+func (v *Viewer) drawTrailingMarkers(screen tcell.Screen, baseX, y int, row layout.VisualRow, line model.Line) {
+	markers := v.trailingMarkers(row, line)
+	if markers == "" {
+		return
+	}
+	width := v.contentWidth()
+	if row.RenderedCellWidth >= width {
+		return
+	}
+	style := v.visualizationStyle(v.toTCellStyle(ansi.DefaultStyle()))
+	screen.PutStrStyled(baseX+row.RenderedCellWidth, y, truncateToWidth(markers, width-row.RenderedCellWidth), style)
+}
+
+func (v *Viewer) trailingMarkers(row layout.VisualRow, line model.Line) string {
+	if row.LineIndex < 0 || row.LineIndex >= len(v.layout.Lines) {
+		return ""
+	}
+	if v.layout.Lines[row.LineIndex].TotalCells != row.SourceCellEnd {
+		return ""
+	}
+
+	var marker strings.Builder
+	if line.Ending == model.LineEndingCRLF && v.cfg.Visualization.ShowCarriageReturns {
+		marker.WriteString(v.cfg.Visualization.CarriageReturnGlyph)
+	}
+	if line.Ending != model.LineEndingNone && v.cfg.Visualization.ShowNewlines {
+		marker.WriteString(v.cfg.Visualization.NewlineGlyph)
+	}
+	if v.cfg.Visualization.ShowEOF && row.LineIndex == len(v.lines)-1 {
+		marker.WriteString(v.cfg.Visualization.EOFGlyph)
+	}
+	return marker.String()
 }
 
 func (v *Viewer) drawFrame(screen tcell.Screen, title string) {
@@ -954,6 +1014,22 @@ func (v *Viewer) toTCellStyle(style ansi.Style) tcell.Style {
 	return tstyle
 }
 
+func (v *Viewer) visualizationStyle(base tcell.Style) tcell.Style {
+	overlay := v.cfg.Visualization.Style
+	style := overlay
+	if style.GetForeground() == tcolor.Default {
+		style = style.Foreground(base.GetForeground())
+	}
+	if style.GetBackground() == tcolor.Default {
+		style = style.Background(base.GetBackground())
+	}
+	style = style.Attributes(base.GetAttributes() | overlay.GetAttributes())
+	if overlay.GetUnderlineStyle() == tcell.UnderlineStyleNone && base.GetUnderlineStyle() != tcell.UnderlineStyleNone {
+		style = style.Underline(base.GetUnderlineStyle(), base.GetUnderlineColor())
+	}
+	return style
+}
+
 type matchStylePreset struct {
 	Fg             tcolor.Color
 	Bg             tcolor.Color
@@ -1062,4 +1138,15 @@ func padRightToWidth(s string, width int) string {
 
 func stringWidth(s string) int {
 	return uniseg.StringWidth(s)
+}
+
+func padMarkerGlyph(glyph string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	glyph = truncateToWidth(glyph, width)
+	if pad := width - stringWidth(glyph); pad > 0 {
+		glyph += strings.Repeat(" ", pad)
+	}
+	return glyph
 }

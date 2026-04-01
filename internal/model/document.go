@@ -19,10 +19,22 @@ type StyleRun struct {
 	Style ansi.Style
 }
 
+// LineEnding records how a logical line was terminated in the byte stream.
+type LineEnding uint8
+
+const (
+	LineEndingNone LineEnding = iota
+	LineEndingLF
+	LineEndingCRLF
+	LineEndingVT
+	LineEndingFF
+)
+
 // Line is a logical line in the parsed document.
 type Line struct {
 	ByteStart int64
 	ByteEnd   int64
+	Ending    LineEnding
 	Text      string
 	Styles    []StyleRun
 	Graphemes []Grapheme
@@ -128,6 +140,7 @@ func (d *Document) Print(r rune, style ansi.Style, offset int64) {
 func (d *Document) Newline(_ ansi.Style, offset int64) {
 	line := d.currentLine()
 	line.ByteEnd = offset
+	line.Ending = d.lineEnding(offset)
 	d.lines = append(d.lines, line)
 
 	d.lineStart = offset
@@ -140,9 +153,41 @@ func (d *Document) currentLine() Line {
 	return Line{
 		ByteStart: d.lineStart,
 		ByteEnd:   d.current.byteEnd,
+		Ending:    LineEndingNone,
 		Text:      text,
 		Styles:    styles,
 		Graphemes: segmentGraphemes(text),
+	}
+}
+
+func (d *Document) lineEnding(offset int64) LineEnding {
+	if offset <= 0 {
+		return LineEndingLF
+	}
+
+	start := offset - 2
+	if start < 0 {
+		start = 0
+	}
+	buf := make([]byte, 2)
+	n, _ := d.store.ReadAt(buf, start)
+	if n <= 0 {
+		return LineEndingLF
+	}
+	buf = buf[:n]
+	if len(buf) >= 2 && buf[len(buf)-2] == '\r' && buf[len(buf)-1] == '\n' {
+		return LineEndingCRLF
+	}
+
+	switch buf[len(buf)-1] {
+	case '\n':
+		return LineEndingLF
+	case '\v':
+		return LineEndingVT
+	case '\f':
+		return LineEndingFF
+	default:
+		return LineEndingLF
 	}
 }
 

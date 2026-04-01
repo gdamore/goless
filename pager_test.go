@@ -733,6 +733,75 @@ func TestPagerSetChromeAffectsSubsequentDraw(t *testing.T) {
 	}
 }
 
+func TestPagerVisualizationMarkers(t *testing.T) {
+	pager := New(Config{
+		TabWidth: 4,
+		WrapMode: NoWrap,
+		Visualization: Visualization{
+			ShowTabs:            true,
+			ShowNewlines:        true,
+			ShowCarriageReturns: true,
+			ShowEOF:             true,
+			TabGlyph:            ">",
+			NewlineGlyph:        "N",
+			CarriageReturnGlyph: "R",
+			EOFGlyph:            "E",
+		},
+	})
+	pager.SetSize(20, 1)
+	if err := pager.AppendString("a\tb\r\nc\nlast"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 20, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if got, want := pagerRowString(screen, 0, 20), "a>  bRN             "; got != want {
+		t.Fatalf("row 0 = %q, want %q", got, want)
+	}
+
+	pager.ScrollDown(1)
+	screen.Clear()
+	pager.Draw(screen)
+	if got, want := pagerRowString(screen, 0, 20), "cN                  "; got != want {
+		t.Fatalf("row 1 = %q, want %q", got, want)
+	}
+
+	pager.ScrollDown(1)
+	screen.Clear()
+	pager.Draw(screen)
+	if got, want := pagerRowString(screen, 0, 20), "lastE               "; got != want {
+		t.Fatalf("row 2 = %q, want %q", got, want)
+	}
+}
+
+func TestPagerSetVisualizationAffectsSubsequentDraw(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap})
+	pager.SetSize(20, 1)
+	if err := pager.AppendString("a\tb\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.SetVisualization(Visualization{
+		ShowTabs:     true,
+		ShowNewlines: true,
+		ShowEOF:      true,
+		TabGlyph:     ">",
+		NewlineGlyph: "N",
+		EOFGlyph:     "E",
+	})
+
+	screen := newPagerMockScreen(t, 20, 1)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if got, want := pagerRowString(screen, 0, 20), "a>  bNE             "; got != want {
+		t.Fatalf("row after SetVisualization = %q, want %q", got, want)
+	}
+}
+
 func TestPagerSetSearchMode(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
@@ -807,6 +876,19 @@ func pagerCellRune(screen tcell.Screen, x, y int) rune {
 func pagerCellStyle(screen tcell.Screen, x, y int) tcell.Style {
 	_, style, _ := screen.Get(x, y)
 	return style
+}
+
+func pagerRowString(screen tcell.Screen, y, width int) string {
+	var out strings.Builder
+	for x := 0; x < width; x++ {
+		str, _, _ := screen.Get(x, y)
+		if str == "" {
+			out.WriteRune(' ')
+			continue
+		}
+		out.WriteString(str)
+	}
+	return out.String()
 }
 
 func pagerFindRune(screen tcell.Screen, y int, want rune, width int) int {

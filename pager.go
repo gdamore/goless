@@ -28,18 +28,19 @@ const (
 
 // Config configures a Pager.
 type Config struct {
-	TabWidth    int                        // TabWidth controls tab expansion during layout. Values <= 0 default to 8.
-	WrapMode    WrapMode                   // WrapMode selects horizontal scrolling or soft wrapping.
-	SearchCase  SearchCaseMode             // SearchCase selects smart-case, case-sensitive, or case-insensitive literal search behavior.
-	SearchMode  SearchMode                 // SearchMode selects substring, whole-word, or regex search behavior.
-	Theme       Theme                      // Theme remaps content default colors and ANSI 0-15 without affecting chrome.
-	KeyGroup    KeyGroup                   // KeyGroup selects a bundled set of key bindings.
-	UnbindKeys  []KeyStroke                // UnbindKeys removes exact bindings from the selected key group.
-	KeyBindings []KeyBinding               // KeyBindings prepend custom bindings ahead of bundled defaults.
-	RenderMode  RenderMode                 // RenderMode controls how escapes and control sequences are presented.
-	Chrome      Chrome                     // Chrome configures optional body framing and title display.
-	ShowStatus  bool                       // ShowStatus enables the status bar on the last screen row.
-	CaptureKey  func(*tcell.EventKey) bool // CaptureKey reserves keys for the embedder before normal pager handling.
+	TabWidth      int                        // TabWidth controls tab expansion during layout. Values <= 0 default to 8.
+	WrapMode      WrapMode                   // WrapMode selects horizontal scrolling or soft wrapping.
+	SearchCase    SearchCaseMode             // SearchCase selects smart-case, case-sensitive, or case-insensitive literal search behavior.
+	SearchMode    SearchMode                 // SearchMode selects substring, whole-word, or regex search behavior.
+	Theme         Theme                      // Theme remaps content default colors and ANSI 0-15 without affecting chrome.
+	Visualization Visualization              // Visualization overlays optional markers for tabs, line endings, carriage returns, and EOF.
+	KeyGroup      KeyGroup                   // KeyGroup selects a bundled set of key bindings.
+	UnbindKeys    []KeyStroke                // UnbindKeys removes exact bindings from the selected key group.
+	KeyBindings   []KeyBinding               // KeyBindings prepend custom bindings ahead of bundled defaults.
+	RenderMode    RenderMode                 // RenderMode controls how escapes and control sequences are presented.
+	Chrome        Chrome                     // Chrome configures optional body framing and title display.
+	ShowStatus    bool                       // ShowStatus enables the status bar on the last screen row.
+	CaptureKey    func(*tcell.EventKey) bool // CaptureKey reserves keys for the embedder before normal pager handling.
 
 	// Text controls user-facing text, help content, and UI indicators.
 	// Zero values are filled from DefaultText.
@@ -76,17 +77,18 @@ func New(cfg Config) *Pager {
 		doc:        doc,
 		captureKey: cfg.CaptureKey,
 		viewer: iview.New(doc, iview.Config{
-			TabWidth:   cfg.TabWidth,
-			WrapMode:   toInternalWrapMode(cfg.WrapMode),
-			SearchCase: toInternalSearchCaseMode(cfg.SearchCase),
-			SearchMode: toInternalSearchMode(cfg.SearchMode),
-			Theme:      toInternalTheme(cfg.Theme),
-			KeyGroup:   toInternalKeyGroup(cfg.KeyGroup),
-			KeyUnbind:  toInternalKeyStrokes(cfg.UnbindKeys),
-			KeyBind:    toInternalKeyBindings(cfg.KeyBindings),
-			Chrome:     toInternalChrome(cfg.Chrome),
-			ShowStatus: cfg.ShowStatus,
-			Text:       toInternalText(cfg.Text),
+			TabWidth:      cfg.TabWidth,
+			WrapMode:      toInternalWrapMode(cfg.WrapMode),
+			SearchCase:    toInternalSearchCaseMode(cfg.SearchCase),
+			SearchMode:    toInternalSearchMode(cfg.SearchMode),
+			Theme:         toInternalTheme(cfg.Theme),
+			Visualization: toInternalVisualization(cfg.Visualization),
+			KeyGroup:      toInternalKeyGroup(cfg.KeyGroup),
+			KeyUnbind:     toInternalKeyStrokes(cfg.UnbindKeys),
+			KeyBind:       toInternalKeyBindings(cfg.KeyBindings),
+			Chrome:        toInternalChrome(cfg.Chrome),
+			ShowStatus:    cfg.ShowStatus,
+			Text:          toInternalText(cfg.Text),
 		}),
 	}
 }
@@ -156,6 +158,11 @@ func (p *Pager) Refresh() {
 // SetTheme updates how document content colors are rendered.
 func (p *Pager) SetTheme(theme Theme) {
 	p.viewer.SetTheme(toInternalTheme(theme))
+}
+
+// SetVisualization updates how hidden structure markers are drawn.
+func (p *Pager) SetVisualization(visual Visualization) {
+	p.viewer.SetVisualization(toInternalVisualization(visual))
 }
 
 // SetChrome updates frame, title, and prompt/status styling.
@@ -470,6 +477,20 @@ func toInternalTheme(theme Theme) iview.Theme {
 		DefaultFG: theme.DefaultFG,
 		DefaultBG: theme.DefaultBG,
 		ANSI:      theme.ANSI,
+	}
+}
+
+func toInternalVisualization(visual Visualization) iview.Visualization {
+	return iview.Visualization{
+		ShowTabs:            visual.ShowTabs,
+		ShowNewlines:        visual.ShowNewlines,
+		ShowCarriageReturns: visual.ShowCarriageReturns,
+		ShowEOF:             visual.ShowEOF,
+		TabGlyph:            visual.TabGlyph,
+		NewlineGlyph:        visual.NewlineGlyph,
+		CarriageReturnGlyph: visual.CarriageReturnGlyph,
+		EOFGlyph:            visual.EOFGlyph,
+		Style:               visual.Style,
 	}
 }
 
