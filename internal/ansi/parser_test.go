@@ -129,6 +129,111 @@ func TestParserLiteralShowsSGRWithoutStyling(t *testing.T) {
 	}
 }
 
+func TestParserLiteralShowsRawC0ControlsVisibly(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParserWithMode(recv, RenderLiteral)
+
+	input := []byte{'A', '\v', '\f', 0x07, 'B'}
+	if _, err := p.Write(input); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+	if got, want := text.String(), "A␋␌␇B"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+}
+
+func TestParserHybridSuppressesRawC0Controls(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParserWithMode(recv, RenderHybrid)
+
+	input := []byte{'A', '\v', '\f', 0x07, 'B'}
+	if _, err := p.Write(input); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		switch ev.kind {
+		case "print":
+			text.WriteRune(ev.r)
+		case "newline":
+			text.WriteRune('\n')
+		}
+	}
+	if got, want := text.String(), "AB"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+}
+
+func TestParserLiteralShowsInvalidBytesAsHex(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParserWithMode(recv, RenderLiteral)
+
+	input := []byte{'A', 0x9c, 0xff, 0xc2, 'B'}
+	if _, err := p.Write(input); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	p.Flush()
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+	if got, want := text.String(), "A\\x9c\\xff\\xc2B"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+}
+
+func TestParserHybridReplacesInvalidBytes(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParserWithMode(recv, RenderHybrid)
+
+	input := []byte{'A', 0x9c, 0xff, 0xc2, 'B'}
+	if _, err := p.Write(input); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	p.Flush()
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+	if got, want := text.String(), "A���B"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+}
+
+func TestParserPresentationReplacesInvalidUTF8(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParserWithMode(recv, RenderPresentation)
+
+	input := []byte{'A', 0xe2, 0x28, 0xa1, 'B'}
+	if _, err := p.Write(input); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+	if got, want := text.String(), "A�(�B"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+}
+
 func TestParserPresentationHidesOSC(t *testing.T) {
 	recv := &recordReceiver{}
 	p := NewParserWithMode(recv, RenderPresentation)
