@@ -626,7 +626,7 @@ func (v *Viewer) trailingMarkers(row layout.VisualRow, line model.Line) string {
 	if row.LineIndex < 0 || row.LineIndex >= len(v.layout.Lines) {
 		return ""
 	}
-	if v.layout.Lines[row.LineIndex].TotalCells != row.SourceCellEnd {
+	if v.cfg.WrapMode == layout.SoftWrap && v.layout.Lines[row.LineIndex].TotalCells != row.SourceCellEnd {
 		return ""
 	}
 	return v.lineEndMarkers(row.LineIndex, line)
@@ -1118,8 +1118,9 @@ func trimLeftToWidth(s string, skip int) string {
 		cluster := gr.Str()
 		clusterWidth := uniseg.StringWidth(cluster)
 		if consumed+clusterWidth > skip {
-			start, _ := gr.Positions()
-			return s[start:]
+			hidden := skip - consumed
+			_, end := gr.Positions()
+			return strings.Repeat(" ", max(clusterWidth-hidden, 0)) + s[end:]
 		}
 		consumed += clusterWidth
 	}
