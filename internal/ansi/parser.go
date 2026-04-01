@@ -479,6 +479,11 @@ func (p *Parser) processSGR(body string) {
 		if part == "" {
 			part = "0"
 		}
+		if strings.Contains(part, ":") {
+			if p.processColonSGR(part) {
+				continue
+			}
+		}
 		code, err := strconv.Atoi(part)
 		if err != nil {
 			continue
@@ -498,7 +503,9 @@ func (p *Parser) processSGR(body string) {
 		case code == 3:
 			p.style.Italic = true
 		case code == 4:
-			p.style.Underline = true
+			p.style.Underline = UnderlineStyleSolid
+		case code == 21:
+			p.style.Underline = UnderlineStyleDouble
 		case code == 9:
 			p.style.Strike = true
 		case code == 5:
@@ -511,7 +518,7 @@ func (p *Parser) processSGR(body string) {
 		case code == 23:
 			p.style.Italic = false
 		case code == 24:
-			p.style.Underline = false
+			p.style.Underline = UnderlineStyleNone
 		case code == 29:
 			p.style.Strike = false
 		case code == 25:
@@ -541,8 +548,80 @@ func (p *Parser) processSGR(body string) {
 				p.style.Bg = color
 			}
 			i += consumed
+		case code == 58:
+			color, consumed, ok := parseExtendedColor(parts[i+1:])
+			if !ok {
+				continue
+			}
+			p.style.UnderlineColor = color
+			i += consumed
+		case code == 59:
+			p.style.UnderlineColor = DefaultColor()
 		}
 	}
+}
+
+func (p *Parser) processColonSGR(part string) bool {
+	fields := strings.Split(part, ":")
+	if len(fields) < 2 {
+		return false
+	}
+	code, err := strconv.Atoi(fields[0])
+	if err != nil {
+		return false
+	}
+	switch code {
+	case 4:
+		p.style.Underline = parseUnderlineStyle(fields[1:])
+		return true
+	case 58:
+		color, ok := parseColonExtendedColor(fields[1:])
+		if !ok {
+			return false
+		}
+		p.style.UnderlineColor = color
+		return true
+	default:
+		return false
+	}
+}
+
+func parseUnderlineStyle(fields []string) UnderlineStyle {
+	if len(fields) == 0 || fields[0] == "" {
+		return UnderlineStyleSolid
+	}
+	code, err := strconv.Atoi(fields[0])
+	if err != nil {
+		return UnderlineStyleSolid
+	}
+	switch code {
+	case 0:
+		return UnderlineStyleNone
+	case 1:
+		return UnderlineStyleSolid
+	case 2:
+		return UnderlineStyleDouble
+	case 3:
+		return UnderlineStyleCurly
+	case 4:
+		return UnderlineStyleDotted
+	case 5:
+		return UnderlineStyleDashed
+	default:
+		return UnderlineStyleSolid
+	}
+}
+
+func parseColonExtendedColor(fields []string) (Color, bool) {
+	normalized := make([]string, 0, len(fields))
+	for _, field := range fields {
+		if field == "" {
+			continue
+		}
+		normalized = append(normalized, field)
+	}
+	color, _, ok := parseExtendedColor(normalized)
+	return color, ok
 }
 
 func parseExtendedColor(parts []string) (Color, int, bool) {

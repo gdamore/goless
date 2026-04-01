@@ -24,6 +24,18 @@ type Color struct {
 	B     uint8
 }
 
+// UnderlineStyle describes underline rendering requested by ANSI styling.
+type UnderlineStyle uint8
+
+const (
+	UnderlineStyleNone UnderlineStyle = iota
+	UnderlineStyleSolid
+	UnderlineStyleDouble
+	UnderlineStyleCurly
+	UnderlineStyleDotted
+	UnderlineStyleDashed
+)
+
 // DefaultColor returns the terminal default color.
 func DefaultColor() Color {
 	return Color{Kind: ColorDefault}
@@ -41,17 +53,18 @@ func RGBColor(r, g, b uint8) Color {
 
 // Style is the normalized style state produced by the ANSI parser.
 type Style struct {
-	Fg        Color
-	Bg        Color
-	Bold      bool
-	Dim       bool
-	Italic    bool
-	Underline bool
-	Strike    bool
-	Blink     bool
-	Reverse   bool
-	URL       string
-	URLID     string
+	Fg             Color
+	Bg             Color
+	UnderlineColor Color
+	Bold           bool
+	Dim            bool
+	Italic         bool
+	Strike         bool
+	Blink          bool
+	Reverse        bool
+	Underline      UnderlineStyle
+	URL            string
+	URLID          string
 }
 
 // DefaultStyle returns the initial style state.
