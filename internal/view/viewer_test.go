@@ -1310,6 +1310,31 @@ func TestThemeRemapsDefaultsAndANSI16Only(t *testing.T) {
 	}
 }
 
+func TestThemeAllowsExplicitResetMappings(t *testing.T) {
+	v := New(model.NewDocument(4), Config{
+		Theme: Theme{
+			DefaultFG: tcolor.Reset,
+			DefaultBG: tcolor.Reset,
+			ANSI: [16]tcolor.Color{
+				1: tcolor.Reset,
+			},
+		},
+	})
+
+	defaultStyle := v.toTCellStyle(ansi.DefaultStyle())
+	if got, want := defaultStyle.GetForeground(), tcolor.Reset; got != want {
+		t.Fatalf("default fg = %v, want %v", got, want)
+	}
+	if got, want := defaultStyle.GetBackground(), tcolor.Reset; got != want {
+		t.Fatalf("default bg = %v, want %v", got, want)
+	}
+
+	indexedStyle := v.toTCellStyle(ansi.Style{Fg: ansi.IndexedColor(1)})
+	if got, want := indexedStyle.GetForeground(), tcolor.Reset; got != want {
+		t.Fatalf("indexed fg = %v, want %v", got, want)
+	}
+}
+
 func TestDrawUsesThemedDefaultBackgroundForBlankContent(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("hi\n")); err != nil {

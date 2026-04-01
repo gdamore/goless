@@ -169,6 +169,8 @@ For host chrome integration:
   can restyle the built-in bottom bar without replacing pager rendering
 - `Theme` only affects document content. Explicit RGB colors and indexed colors
   above 15 are preserved exactly.
+- In `Theme`, zero means "leave this mapping alone"; `color.Reset` means
+  "explicitly use the terminal default here".
 - Built-in preset bundles are available as `DarkPreset`, `LightPreset`,
   `PlainPreset`, and `PrettyPreset`
 

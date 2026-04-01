@@ -10,7 +10,8 @@ import (
 
 // Theme controls how document content colors are rendered.
 //
-// Zero-valued fields preserve the built-in mapping.
+// Zero-valued fields preserve the built-in mapping. color.Reset explicitly
+// maps a themed entry back to the terminal default color.
 type Theme struct {
 	DefaultFG tcolor.Color
 	DefaultBG tcolor.Color

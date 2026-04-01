@@ -65,7 +65,7 @@ var DarkPreset = Preset{
 		Frame:            SingleFrame(),
 		TitleAlign:       TitleAlignCenter,
 		BorderStyle:      tcell.StyleDefault.Foreground(solarizedBase01),
-		TitleStyle:       tcell.StyleDefault.Foreground(solarizedBlue).Background(solarizedBase3).Bold(true),
+		TitleStyle:       tcell.StyleDefault.Foreground(solarizedBlue).Bold(true),
 		StatusStyle:      tcell.StyleDefault.Foreground(solarizedBase3).Background(solarizedBase01),
 		PromptStyle:      tcell.StyleDefault.Foreground(solarizedBase3).Background(solarizedBase02),
 		PromptErrorStyle: tcell.StyleDefault.Foreground(solarizedRed).Background(solarizedBase02).Bold(true),

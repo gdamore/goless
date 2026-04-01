@@ -14,12 +14,16 @@ import tcolor "github.com/gdamore/tcell/v3/color"
 // ANSI remaps only the base 16 ANSI indexed colors. Indexed colors >= 16 and
 // explicit RGB colors are preserved exactly.
 //
-// Zero-valued fields preserve the built-in mapping.
+// Zero-valued fields preserve the built-in mapping. Use color.Reset to map a
+// theme entry back to the terminal's own default color explicitly.
 type Theme struct {
 	// DefaultFG replaces the ANSI default foreground color.
+	// Zero preserves the built-in mapping. color.Reset forces the terminal default.
 	DefaultFG tcolor.Color
 	// DefaultBG replaces the ANSI default background color.
+	// Zero preserves the built-in mapping. color.Reset forces the terminal default.
 	DefaultBG tcolor.Color
 	// ANSI remaps ANSI indexed colors 0 through 15.
+	// Zero preserves the built-in mapping for that slot.
 	ANSI [16]tcolor.Color
 }
