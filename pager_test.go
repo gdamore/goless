@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gdamore/tcell/v3"
+	tcolor "github.com/gdamore/tcell/v3/color"
 	"github.com/gdamore/tcell/v3/vt"
 )
 
@@ -591,6 +592,49 @@ func TestPagerTextHooksFormatStatusAndPrompt(t *testing.T) {
 	}
 	if got := pagerCellRune(screen, 1, 1); got != 'f' {
 		t.Fatalf("prompt text rune = %q, want %q", got, 'f')
+	}
+}
+
+func TestPagerThemeAffectsContentColorsOnly(t *testing.T) {
+	pager := New(Config{
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		ShowStatus: true,
+		Theme: Theme{
+			DefaultFG: tcolor.Red,
+			DefaultBG: tcolor.Blue,
+			ANSI: [16]tcolor.Color{
+				1: tcolor.Aqua,
+			},
+		},
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("plain\n\x1b[31mansi\x1b[0m\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 20, 2)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	_, plainStyle, _ := screen.Get(0, 0)
+	if got, want := plainStyle.GetForeground(), tcolor.Red; got != want {
+		t.Fatalf("plain fg = %v, want %v", got, want)
+	}
+	if got, want := plainStyle.GetBackground(), tcolor.Blue; got != want {
+		t.Fatalf("plain bg = %v, want %v", got, want)
+	}
+
+	pager.ScrollDown(1)
+	screen.Clear()
+	pager.Draw(screen)
+	_, ansiStyle, _ := screen.Get(0, 0)
+	if got, want := ansiStyle.GetForeground(), tcolor.Aqua; got != want {
+		t.Fatalf("ansi fg = %v, want %v", got, want)
+	}
+	if got, want := ansiStyle.GetBackground(), tcolor.Blue; got != want {
+		t.Fatalf("ansi bg = %v, want %v", got, want)
 	}
 }
 
