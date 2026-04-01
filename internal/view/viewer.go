@@ -1119,7 +1119,10 @@ func trimLeftToWidth(s string, skip int) string {
 		clusterWidth := uniseg.StringWidth(cluster)
 		if consumed+clusterWidth > skip {
 			hidden := skip - consumed
-			_, end := gr.Positions()
+			start, end := gr.Positions()
+			if hidden == 0 {
+				return s[start:]
+			}
 			return strings.Repeat(" ", max(clusterWidth-hidden, 0)) + s[end:]
 		}
 		consumed += clusterWidth
