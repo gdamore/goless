@@ -20,6 +20,7 @@ type Text struct {
 	StatusSearchInfo func(query string, current, total int) string
 	StatusPosition   func(current, total, column int) string
 	FollowMode       string
+	StatusLine       func(StatusInfo) (left, right string)
 
 	SearchEmpty      string
 	SearchNotFound   func(query string) string
@@ -33,6 +34,7 @@ type Text struct {
 
 	LeftOverflowIndicator  string
 	RightOverflowIndicator string
+	PromptLine             func(PromptInfo) string
 }
 
 func (t Text) helpLines() []string {

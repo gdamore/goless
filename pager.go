@@ -527,12 +527,25 @@ func toInternalText(text Text) iview.Text {
 	}
 
 	return iview.Text{
-		HelpTitle:              text.HelpTitle,
-		HelpClose:              text.HelpClose,
-		HelpBody:               text.HelpBody,
-		StatusSearchInfo:       text.StatusSearchInfo,
-		StatusPosition:         text.StatusPosition,
-		FollowMode:             text.FollowMode,
+		HelpTitle:        text.HelpTitle,
+		HelpClose:        text.HelpClose,
+		HelpBody:         text.HelpBody,
+		StatusSearchInfo: text.StatusSearchInfo,
+		StatusPosition:   text.StatusPosition,
+		FollowMode:       text.FollowMode,
+		StatusLine: func(info iview.StatusInfo) (left, right string) {
+			if text.StatusLine == nil {
+				return info.DefaultLeft, info.DefaultRight
+			}
+			return text.StatusLine(StatusInfo{
+				Search:       toPublicSearchState(info.Search),
+				Following:    info.Following,
+				Message:      info.Message,
+				Position:     Position{Row: info.Position.Row, Rows: info.Position.Rows, Column: info.Position.Column},
+				DefaultLeft:  info.DefaultLeft,
+				DefaultRight: info.DefaultRight,
+			})
+		},
 		SearchEmpty:            text.SearchEmpty,
 		SearchNotFound:         text.SearchNotFound,
 		SearchMatchCount:       text.SearchMatchCount,
@@ -543,14 +556,30 @@ func toInternalText(text Text) iview.Text {
 		CommandLine:            text.CommandLine,
 		LeftOverflowIndicator:  text.LeftOverflowIndicator,
 		RightOverflowIndicator: text.RightOverflowIndicator,
+		PromptLine: func(info iview.PromptInfo) string {
+			if text.PromptLine == nil {
+				return info.DefaultText
+			}
+			return text.PromptLine(PromptInfo{
+				Kind:        toPublicPromptKind(info.Kind),
+				Prefix:      info.Prefix,
+				Input:       info.Input,
+				Error:       info.Error,
+				Search:      toPublicSearchState(info.Search),
+				DefaultText: info.DefaultText,
+			})
+		},
 	}
 }
 
 func toInternalChrome(chrome Chrome) iview.Chrome {
 	return iview.Chrome{
-		Title:       chrome.Title,
-		BorderStyle: chrome.BorderStyle,
-		TitleStyle:  chrome.TitleStyle,
+		Title:            chrome.Title,
+		BorderStyle:      chrome.BorderStyle,
+		TitleStyle:       chrome.TitleStyle,
+		StatusStyle:      chrome.StatusStyle,
+		PromptStyle:      chrome.PromptStyle,
+		PromptErrorStyle: chrome.PromptErrorStyle,
 		Frame: iview.Frame{
 			Horizontal:  chrome.Frame.Horizontal,
 			Vertical:    chrome.Frame.Vertical,
@@ -559,5 +588,29 @@ func toInternalChrome(chrome Chrome) iview.Chrome {
 			BottomLeft:  chrome.Frame.BottomLeft,
 			BottomRight: chrome.Frame.BottomRight,
 		},
+	}
+}
+
+func toPublicSearchState(state iview.SearchSnapshot) SearchState {
+	return SearchState{
+		Query:        state.Query,
+		Forward:      state.Forward,
+		CaseMode:     SearchCaseMode(state.CaseMode),
+		Mode:         SearchMode(state.Mode),
+		MatchCount:   state.MatchCount,
+		CurrentMatch: state.CurrentMatch,
+		CompileError: state.CompileError,
+		Preview:      state.Preview,
+	}
+}
+
+func toPublicPromptKind(kind iview.PromptKind) PromptKind {
+	switch kind {
+	case iview.PromptKindSearchBackward:
+		return PromptSearchBackward
+	case iview.PromptKindCommand:
+		return PromptCommand
+	default:
+		return PromptSearchForward
 	}
 }

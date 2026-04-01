@@ -32,6 +32,12 @@ type Chrome struct {
 	BorderStyle tcell.Style
 	// TitleStyle controls the style used when drawing the frame title.
 	TitleStyle tcell.Style
+	// StatusStyle controls the style used when drawing the status bar.
+	StatusStyle tcell.Style
+	// PromptStyle controls the style used when drawing the prompt line.
+	PromptStyle tcell.Style
+	// PromptErrorStyle controls the style used for prompt-side error text.
+	PromptErrorStyle tcell.Style
 }
 
 // SingleFrame returns a single-line box drawing frame.

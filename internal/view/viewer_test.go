@@ -1156,6 +1156,126 @@ func TestStatusBarUsesDisplayWidthForRightAlignedText(t *testing.T) {
 	}
 }
 
+func TestStatusLineFormatterOverridesBuiltInStatusText(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nbeta\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		Text: Text{
+			StatusLine: func(info StatusInfo) (left, right string) {
+				if info.DefaultLeft == "" || info.DefaultRight == "" {
+					t.Fatalf("StatusLine got empty defaults: %+v", info)
+				}
+				return "L:" + info.DefaultLeft, "R:" + info.DefaultRight
+			},
+		},
+	})
+	v.SetSize(20, 2)
+	v.relayout()
+
+	leftText, rightText := v.statusText()
+	if got, want := leftText, "L:search:smart,sub"; got != want {
+		t.Fatalf("left status text = %q, want %q", got, want)
+	}
+	if !strings.HasPrefix(rightText, "R:row 1/2  col 0") {
+		t.Fatalf("right status text = %q, want prefix %q", rightText, "R:row 1/2  col 0")
+	}
+}
+
+func TestPromptLineFormatterOverridesBuiltInPromptText(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Text: Text{
+			PromptLine: func(info PromptInfo) string {
+				if got, want := info.DefaultText, "/[smart,sub] a"; got != want {
+					t.Fatalf("PromptLine default text = %q, want %q", got, want)
+				}
+				if got, want := info.Kind, PromptKindSearchForward; got != want {
+					t.Fatalf("PromptLine kind = %v, want %v", got, want)
+				}
+				return "find>" + info.Input
+			},
+		},
+	})
+	v.SetSize(20, 2)
+	v.beginPrompt(promptSearchForward)
+	v.prompt.buffer = []rune("a")
+
+	if got, want := v.promptText(), "find>a"; got != want {
+		t.Fatalf("promptText() = %q, want %q", got, want)
+	}
+}
+
+func TestDrawStatusAndPromptUseConfiguredStyles(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	statusStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(3)).Background(tcolor.PaletteColor(7))
+	promptStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(2)).Background(tcolor.PaletteColor(0)).Bold(true)
+	promptErrorStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(1)).Background(tcolor.PaletteColor(0))
+
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		SearchMode: SearchRegex,
+		Chrome: Chrome{
+			StatusStyle:      statusStyle,
+			PromptStyle:      promptStyle,
+			PromptErrorStyle: promptErrorStyle,
+		},
+	})
+	v.SetSize(20, 2)
+	v.relayout()
+
+	_, screen := newMockScreen(t, 20, 2)
+	defer screen.Fini()
+
+	v.drawStatus(screen, 1)
+	_, gotStatusStyle, _ := screen.Get(0, 1)
+	if got, want := gotStatusStyle.GetForeground(), statusStyle.GetForeground(); got != want {
+		t.Fatalf("status fg = %v, want %v", got, want)
+	}
+	if got, want := gotStatusStyle.GetBackground(), statusStyle.GetBackground(); got != want {
+		t.Fatalf("status bg = %v, want %v", got, want)
+	}
+
+	v.beginPrompt(promptSearchForward)
+	v.prompt.buffer = []rune("(")
+	v.updatePromptPreview()
+	screen.Clear()
+	v.drawPrompt(screen, 1)
+
+	_, gotPromptStyle, _ := screen.Get(1, 1)
+	if got, want := gotPromptStyle.GetForeground(), promptStyle.GetForeground(); got != want {
+		t.Fatalf("prompt fg = %v, want %v", got, want)
+	}
+	if got, want := gotPromptStyle.GetBackground(), promptStyle.GetBackground(); got != want {
+		t.Fatalf("prompt bg = %v, want %v", got, want)
+	}
+	if !gotPromptStyle.HasBold() {
+		t.Fatal("prompt style lost bold attribute")
+	}
+
+	errorStart := stringWidth(truncateToWidth(" "+v.promptText(), v.width))
+	_, gotErrorStyle, _ := screen.Get(errorStart, 1)
+	if got, want := gotErrorStyle.GetForeground(), promptErrorStyle.GetForeground(); got != want {
+		t.Fatalf("prompt error fg = %v, want %v", got, want)
+	}
+	if got, want := gotErrorStyle.GetBackground(), promptErrorStyle.GetBackground(); got != want {
+		t.Fatalf("prompt error bg = %v, want %v", got, want)
+	}
+}
+
 func TestTruncateToWidthUsesDisplayCellsAndPreservesUTF8(t *testing.T) {
 	got := truncateToWidth("é界b", 2)
 	if !utf8.ValidString(got) {

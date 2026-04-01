@@ -588,7 +588,7 @@ func (v *Viewer) drawFrame(screen tcell.Screen, title string) {
 }
 
 func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
-	style := statusBarStyle
+	style := v.cfg.Chrome.StatusStyle
 	screen.PutStrStyled(0, y, strings.Repeat(" ", max(v.width, 0)), style)
 
 	leftOverflow, rightOverflow := v.statusOverflow()
@@ -720,6 +720,20 @@ func (v *Viewer) statusText() (left, right string) {
 		current = min(v.rowOffset+1, len(v.layout.Rows))
 	}
 	right = v.text.StatusPosition(current, len(v.layout.Rows), v.colOffset)
+	if v.text.StatusLine != nil {
+		return v.text.StatusLine(StatusInfo{
+			Search:    v.SearchSnapshot(),
+			Following: v.follow,
+			Message:   v.message,
+			Position: Position{
+				Row:    current,
+				Rows:   len(v.layout.Rows),
+				Column: v.colOffset,
+			},
+			DefaultLeft:  left,
+			DefaultRight: right,
+		})
+	}
 	return left, right
 }
 
@@ -732,10 +746,10 @@ func (v *Viewer) statusOverflow() (left, right bool) {
 }
 
 func (v *Viewer) drawPrompt(screen tcell.Screen, y int) {
-	style := tcell.StyleDefault.Reverse(true)
+	style := v.cfg.Chrome.PromptStyle
 	prompt := ""
 	if v.prompt != nil {
-		prompt = " " + v.prompt.String()
+		prompt = " " + v.promptText()
 	}
 	screen.PutStrStyled(0, y, padRightToWidth(prompt, v.width), style)
 	if v.prompt != nil && v.prompt.errText != "" && v.width > 0 {
@@ -743,9 +757,37 @@ func (v *Viewer) drawPrompt(screen tcell.Screen, y int) {
 		paddedPrompt := truncateToWidth(prompt, v.width)
 		start := stringWidth(paddedPrompt)
 		if start < v.width {
-			errStyle := style.Foreground(tcolor.Red)
-			screen.PutStrStyled(start, y, truncateToWidth(errText, v.width-start), errStyle)
+			screen.PutStrStyled(start, y, truncateToWidth(errText, v.width-start), v.cfg.Chrome.PromptErrorStyle)
 		}
+	}
+}
+
+func (v *Viewer) promptText() string {
+	if v.prompt == nil {
+		return ""
+	}
+	defaultText := v.prompt.String()
+	if v.text.PromptLine == nil {
+		return defaultText
+	}
+	return v.text.PromptLine(PromptInfo{
+		Kind:        toPromptKind(v.prompt.kind),
+		Prefix:      v.prompt.prefix,
+		Input:       string(v.prompt.buffer),
+		Error:       v.prompt.errText,
+		Search:      v.SearchSnapshot(),
+		DefaultText: defaultText,
+	})
+}
+
+func toPromptKind(kind promptKind) PromptKind {
+	switch kind {
+	case promptSearchBackward:
+		return PromptKindSearchBackward
+	case promptCommand:
+		return PromptKindCommand
+	default:
+		return PromptKindSearchForward
 	}
 }
 
