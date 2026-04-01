@@ -217,7 +217,7 @@ func (v *Viewer) Refresh() {
 // Draw renders the current viewport.
 func (v *Viewer) Draw(screen tcell.Screen) {
 	v.ensureLayout()
-	screen.Clear()
+	screen.Fill(' ', v.toTCellStyle(ansi.DefaultStyle()))
 
 	if v.mode == modeHelp {
 		v.drawFrame(screen, v.helpFrameTitle())

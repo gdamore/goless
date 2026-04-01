@@ -28,6 +28,12 @@ func TestLightPresetUsesSolarizedLightDefaults(t *testing.T) {
 	if got, want := LightPreset.Theme.DefaultFG, rgb(0x65, 0x7b, 0x83); got != want {
 		t.Fatalf("LightPreset.Theme.DefaultFG = %v, want %v", got, want)
 	}
+	if got, want := LightPreset.Chrome.BorderStyle.GetBackground(), rgb(0xfd, 0xf6, 0xe3); got != want {
+		t.Fatalf("LightPreset.Chrome.BorderStyle background = %v, want %v", got, want)
+	}
+	if got, want := LightPreset.Chrome.TitleStyle.GetBackground(), rgb(0xfd, 0xf6, 0xe3); got != want {
+		t.Fatalf("LightPreset.Chrome.TitleStyle background = %v, want %v", got, want)
+	}
 }
 
 func TestPlainPresetUsesMonochromePalette(t *testing.T) {
