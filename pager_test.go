@@ -4,6 +4,7 @@
 package goless
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 
@@ -541,10 +542,15 @@ func TestPagerSearchStateShowsInvalidRegexPreview(t *testing.T) {
 func TestPagerTextHooksFormatStatusAndPrompt(t *testing.T) {
 	statusCalled := false
 	promptCalled := false
+	statusStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(3)).Background(tcolor.PaletteColor(7))
+	promptStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(2)).Background(tcolor.PaletteColor(0)).Bold(true)
+	promptErrorStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(1)).Background(tcolor.PaletteColor(0))
 	pager := New(Config{
 		TabWidth:   4,
 		WrapMode:   NoWrap,
 		ShowStatus: true,
+		SearchMode: SearchRegex,
+		Chrome:     Chrome{StatusStyle: statusStyle, PromptStyle: promptStyle, PromptErrorStyle: promptErrorStyle},
 		Text: Text{
 			StatusLine: func(info StatusInfo) (left, right string) {
 				statusCalled = true
@@ -578,12 +584,18 @@ func TestPagerTextHooksFormatStatusAndPrompt(t *testing.T) {
 	if got := pagerCellRune(screen, 2, 1); got != 'L' {
 		t.Fatalf("status text rune = %q, want %q", got, 'L')
 	}
+	if got, want := pagerCellStyle(screen, 0, 1).GetForeground(), statusStyle.GetForeground(); got != want {
+		t.Fatalf("status fg = %v, want %v", got, want)
+	}
+	if got, want := pagerCellStyle(screen, 0, 1).GetBackground(), statusStyle.GetBackground(); got != want {
+		t.Fatalf("status bg = %v, want %v", got, want)
+	}
 
 	if result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "/", tcell.ModNone)); !result.Handled {
 		t.Fatal("HandleKeyResult(/).Handled = false, want true")
 	}
-	if result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "a", tcell.ModNone)); !result.Handled {
-		t.Fatal("HandleKeyResult(a).Handled = false, want true")
+	if result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "(", tcell.ModNone)); !result.Handled {
+		t.Fatal("HandleKeyResult(()).Handled = false, want true")
 	}
 	screen.Clear()
 	pager.Draw(screen)
@@ -592,6 +604,23 @@ func TestPagerTextHooksFormatStatusAndPrompt(t *testing.T) {
 	}
 	if got := pagerCellRune(screen, 1, 1); got != 'f' {
 		t.Fatalf("prompt text rune = %q, want %q", got, 'f')
+	}
+	promptCellStyle := pagerCellStyle(screen, 1, 1)
+	if got, want := promptCellStyle.GetForeground(), promptStyle.GetForeground(); got != want {
+		t.Fatalf("prompt fg = %v, want %v", got, want)
+	}
+	if got, want := promptCellStyle.GetBackground(), promptStyle.GetBackground(); got != want {
+		t.Fatalf("prompt bg = %v, want %v", got, want)
+	}
+	if !promptCellStyle.HasBold() {
+		t.Fatal("prompt style lost bold attribute")
+	}
+	errorCellStyle := pagerCellStyle(screen, len([]rune(" find>(")), 1)
+	if got, want := errorCellStyle.GetForeground(), promptErrorStyle.GetForeground(); got != want {
+		t.Fatalf("prompt error fg = %v, want %v", got, want)
+	}
+	if got, want := errorCellStyle.GetBackground(), promptErrorStyle.GetBackground(); got != want {
+		t.Fatalf("prompt error bg = %v, want %v", got, want)
 	}
 }
 
@@ -709,8 +738,16 @@ func pagerCellRune(screen tcell.Screen, x, y int) rune {
 	return []rune(str)[0]
 }
 
+func pagerCellStyle(screen tcell.Screen, x, y int) tcell.Style {
+	_, style, _ := screen.Get(x, y)
+	return style
+}
+
 func newPagerMockScreen(t *testing.T, width, height int) tcell.Screen {
 	t.Helper()
+	if runtime.GOOS == "js" {
+		t.Skip("not supported on webasm")
+	}
 	term := vt.NewMockTerm(vt.MockOptSize{X: vt.Col(width), Y: vt.Row(height)})
 	screen, err := tcell.NewTerminfoScreenFromTty(term)
 	if err != nil {

@@ -753,7 +753,7 @@ func (v *Viewer) drawPrompt(screen tcell.Screen, y int) {
 		prompt = " " + v.promptText()
 	}
 	screen.PutStrStyled(0, y, padRightToWidth(prompt, v.width), style)
-	if v.prompt != nil && v.prompt.errText != "" && v.width > 0 {
+	if v.prompt != nil && v.prompt.errText != "" && v.width > 0 && !strings.Contains(prompt, v.prompt.errText) {
 		errText := "  " + v.prompt.errText
 		paddedPrompt := truncateToWidth(prompt, v.width)
 		start := stringWidth(paddedPrompt)
