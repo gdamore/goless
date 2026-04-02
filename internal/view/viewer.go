@@ -23,6 +23,7 @@ type Config struct {
 	Theme            Theme
 	Visualization    Visualization
 	HyperlinkHandler HyperlinkHandler
+	CommandHandler   CommandHandler
 	KeyGroup         KeyGroup
 	KeyUnbind        []KeyStroke
 	KeyBind          []KeyBinding
@@ -1088,8 +1089,7 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		v.cancelPrompt()
 		return KeyResult{Handled: true}
 	case tcell.KeyEnter:
-		v.commitPrompt()
-		return KeyResult{Handled: true}
+		return v.commitPrompt()
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if v.prompt != nil && len(v.prompt.buffer) > 0 {
 			v.prompt.buffer = v.prompt.buffer[:len(v.prompt.buffer)-1]

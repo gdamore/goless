@@ -59,6 +59,7 @@ func run() error {
 		Theme:            preset.Theme,
 		Visualization:    demoVisualization(hidden),
 		HyperlinkHandler: demoHyperlinkHandler(liveLinks),
+		CommandHandler:   demoCommandHandler(),
 		Chrome:           chromeCfg,
 		ShowStatus:       true,
 	})
@@ -236,6 +237,17 @@ func demoHyperlinkHandler(live bool) goless.HyperlinkHandler {
 				Underline(tcell.UnderlineStyleSolid),
 			Live:     live,
 			StyleSet: true,
+		}
+	}
+}
+
+func demoCommandHandler() func(goless.Command) goless.CommandResult {
+	return func(cmd goless.Command) goless.CommandResult {
+		switch cmd.Name {
+		case "q", "quit":
+			return goless.CommandResult{Handled: true, Quit: true}
+		default:
+			return goless.CommandResult{}
 		}
 	}
 }
