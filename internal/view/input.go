@@ -43,6 +43,8 @@ const (
 	actionScrollDown
 	actionScrollLeft
 	actionScrollRight
+	actionHalfPageUp
+	actionHalfPageDown
 	actionPageUp
 	actionPageDown
 	actionGoTop

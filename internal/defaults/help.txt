@@ -1,6 +1,7 @@
 Navigation
 Up/Down, j/k: move
 Left/Right, h/l: scroll horizontally
+Ctrl-U/Ctrl-D, u/d: half-page
 PgUp/PgDn, b/f, Space: page
 g/G: top/bottom
 w: toggle wrap
@@ -14,6 +15,7 @@ F3: cycle substring/whole-word/regex matching
 
 Commands
 :123: jump to line 123
+:50%: jump to 50%
 :set searchcase smart|case|nocase
 :set searchmode sub|word|regex
 

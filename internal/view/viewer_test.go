@@ -62,6 +62,36 @@ func TestLessKeyMapGoBottom(t *testing.T) {
 	}
 }
 
+func TestLessKeyMapHalfPageMoves(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\nsix\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	v.HandleKey(keyRune("d"))
+	if got, want := v.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row after d = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("u"))
+	if got, want := v.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row after u = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyCtrlRune("d"))
+	if got, want := v.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row after Ctrl-D = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyCtrlRune("u"))
+	if got, want := v.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row after Ctrl-U = %d, want %d", got, want)
+	}
+}
+
 func TestLessKeyMapHelpScrollsAndCloses(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("hello\nworld\n")); err != nil {
@@ -80,6 +110,26 @@ func TestLessKeyMapHelpScrollsAndCloses(t *testing.T) {
 	v.HandleKey(keyRune("H"))
 	if got, want := v.mode, modeNormal; got != want {
 		t.Fatalf("mode after H = %v, want %v", got, want)
+	}
+}
+
+func TestCommandPercentJump(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	v.HandleKey(keyRune(":"))
+	for _, s := range []string{"5", "0", "%"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.Position().Row, 5; got != want {
+		t.Fatalf("Position().Row after :50%% = %d, want %d", got, want)
 	}
 }
 
@@ -1583,6 +1633,10 @@ func TestHelpFrameTitleUsesConfiguredAlignment(t *testing.T) {
 
 func keyRune(s string) *tcell.EventKey {
 	return tcell.NewEventKey(tcell.KeyRune, s, tcell.ModNone)
+}
+
+func keyCtrlRune(s string) *tcell.EventKey {
+	return tcell.NewEventKey(tcell.KeyRune, s, tcell.ModCtrl)
 }
 
 func keyKey(k tcell.Key) *tcell.EventKey {

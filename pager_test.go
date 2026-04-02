@@ -491,6 +491,32 @@ func TestPagerJumpToLine(t *testing.T) {
 	}
 }
 
+func TestPagerHalfPageAndPercentNavigation(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 4)
+	if err := pager.AppendString("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	pager.HalfPageDown()
+	if got, want := pager.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row after HalfPageDown = %d, want %d", got, want)
+	}
+
+	pager.HalfPageUp()
+	if got, want := pager.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row after HalfPageUp = %d, want %d", got, want)
+	}
+
+	if !pager.GoPercent(50) {
+		t.Fatal("GoPercent(50) = false, want true")
+	}
+	if got, want := pager.Position().Row, 4; got != want {
+		t.Fatalf("Position().Row after GoPercent(50) = %d, want %d", got, want)
+	}
+}
+
 func TestPagerSearchForwardSmartCase(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)

@@ -42,6 +42,8 @@ const (
 	KeyActionScrollDown           = actionScrollDown
 	KeyActionScrollLeft           = actionScrollLeft
 	KeyActionScrollRight          = actionScrollRight
+	KeyActionHalfPageUp           = actionHalfPageUp
+	KeyActionHalfPageDown         = actionHalfPageDown
 	KeyActionPageUp               = actionPageUp
 	KeyActionPageDown             = actionPageDown
 	KeyActionGoTop                = actionGoTop
@@ -119,6 +121,10 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyRune, rune: "k", action: actionScrollUp},
 			{key: tcell.KeyRune, rune: "h", action: actionScrollLeft},
 			{key: tcell.KeyRune, rune: "l", action: actionScrollRight},
+			{key: tcell.KeyRune, rune: "u", mod: tcell.ModCtrl, action: actionHalfPageUp},
+			{key: tcell.KeyRune, rune: "d", mod: tcell.ModCtrl, action: actionHalfPageDown},
+			{key: tcell.KeyRune, rune: "u", action: actionHalfPageUp},
+			{key: tcell.KeyRune, rune: "d", action: actionHalfPageDown},
 			{key: tcell.KeyRune, rune: " ", action: actionPageDown},
 			{key: tcell.KeyRune, rune: "f", action: actionPageDown},
 			{key: tcell.KeyRune, rune: "b", action: actionPageUp},
@@ -138,6 +144,10 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyCtrlC, action: actionQuit},
 			{key: tcell.KeyUp, action: actionScrollUp},
 			{key: tcell.KeyDown, action: actionScrollDown},
+			{key: tcell.KeyRune, rune: "u", mod: tcell.ModCtrl, action: actionHalfPageUp},
+			{key: tcell.KeyRune, rune: "d", mod: tcell.ModCtrl, action: actionHalfPageDown},
+			{key: tcell.KeyRune, rune: "u", action: actionHalfPageUp},
+			{key: tcell.KeyRune, rune: "d", action: actionHalfPageDown},
 			{key: tcell.KeyPgUp, action: actionPageUp},
 			{key: tcell.KeyPgDn, action: actionPageDown},
 			{key: tcell.KeyHome, action: actionGoTop},
@@ -241,6 +251,9 @@ func actionForBindings(bindings []keyBinding, ev *tcell.EventKey) action {
 }
 
 func (b keyBinding) matches(ev *tcell.EventKey) bool {
+	if ctrlKeyBindingMatches(b, ev) {
+		return true
+	}
 	if ev.Key() != b.key {
 		return false
 	}
@@ -251,6 +264,34 @@ func (b keyBinding) matches(ev *tcell.EventKey) bool {
 		return false
 	}
 	return true
+}
+
+func ctrlKeyBindingMatches(b keyBinding, ev *tcell.EventKey) bool {
+	if b.key != tcell.KeyRune || b.mod != tcell.ModCtrl || len(b.rune) != 1 {
+		return false
+	}
+	want, ok := ctrlKeyForRune(rune(b.rune[0]))
+	if !ok {
+		return false
+	}
+	if ev.Key() != want {
+		return false
+	}
+	if b.anyMod {
+		return true
+	}
+	return ev.Modifiers() == tcell.ModCtrl || ev.Modifiers() == tcell.ModNone
+}
+
+func ctrlKeyForRune(r rune) (tcell.Key, bool) {
+	switch {
+	case r >= 'a' && r <= 'z':
+		return tcell.Key(int(tcell.KeyCtrlA) + int(r-'a')), true
+	case r >= 'A' && r <= 'Z':
+		return tcell.Key(int(tcell.KeyCtrlA) + int(r-'A')), true
+	default:
+		return tcell.KeyRune, false
+	}
 }
 
 func removeBindings(bindings []keyBinding, stroke KeyStroke) []keyBinding {

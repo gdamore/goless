@@ -529,6 +529,11 @@ func (v *Viewer) runCommand(text string) (commit bool, quit bool) {
 		return true, false
 	}
 
+	if percent, ok := parsePercentCommand(text); ok {
+		v.goToPercent(percent)
+		return true, false
+	}
+
 	lineNumber, err := strconv.Atoi(text)
 	if err == nil {
 		v.goToLine(lineNumber)
@@ -547,6 +552,21 @@ func (v *Viewer) runCommand(text string) (commit bool, quit bool) {
 
 	v.message = v.text.CommandUnknown(text)
 	return true, false
+}
+
+func parsePercentCommand(text string) (int, bool) {
+	if !strings.HasSuffix(text, "%") {
+		return 0, false
+	}
+	raw := strings.TrimSpace(strings.TrimSuffix(text, "%"))
+	if raw == "" {
+		return 0, false
+	}
+	percent, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, false
+	}
+	return percent, true
 }
 
 func (v *Viewer) runSetCommand(text string) bool {
@@ -611,6 +631,17 @@ func (v *Viewer) goToLine(lineNumber int) {
 	}
 	v.restoreAnchor(layout.Anchor{LineIndex: lineIndex, GraphemeIndex: 0})
 	v.message = v.text.CommandLine(lineNumber)
+}
+
+func (v *Viewer) goToPercent(percent int) {
+	if percent < 0 || percent > 100 {
+		v.message = v.text.CommandUnknown(strconv.Itoa(percent) + "%")
+		return
+	}
+	if !v.GoPercent(percent) {
+		return
+	}
+	v.message = strconv.Itoa(percent) + "%"
 }
 
 // JumpToLine moves the viewport to the requested logical line.

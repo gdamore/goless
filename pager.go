@@ -246,6 +246,16 @@ func (p *Pager) ScrollRight(n int) {
 	p.viewer.ScrollRight(n)
 }
 
+// HalfPageDown moves the viewport down by roughly half a page.
+func (p *Pager) HalfPageDown() {
+	p.viewer.HalfPageDown()
+}
+
+// HalfPageUp moves the viewport up by roughly half a page.
+func (p *Pager) HalfPageUp() {
+	p.viewer.HalfPageUp()
+}
+
 // PageDown moves the viewport down by roughly one page.
 func (p *Pager) PageDown() {
 	p.viewer.PageDown()
@@ -264,6 +274,11 @@ func (p *Pager) GoTop() {
 // GoBottom moves the viewport to the end of the document.
 func (p *Pager) GoBottom() {
 	p.viewer.GoBottom()
+}
+
+// GoPercent moves the viewport near the requested document percentage.
+func (p *Pager) GoPercent(percent int) bool {
+	return p.viewer.GoPercent(percent)
 }
 
 // Follow pins the viewport to the end of the document as new content arrives.
@@ -443,6 +458,10 @@ func toInternalKeyAction(a KeyAction) iview.KeyAction {
 		return iview.KeyActionScrollLeft
 	case KeyActionScrollRight:
 		return iview.KeyActionScrollRight
+	case KeyActionHalfPageUp:
+		return iview.KeyActionHalfPageUp
+	case KeyActionHalfPageDown:
+		return iview.KeyActionHalfPageDown
 	case KeyActionPageUp:
 		return iview.KeyActionPageUp
 	case KeyActionPageDown:
