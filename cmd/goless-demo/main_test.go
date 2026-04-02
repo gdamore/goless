@@ -137,7 +137,7 @@ func TestDemoSessionCommandHandler(t *testing.T) {
 	if !result.Handled || result.Quit {
 		t.Fatalf("next command result = %+v, want handled non-quit", result)
 	}
-	if got, want := result.Message, "two.txt"; got != want {
+	if got, want := result.Message, "two.txt (2/2)"; got != want {
 		t.Fatalf("next command message = %q, want %q", got, want)
 	}
 	if got, want := session.currentFile(), "two.txt"; got != want {
@@ -159,7 +159,7 @@ func TestDemoSessionCommandHandler(t *testing.T) {
 	if !result.Handled || result.Quit {
 		t.Fatalf("prev command result = %+v, want handled non-quit", result)
 	}
-	if got, want := result.Message, "one.txt"; got != want {
+	if got, want := result.Message, "one.txt (1/2)"; got != want {
 		t.Fatalf("prev command message = %q, want %q", got, want)
 	}
 	if got, want := session.currentFile(), "one.txt"; got != want {
@@ -172,6 +172,45 @@ func TestDemoSessionCommandHandler(t *testing.T) {
 	result = handler(goless.Command{Name: "bogus"})
 	if result.Handled || result.Quit {
 		t.Fatalf("bogus command result = %+v, want unhandled", result)
+	}
+}
+
+func TestDemoSessionAdditionalCommands(t *testing.T) {
+	session := newDemoSession([]string{"one.txt", "two.txt", "three.txt"}, demoStartup{})
+	reloads := 0
+	handler := session.commandHandler(func() error {
+		reloads++
+		return nil
+	})
+
+	result := handler(goless.Command{Name: "file"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("file command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "one.txt (1/3)"; got != want {
+		t.Fatalf("file command message = %q, want %q", got, want)
+	}
+
+	result = handler(goless.Command{Name: "last"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("last command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "three.txt (3/3)"; got != want {
+		t.Fatalf("last command message = %q, want %q", got, want)
+	}
+	if got, want := reloads, 1; got != want {
+		t.Fatalf("reload count after last = %d, want %d", got, want)
+	}
+
+	result = handler(goless.Command{Name: "rewind"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("rewind command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "one.txt (1/3)"; got != want {
+		t.Fatalf("rewind command message = %q, want %q", got, want)
+	}
+	if got, want := reloads, 2; got != want {
+		t.Fatalf("reload count after rewind = %d, want %d", got, want)
 	}
 }
 
@@ -190,6 +229,24 @@ func TestDemoSessionCommandHandlerReloadFailureRestoresIndex(t *testing.T) {
 	}
 	if got, want := session.currentFile(), "one.txt"; got != want {
 		t.Fatalf("current file after failed reload = %q, want %q", got, want)
+	}
+}
+
+func TestDemoSessionCommandHandlerReloadFailureRestoresIndexForLast(t *testing.T) {
+	session := newDemoSession([]string{"one.txt", "two.txt", "three.txt"}, demoStartup{})
+	handler := session.commandHandler(func() error {
+		return fmt.Errorf("reload failed")
+	})
+
+	result := handler(goless.Command{Name: "last"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("last command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "reload failed"; got != want {
+		t.Fatalf("last command message = %q, want %q", got, want)
+	}
+	if got, want := session.currentFile(), "one.txt"; got != want {
+		t.Fatalf("current file after failed last reload = %q, want %q", got, want)
 	}
 }
 
