@@ -239,6 +239,13 @@ The repository includes a small demo in `cmd/goless-demo`.
 go run ./cmd/goless-demo -- file.txt
 ```
 
+It also accepts less-style startup directives and multiple files:
+
+```bash
+go run ./cmd/goless-demo +42 -- a.txt b.txt
+go run ./cmd/goless-demo +/needle -- a.txt b.txt
+```
+
 It can also read from stdin:
 
 ```bash
@@ -250,8 +257,10 @@ Demo flags:
 - `-preset none|dark|light|plain|pretty`
 - `-chrome auto|none|single|rounded`
 - `-hidden`
+- `-live-links`
 - `-render hybrid|literal|presentation`
 - `-title text`
+- optional `+line` or `+/pattern` startup directive before files
 
 The default key group is intentionally less-like. Common bindings include:
 
@@ -267,6 +276,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `F4` to cycle visual presets in the demo program
 - `F5` to toggle hidden-character markers in the demo program
 - `:` then a number to jump to a line
+- `:next` / `:prev` to move through a multi-file demo session
 - `:set searchcase smart|case|nocase` to set search mode directly
 - `:set searchmode sub|word|regex` to set search mode directly
 - `F` to enable follow mode

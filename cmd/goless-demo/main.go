@@ -32,7 +32,7 @@ func run() error {
 	var title string
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-title text] [+line|+/pattern] [file]\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-title text] [+line|+/pattern] [file ...]\n")
 	}
 	flag.StringVar(&presetName, "preset", "none", "visual preset: none, dark, light, plain, pretty")
 	flag.StringVar(&chromeName, "chrome", "auto", "chrome override: auto, none, single, rounded")
@@ -50,41 +50,17 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	startup, files, err := demoInputs(flag.Args())
+	if err != nil {
+		return err
+	}
+	session := newDemoSession(files, startup)
 	chromeCfg, err := demoChrome(chromeName, title, preset.Chrome)
 	if err != nil {
 		return err
 	}
-	pager := goless.New(goless.Config{
-		TabWidth:         8,
-		WrapMode:         goless.NoWrap,
-		RenderMode:       renderMode,
-		Theme:            preset.Theme,
-		Visualization:    demoVisualization(hidden),
-		HyperlinkHandler: demoHyperlinkHandler(liveLinks),
-		CommandHandler:   demoCommandHandler(),
-		Chrome:           chromeCfg,
-		ShowStatus:       true,
-	})
 
-	startup, fileArg, err := demoInputs(flag.Args())
-	if err != nil {
-		return err
-	}
-
-	var (
-		input io.Reader = os.Stdin
-		file  *os.File
-	)
-	if fileArg != "" {
-		var err error
-		file, err = os.Open(fileArg)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		input = file
-	}
-	if fileArg == "" && stdinIsTerminal() {
+	if !session.hasFiles() && stdinIsTerminal() {
 		return fmt.Errorf("stdin is a terminal; specify a file or pipe input")
 	}
 
@@ -102,11 +78,49 @@ func run() error {
 		screen.Sync()
 		width, height = screen.Size()
 	}
-	pager.SetSize(width, height)
-	pager.Draw(screen)
 
-	readResult := make(chan error, 1)
-	go readIntoPager(pager, input, screen.EventQ(), readResult)
+	var (
+		pager          *goless.Pager
+		readResult     chan error
+		reloadCurrent  func() error
+		buildDemoPager func() *goless.Pager
+	)
+	buildDemoPager = func() *goless.Pager {
+		return newDemoPager(
+			renderMode,
+			preset,
+			session.chrome(chromeCfg),
+			hidden,
+			liveLinks,
+			session.commandHandler(func() error {
+				if reloadCurrent == nil {
+					return fmt.Errorf("file reload unavailable")
+				}
+				return reloadCurrent()
+			}),
+		)
+	}
+
+	if session.hasFiles() {
+		reloadCurrent = func() error {
+			nextPager := buildDemoPager()
+			nextPager.SetSize(width, height)
+			if err := loadDemoFile(nextPager, session.currentFile(), session.startup); err != nil {
+				return err
+			}
+			pager = nextPager
+			return nil
+		}
+		if err := reloadCurrent(); err != nil {
+			return err
+		}
+	} else {
+		pager = buildDemoPager()
+		pager.SetSize(width, height)
+		readResult = make(chan error, 1)
+		go readIntoPager(pager, os.Stdin, screen.EventQ(), readResult)
+	}
+	pager.Draw(screen)
 
 	for {
 		ev := <-screen.EventQ()
@@ -127,7 +141,7 @@ func run() error {
 					return err
 				}
 				pager.SetTheme(preset.Theme)
-				pager.SetChrome(chromeCfg)
+				pager.SetChrome(session.chrome(chromeCfg))
 				break
 			}
 			if event.Key() == tcell.KeyF5 {
@@ -139,13 +153,16 @@ func run() error {
 				return nil
 			}
 		case *tcell.EventInterrupt:
-			select {
-			case err := <-readResult:
-				if err != nil {
-					return err
+			if readResult != nil {
+				select {
+				case err := <-readResult:
+					if err != nil {
+						return err
+					}
+					applyStartupCommand(pager, startup)
+					readResult = nil
+				default:
 				}
-				applyStartupCommand(pager, startup)
-			default:
 			}
 		}
 		pager.Draw(screen)
@@ -187,7 +204,100 @@ type demoStartup struct {
 	query string
 }
 
-func demoInputs(args []string) (demoStartup, string, error) {
+type demoSession struct {
+	files   []string
+	index   int
+	startup demoStartup
+}
+
+func newDemoSession(files []string, startup demoStartup) *demoSession {
+	return &demoSession{
+		files:   append([]string(nil), files...),
+		startup: startup,
+	}
+}
+
+func (s *demoSession) hasFiles() bool {
+	return len(s.files) > 0
+}
+
+func (s *demoSession) currentFile() string {
+	if len(s.files) == 0 {
+		return ""
+	}
+	return s.files[s.index]
+}
+
+func (s *demoSession) chrome(base goless.Chrome) goless.Chrome {
+	chrome := base
+	if s.hasFiles() {
+		if chrome.Title == "" {
+			chrome.Title = s.currentFile()
+		} else {
+			chrome.Title = chrome.Title + " - " + s.currentFile()
+		}
+	}
+	return chrome
+}
+
+func (s *demoSession) canNext() bool {
+	return s.index+1 < len(s.files)
+}
+
+func (s *demoSession) canPrev() bool {
+	return s.index > 0
+}
+
+func (s *demoSession) next() bool {
+	if !s.canNext() {
+		return false
+	}
+	s.index++
+	return true
+}
+
+func (s *demoSession) prev() bool {
+	if !s.canPrev() {
+		return false
+	}
+	s.index--
+	return true
+}
+
+func (s *demoSession) commandHandler(reload func() error) func(goless.Command) goless.CommandResult {
+	return func(cmd goless.Command) goless.CommandResult {
+		switch cmd.Name {
+		case "q", "quit":
+			return goless.CommandResult{Handled: true, Quit: true}
+		case "next", "n":
+			if !s.canNext() {
+				return goless.CommandResult{Handled: true, Message: "already at last file"}
+			}
+			index := s.index
+			s.next()
+			if err := reload(); err != nil {
+				s.index = index
+				return goless.CommandResult{Handled: true, Message: err.Error()}
+			}
+			return goless.CommandResult{Handled: true, Message: s.currentFile()}
+		case "prev", "p", "previous":
+			if !s.canPrev() {
+				return goless.CommandResult{Handled: true, Message: "already at first file"}
+			}
+			index := s.index
+			s.prev()
+			if err := reload(); err != nil {
+				s.index = index
+				return goless.CommandResult{Handled: true, Message: err.Error()}
+			}
+			return goless.CommandResult{Handled: true, Message: s.currentFile()}
+		default:
+			return goless.CommandResult{}
+		}
+	}
+}
+
+func demoInputs(args []string) (demoStartup, []string, error) {
 	var startup demoStartup
 	positional := args
 	if len(positional) > 0 && positional[0] == "--" {
@@ -196,7 +306,7 @@ func demoInputs(args []string) (demoStartup, string, error) {
 	if len(positional) > 0 && strings.HasPrefix(positional[0], "+") {
 		parsedStartup, err := parseStartup(positional[0])
 		if err != nil {
-			return demoStartup{}, "", err
+			return demoStartup{}, nil, err
 		}
 		startup = parsedStartup
 		positional = positional[1:]
@@ -204,14 +314,7 @@ func demoInputs(args []string) (demoStartup, string, error) {
 			positional = positional[1:]
 		}
 	}
-	switch len(positional) {
-	case 0:
-		return startup, "", nil
-	case 1:
-		return startup, positional[0], nil
-	default:
-		return demoStartup{}, "", fmt.Errorf("usage: goless-demo [+line|+/pattern] [file]")
-	}
+	return startup, append([]string(nil), positional...), nil
 }
 
 func parseStartup(arg string) (demoStartup, error) {
@@ -239,6 +342,20 @@ func applyStartupCommand(pager *goless.Pager, startup demoStartup) {
 	if startup.query != "" {
 		pager.SearchForward(startup.query)
 	}
+}
+
+func loadDemoFile(pager *goless.Pager, path string, startup demoStartup) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if _, err := pager.ReadFrom(file); err != nil {
+		return err
+	}
+	pager.Flush()
+	applyStartupCommand(pager, startup)
+	return nil
 }
 
 func stdinIsTerminal() bool {
@@ -305,15 +422,25 @@ func demoHyperlinkHandler(live bool) goless.HyperlinkHandler {
 	}
 }
 
-func demoCommandHandler() func(goless.Command) goless.CommandResult {
-	return func(cmd goless.Command) goless.CommandResult {
-		switch cmd.Name {
-		case "q", "quit":
-			return goless.CommandResult{Handled: true, Quit: true}
-		default:
-			return goless.CommandResult{}
-		}
-	}
+func newDemoPager(
+	renderMode goless.RenderMode,
+	preset goless.Preset,
+	chrome goless.Chrome,
+	hidden bool,
+	liveLinks bool,
+	commandHandler func(goless.Command) goless.CommandResult,
+) *goless.Pager {
+	return goless.New(goless.Config{
+		TabWidth:         8,
+		WrapMode:         goless.NoWrap,
+		RenderMode:       renderMode,
+		Theme:            preset.Theme,
+		Visualization:    demoVisualization(hidden),
+		HyperlinkHandler: demoHyperlinkHandler(liveLinks),
+		CommandHandler:   commandHandler,
+		Chrome:           chrome,
+		ShowStatus:       true,
+	})
 }
 
 func demoChrome(name, title string, base goless.Chrome) (goless.Chrome, error) {
