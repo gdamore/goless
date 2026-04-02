@@ -92,7 +92,7 @@ func TestPagerCaptureKeyReservesBinding(t *testing.T) {
 			return ev.Key() == tcell.KeyRune && ev.Str() == "n"
 		},
 	})
-	pager.SetSize(20, 2)
+	pager.SetSize(30, 2)
 	if err := pager.AppendString("alpha\nbeta\nalpha\n"); err != nil {
 		t.Fatalf("AppendString failed: %v", err)
 	}
@@ -259,6 +259,159 @@ func TestPagerPromptKeyBindingOverridesBuiltins(t *testing.T) {
 	}
 	if !result.Quit {
 		t.Fatal("HandleKeyResult(Escape).Quit = false, want true for prompt override")
+	}
+}
+
+func TestPagerCommandHandlerHandlesUnknownCommand(t *testing.T) {
+	handled := false
+	pager := New(Config{
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		ShowStatus: true,
+		Text: Text{
+			StatusLine: func(info StatusInfo) (left, right string) {
+				return info.Message, ""
+			},
+		},
+		CommandHandler: func(cmd Command) CommandResult {
+			handled = true
+			if got, want := cmd.Raw, "next file"; got != want {
+				t.Fatalf("Command.Raw = %q, want %q", got, want)
+			}
+			if got, want := cmd.Name, "next"; got != want {
+				t.Fatalf("Command.Name = %q, want %q", got, want)
+			}
+			if got, want := strings.Join(cmd.Args, ","), "file"; got != want {
+				t.Fatalf("Command.Args = %q, want %q", got, want)
+			}
+			return CommandResult{
+				Handled: true,
+				Message: "advanced",
+			}
+		},
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, ":", tcell.ModNone)); !result.Handled {
+		t.Fatal("HandleKeyResult(:).Handled = false, want true")
+	}
+	for _, r := range "next file" {
+		pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, string(r), tcell.ModNone))
+	}
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyEnter, "", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(Enter).Handled = false, want true")
+	}
+	if result.Quit {
+		t.Fatal("HandleKeyResult(Enter).Quit = true, want false")
+	}
+	if !handled {
+		t.Fatal("CommandHandler was not called")
+	}
+
+	screen := newPagerMockScreen(t, 30, 2)
+	defer screen.Fini()
+	pager.Draw(screen)
+	if got := pagerRowString(screen, 1, 30); !strings.Contains(got, "advanced") {
+		t.Fatalf("status line = %q, want message", got)
+	}
+}
+
+func TestPagerCommandHandlerCanKeepPromptOpen(t *testing.T) {
+	pager := New(Config{
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		ShowStatus: true,
+		CommandHandler: func(cmd Command) CommandResult {
+			return CommandResult{
+				Handled:    true,
+				Message:    "need more",
+				KeepPrompt: true,
+			}
+		},
+	})
+	pager.SetSize(30, 2)
+	if err := pager.AppendString("alpha\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, ":", tcell.ModNone))
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "n", tcell.ModNone))
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyEnter, "", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(Enter).Handled = false, want true")
+	}
+	if result.Quit {
+		t.Fatal("HandleKeyResult(Enter).Quit = true, want false")
+	}
+
+	screen := newPagerMockScreen(t, 30, 2)
+	defer screen.Fini()
+	pager.Draw(screen)
+	if got := pagerRowString(screen, 1, 30); !strings.Contains(got, ":n") {
+		t.Fatalf("prompt line = %q, want command prompt to remain open", got)
+	}
+}
+
+func TestPagerCommandHandlerCanRequestQuit(t *testing.T) {
+	pager := New(Config{
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		ShowStatus: true,
+		CommandHandler: func(cmd Command) CommandResult {
+			return CommandResult{Handled: true, Quit: true}
+		},
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, ":", tcell.ModNone))
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "q", tcell.ModNone))
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyEnter, "", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(Enter).Handled = false, want true")
+	}
+	if !result.Quit {
+		t.Fatal("HandleKeyResult(Enter).Quit = false, want true")
+	}
+}
+
+func TestPagerBuiltInCommandWinsBeforeCommandHandler(t *testing.T) {
+	handled := false
+	pager := New(Config{
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		ShowStatus: true,
+		CommandHandler: func(cmd Command) CommandResult {
+			handled = true
+			return CommandResult{Handled: true, Message: "override"}
+		},
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\ngamma\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, ":", tcell.ModNone))
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "2", tcell.ModNone))
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyEnter, "", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(Enter).Handled = false, want true")
+	}
+	if handled {
+		t.Fatal("CommandHandler was called for built-in line jump")
+	}
+	if got, want := pager.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row = %d, want %d", got, want)
 	}
 }
 

@@ -255,24 +255,29 @@ func (v *Viewer) cancelPrompt() {
 	v.prompt = nil
 }
 
-func (v *Viewer) commitPrompt() {
+func (v *Viewer) commitPrompt() KeyResult {
 	if v.prompt == nil {
-		return
+		return KeyResult{}
 	}
 
 	text := string(v.prompt.buffer)
 	commit := true
+	quit := false
 	switch v.prompt.kind {
 	case promptSearchForward:
 		commit = v.commitPromptSearch(text, true)
 	case promptSearchBackward:
 		commit = v.commitPromptSearch(text, false)
 	case promptCommand:
-		v.runCommand(text)
+		commit, quit = v.runCommand(text)
 	}
 	if commit {
 		v.cancelPrompt()
 	}
+	if quit {
+		return KeyResult{Handled: true, Quit: true}
+	}
+	return KeyResult{Handled: true}
 }
 
 func (v *Viewer) commitPromptSearch(text string, forward bool) bool {
@@ -514,22 +519,34 @@ func (v *Viewer) revealMatchHorizontally(match searchMatch) {
 	v.relayout()
 }
 
-func (v *Viewer) runCommand(text string) {
+func (v *Viewer) runCommand(text string) (commit bool, quit bool) {
 	text = strings.TrimSpace(text)
 	if text == "" {
-		return
+		return true, false
 	}
 
 	if v.runSetCommand(text) {
-		return
+		return true, false
 	}
 
 	lineNumber, err := strconv.Atoi(text)
-	if err != nil {
-		v.message = v.text.CommandUnknown(text)
-		return
+	if err == nil {
+		v.goToLine(lineNumber)
+		return true, false
 	}
-	v.goToLine(lineNumber)
+
+	if v.cfg.CommandHandler != nil {
+		result := v.cfg.CommandHandler(parseCommand(text))
+		if result.Handled {
+			if result.Message != "" {
+				v.message = result.Message
+			}
+			return !result.KeepPrompt, result.Quit
+		}
+	}
+
+	v.message = v.text.CommandUnknown(text)
+	return true, false
 }
 
 func (v *Viewer) runSetCommand(text string) bool {

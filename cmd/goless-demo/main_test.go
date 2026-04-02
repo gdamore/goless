@@ -116,3 +116,17 @@ func TestDemoHyperlinkHandler(t *testing.T) {
 		t.Fatal("demo live hyperlink handler left link inert")
 	}
 }
+
+func TestDemoCommandHandler(t *testing.T) {
+	handler := demoCommandHandler()
+
+	if result := handler(goless.Command{Name: "quit"}); !result.Handled || !result.Quit {
+		t.Fatalf("quit command result = %+v, want handled quit", result)
+	}
+	if result := handler(goless.Command{Name: "q"}); !result.Handled || !result.Quit {
+		t.Fatalf("q command result = %+v, want handled quit", result)
+	}
+	if result := handler(goless.Command{Name: "next"}); result.Handled || result.Quit {
+		t.Fatalf("next command result = %+v, want unhandled", result)
+	}
+}
