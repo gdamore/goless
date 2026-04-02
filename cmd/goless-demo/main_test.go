@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/gdamore/goless"
@@ -117,8 +118,13 @@ func TestDemoHyperlinkHandler(t *testing.T) {
 	}
 }
 
-func TestDemoCommandHandler(t *testing.T) {
-	handler := demoCommandHandler()
+func TestDemoSessionCommandHandler(t *testing.T) {
+	session := newDemoSession([]string{"one.txt", "two.txt"}, demoStartup{})
+	reloads := 0
+	handler := session.commandHandler(func() error {
+		reloads++
+		return nil
+	})
 
 	if result := handler(goless.Command{Name: "quit"}); !result.Handled || !result.Quit {
 		t.Fatalf("quit command result = %+v, want handled quit", result)
@@ -126,8 +132,64 @@ func TestDemoCommandHandler(t *testing.T) {
 	if result := handler(goless.Command{Name: "q"}); !result.Handled || !result.Quit {
 		t.Fatalf("q command result = %+v, want handled quit", result)
 	}
-	if result := handler(goless.Command{Name: "next"}); result.Handled || result.Quit {
-		t.Fatalf("next command result = %+v, want unhandled", result)
+
+	result := handler(goless.Command{Name: "next"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("next command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "two.txt"; got != want {
+		t.Fatalf("next command message = %q, want %q", got, want)
+	}
+	if got, want := session.currentFile(), "two.txt"; got != want {
+		t.Fatalf("current file after next = %q, want %q", got, want)
+	}
+	if got, want := reloads, 1; got != want {
+		t.Fatalf("reload count after next = %d, want %d", got, want)
+	}
+
+	result = handler(goless.Command{Name: "next"})
+	if !result.Handled || result.Message == "" {
+		t.Fatalf("boundary next command result = %+v, want handled message", result)
+	}
+	if got, want := reloads, 1; got != want {
+		t.Fatalf("reload count after boundary next = %d, want %d", got, want)
+	}
+
+	result = handler(goless.Command{Name: "prev"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("prev command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "one.txt"; got != want {
+		t.Fatalf("prev command message = %q, want %q", got, want)
+	}
+	if got, want := session.currentFile(), "one.txt"; got != want {
+		t.Fatalf("current file after prev = %q, want %q", got, want)
+	}
+	if got, want := reloads, 2; got != want {
+		t.Fatalf("reload count after prev = %d, want %d", got, want)
+	}
+
+	result = handler(goless.Command{Name: "bogus"})
+	if result.Handled || result.Quit {
+		t.Fatalf("bogus command result = %+v, want unhandled", result)
+	}
+}
+
+func TestDemoSessionCommandHandlerReloadFailureRestoresIndex(t *testing.T) {
+	session := newDemoSession([]string{"one.txt", "two.txt"}, demoStartup{})
+	handler := session.commandHandler(func() error {
+		return fmt.Errorf("reload failed")
+	})
+
+	result := handler(goless.Command{Name: "next"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("next command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "reload failed"; got != want {
+		t.Fatalf("next command message = %q, want %q", got, want)
+	}
+	if got, want := session.currentFile(), "one.txt"; got != want {
+		t.Fatalf("current file after failed reload = %q, want %q", got, want)
 	}
 }
 
@@ -137,22 +199,23 @@ func TestDemoInputs(t *testing.T) {
 		args      []string
 		wantLine  int
 		wantQuery string
-		wantFile  string
+		wantFiles []string
 		wantErr   bool
 	}{
 		{name: "none", args: nil},
-		{name: "file only", args: []string{"sample.txt"}, wantFile: "sample.txt"},
-		{name: "startup and file", args: []string{"+42", "sample.txt"}, wantLine: 42, wantFile: "sample.txt"},
-		{name: "startup search and file", args: []string{"+/needle", "sample.txt"}, wantQuery: "needle", wantFile: "sample.txt"},
-		{name: "startup with separator", args: []string{"+7", "--", "sample.txt"}, wantLine: 7, wantFile: "sample.txt"},
-		{name: "separator only", args: []string{"--", "sample.txt"}, wantFile: "sample.txt"},
+		{name: "file only", args: []string{"sample.txt"}, wantFiles: []string{"sample.txt"}},
+		{name: "multiple files", args: []string{"a.txt", "b.txt"}, wantFiles: []string{"a.txt", "b.txt"}},
+		{name: "startup only", args: []string{"+42"}, wantLine: 42},
+		{name: "startup and file", args: []string{"+42", "sample.txt"}, wantLine: 42, wantFiles: []string{"sample.txt"}},
+		{name: "startup search and file", args: []string{"+/needle", "sample.txt"}, wantQuery: "needle", wantFiles: []string{"sample.txt"}},
+		{name: "startup with separator", args: []string{"+7", "--", "sample.txt"}, wantLine: 7, wantFiles: []string{"sample.txt"}},
+		{name: "separator only", args: []string{"--", "sample.txt"}, wantFiles: []string{"sample.txt"}},
 		{name: "bad startup", args: []string{"+bogus"}, wantErr: true},
 		{name: "bad startup search", args: []string{"+/"}, wantErr: true},
-		{name: "too many args", args: []string{"+3", "a", "b"}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			startup, file, err := demoInputs(tt.args)
+			startup, files, err := demoInputs(tt.args)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("demoInputs(...) = nil error, want error")
@@ -168,8 +231,13 @@ func TestDemoInputs(t *testing.T) {
 			if got, want := startup.query, tt.wantQuery; got != want {
 				t.Fatalf("startup.query = %q, want %q", got, want)
 			}
-			if got, want := file, tt.wantFile; got != want {
-				t.Fatalf("file = %q, want %q", got, want)
+			if len(files) != len(tt.wantFiles) {
+				t.Fatalf("len(files) = %d, want %d", len(files), len(tt.wantFiles))
+			}
+			for i := range tt.wantFiles {
+				if got, want := files[i], tt.wantFiles[i]; got != want {
+					t.Fatalf("files[%d] = %q, want %q", i, got, want)
+				}
 			}
 		})
 	}
