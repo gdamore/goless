@@ -90,6 +90,16 @@ func TestLessKeyMapHalfPageMoves(t *testing.T) {
 	if got, want := v.Position().Row, 1; got != want {
 		t.Fatalf("Position().Row after Ctrl-U = %d, want %d", got, want)
 	}
+
+	v.HandleKey(keyKey(tcell.KeyCtrlD))
+	if got, want := v.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row after KeyCtrlD = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyCtrlU))
+	if got, want := v.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row after KeyCtrlU = %d, want %d", got, want)
+	}
 }
 
 func TestLessKeyMapHelpScrollsAndCloses(t *testing.T) {
@@ -1236,6 +1246,26 @@ func TestStatusTextPlacesPositionOnRight(t *testing.T) {
 	}
 }
 
+func TestStatusTextAndPositionAgreeWithFixedHeaders(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("h1\nh2\nbody1\nbody2\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true, HeaderLines: 2})
+	v.SetSize(20, 2)
+	v.relayout()
+
+	pos := v.Position()
+	if got, want := pos.Row, 1; got != want {
+		t.Fatalf("Position().Row with fixed headers filling viewport = %d, want %d", got, want)
+	}
+	_, rightText := v.statusText()
+	if !strings.Contains(rightText, "row 1/4") {
+		t.Fatalf("right status text = %q, want row indicator for first visible row", rightText)
+	}
+}
+
 func TestStatusTextUsesActiveSearchOverride(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("Beta\nbeta\n")); err != nil {
@@ -1829,6 +1859,33 @@ func TestDrawLineNumbersWithHeaderColumnsInSoftWrap(t *testing.T) {
 	}
 	if got := cellRune(screen, 0, 3); got != ' ' {
 		t.Fatalf("second continuation row gutter rune = %q, want space", got)
+	}
+}
+
+func TestLineNumberStyleAppliesToBlankGutterRows(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefghij\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	gutterBG := tcolor.NewRGBColor(0x11, 0x22, 0x33)
+	v := New(doc, Config{
+		TabWidth:    4,
+		WrapMode:    layout.SoftWrap,
+		LineNumbers: true,
+		Chrome: Chrome{
+			LineNumberStyle: tcell.StyleDefault.Background(gutterBG),
+		},
+	})
+	v.SetSize(6, 4)
+
+	_, screen := newMockScreen(t, 6, 4)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	_, style, _ := screen.Get(0, 1)
+	if got, want := style.GetBackground(), gutterBG; got != want {
+		t.Fatalf("continuation gutter background = %v, want %v", got, want)
 	}
 }
 

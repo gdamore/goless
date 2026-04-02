@@ -162,6 +162,7 @@ The main config knobs are:
 - `SearchMode`: `SearchSubstring`, `SearchWholeWord`, or `SearchRegex`
 - `LineNumbers`: enable an adaptive line-number gutter
 - `HeaderLines`: pin the first N logical lines at the top of the viewport
+- `HeaderColumns`: pin the first N display columns at the left edge of the viewport
 - `Theme`: remap content default colors and ANSI 0-15 without affecting chrome
 - `Visualization`: show tabs, line endings, carriage returns, and EOF with pager-added markers
 - `HyperlinkHandler`: inspect OSC 8 links, decide whether they go live,
@@ -175,8 +176,9 @@ The main config knobs are:
 - `Chrome.HeaderStyle`: optional style for fixed header rows and columns
 - `Text`: override help text, status text, prompt text, and UI strings
 
-`Pager.SetTheme`, `Pager.SetVisualization`, `Pager.SetHyperlinkHandler`, and
-`Pager.SetChrome` can update those settings on a running pager instance.
+`Pager.SetTheme`, `Pager.SetVisualization`, `Pager.SetHyperlinkHandler`,
+`Pager.SetChrome`, `Pager.SetHeaderLines`, and `Pager.SetHeaderColumns` can
+update those settings on a running pager instance.
 
 For OSC 8 specifically:
 
