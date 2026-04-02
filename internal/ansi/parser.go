@@ -230,7 +230,11 @@ func (p *Parser) stateOSC(b byte) {
 	case 0x9c:
 		handled := p.handlesOSC() && p.processOSC()
 		if p.showsUnsupportedSequences() && !handled {
-			p.emitEscapeVisible([]byte{0x1b, '\\'})
+			final := []byte{0x1b, '\\'}
+			if p.renderMode == RenderLiteral {
+				final = []byte{0x9c}
+			}
+			p.emitEscapeVisible(final)
 			return
 		}
 		p.buf.Reset()
@@ -259,7 +263,7 @@ func (p *Parser) stateStr(b byte) {
 	case 0x07, 0x9c:
 		if p.showsUnsupportedSequences() {
 			final := []byte{b}
-			if b == 0x9c {
+			if b == 0x9c && p.renderMode != RenderLiteral {
 				final = []byte{0x1b, '\\'}
 			}
 			p.emitEscapeVisible(final)
