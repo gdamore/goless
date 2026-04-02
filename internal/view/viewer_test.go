@@ -155,6 +155,58 @@ func TestSetNumbersCommand(t *testing.T) {
 	}
 }
 
+func TestSetHeadersCommand(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	v.HandleKey(keyRune(":"))
+	for _, s := range "set headers 1" {
+		v.HandleKey(keyRune(string(s)))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.HeaderLines(), 1; got != want {
+		t.Fatalf("HeaderLines after :set headers 1 = %d, want %d", got, want)
+	}
+}
+
+func TestSetHeadersCommandClearsPriorInvalidMessage(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	v.HandleKey(keyRune(":"))
+	for _, s := range "set header on" {
+		v.HandleKey(keyRune(string(s)))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+	if !strings.Contains(v.message, "set header on") {
+		t.Fatalf("message after invalid command = %q, want it to mention invalid command", v.message)
+	}
+
+	v.HandleKey(keyRune(":"))
+	for _, s := range "set headers on" {
+		v.HandleKey(keyRune(string(s)))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.HeaderLines(), 1; got != want {
+		t.Fatalf("HeaderLines after :set headers on = %d, want %d", got, want)
+	}
+	if strings.Contains(v.message, "set header on") {
+		t.Fatalf("message after valid command = %q, still mentions prior invalid command", v.message)
+	}
+}
+
 func TestKeyBindingMatchesRequireExactNoModifierByDefault(t *testing.T) {
 	binding := keyBinding{
 		key:    tcell.KeyRune,
@@ -1730,6 +1782,107 @@ func TestDrawLineNumbersBlankOnWrappedContinuationRows(t *testing.T) {
 	}
 	if got := cellRune(screen, 0, 1); got != ' ' {
 		t.Fatalf("continuation row gutter rune = %q, want space", got)
+	}
+}
+
+func TestHeaderLinesStayFixedInNoWrap(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("header\none\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, HeaderLines: 1})
+	v.SetSize(12, 3)
+	v.ScrollDown(1)
+
+	_, screen := newMockScreen(t, 12, 3)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got := screenRowString(screen, 0, 12); !strings.Contains(got, "header") {
+		t.Fatalf("top row = %q, want fixed header line", got)
+	}
+	if got := screenRowString(screen, 1, 12); !strings.Contains(got, "two") {
+		t.Fatalf("second row = %q, want scrolled body line", got)
+	}
+}
+
+func TestHeaderLinesStayFixedAcrossWrappedRows(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdef\none\ntwo\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.SoftWrap, HeaderLines: 1})
+	v.SetSize(4, 4)
+	v.ScrollDown(1)
+
+	_, screen := newMockScreen(t, 4, 4)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got := screenRowString(screen, 0, 4); got != "abcd" {
+		t.Fatalf("first wrapped header row = %q, want %q", got, "abcd")
+	}
+	if got := screenRowString(screen, 1, 4); got != "ef  " {
+		t.Fatalf("second wrapped header row = %q, want %q", got, "ef  ")
+	}
+}
+
+func TestHeaderStyleAppliesToFixedRows(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("header\nbody\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	headerBG := tcolor.NewRGBColor(0xaa, 0xbb, 0xcc)
+	v := New(doc, Config{
+		TabWidth:    4,
+		WrapMode:    layout.NoWrap,
+		HeaderLines: 1,
+		Chrome: Chrome{
+			HeaderStyle: tcell.StyleDefault.Background(headerBG).Bold(true),
+		},
+	})
+	v.SetSize(10, 3)
+
+	_, screen := newMockScreen(t, 10, 3)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	_, headerStyle, _ := screen.Get(0, 0)
+	if got, want := headerStyle.GetBackground(), headerBG; got != want {
+		t.Fatalf("header background = %v, want %v", got, want)
+	}
+	if !headerStyle.HasBold() {
+		t.Fatal("header style should be bold")
+	}
+	_, bodyStyle, _ := screen.Get(0, 1)
+	if got, want := bodyStyle.GetBackground(), tcolor.Default; got != want {
+		t.Fatalf("body background = %v, want %v", got, want)
+	}
+}
+
+func TestDefaultHeaderStyleIsBold(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("header\nbody\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{
+		TabWidth:    4,
+		WrapMode:    layout.NoWrap,
+		HeaderLines: 1,
+	})
+	v.SetSize(10, 3)
+
+	_, screen := newMockScreen(t, 10, 3)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	_, headerStyle, _ := screen.Get(0, 0)
+	if !headerStyle.HasBold() {
+		t.Fatal("default header style should be bold")
 	}
 }
 

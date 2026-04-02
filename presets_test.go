@@ -28,8 +28,11 @@ func TestDarkPresetUsesSolarizedDarkDefaults(t *testing.T) {
 	if got, want := DarkPreset.Chrome.StatusStyle.GetBackground(), DarkPreset.Theme.DefaultBG; got != want {
 		t.Fatalf("DarkPreset.Chrome.StatusStyle background = %v, want %v", got, want)
 	}
-	if got, want := DarkPreset.Chrome.LineNumberStyle.GetBackground(), DarkPreset.Theme.DefaultBG; got != want {
-		t.Fatalf("DarkPreset.Chrome.LineNumberStyle background = %v, want %v", got, want)
+	if got, want := DarkPreset.Chrome.HeaderStyle.GetBackground(), rgb(0x07, 0x36, 0x42); got != want {
+		t.Fatalf("DarkPreset.Chrome.HeaderStyle background = %v, want %v", got, want)
+	}
+	if !DarkPreset.Chrome.HeaderStyle.HasBold() {
+		t.Fatal("DarkPreset.Chrome.HeaderStyle should be bold")
 	}
 	if got, want := DarkPreset.Chrome.PromptStyle.GetBackground(), DarkPreset.Theme.DefaultBG; got != want {
 		t.Fatalf("DarkPreset.Chrome.PromptStyle background = %v, want %v", got, want)
@@ -52,8 +55,11 @@ func TestLightPresetUsesSolarizedLightDefaults(t *testing.T) {
 	if got, want := LightPreset.Chrome.TitleStyle.GetBackground(), rgb(0xfd, 0xf6, 0xe3); got != want {
 		t.Fatalf("LightPreset.Chrome.TitleStyle background = %v, want %v", got, want)
 	}
-	if got, want := LightPreset.Chrome.LineNumberStyle.GetBackground(), rgb(0xfd, 0xf6, 0xe3); got != want {
-		t.Fatalf("LightPreset.Chrome.LineNumberStyle background = %v, want %v", got, want)
+	if got, want := LightPreset.Chrome.HeaderStyle.GetBackground(), rgb(0xee, 0xe8, 0xd5); got != want {
+		t.Fatalf("LightPreset.Chrome.HeaderStyle background = %v, want %v", got, want)
+	}
+	if !LightPreset.Chrome.HeaderStyle.HasBold() {
+		t.Fatal("LightPreset.Chrome.HeaderStyle should be bold")
 	}
 }
 
@@ -66,6 +72,9 @@ func TestPlainPresetUsesMonochromePalette(t *testing.T) {
 	}
 	if got, want := PlainPreset.Chrome.TitleAlign, TitleAlignLeft; got != want {
 		t.Fatalf("PlainPreset.Chrome.TitleAlign = %v, want %v", got, want)
+	}
+	if !PlainPreset.Chrome.HeaderStyle.HasBold() {
+		t.Fatal("PlainPreset.Chrome.HeaderStyle should be bold")
 	}
 }
 
@@ -81,5 +90,8 @@ func TestPrettyPresetUsesRoundedDecorativeChrome(t *testing.T) {
 	}
 	if !PrettyPreset.Chrome.TitleStyle.HasBold() {
 		t.Fatal("PrettyPreset.Chrome.TitleStyle should be bold")
+	}
+	if !PrettyPreset.Chrome.HeaderStyle.HasBold() {
+		t.Fatal("PrettyPreset.Chrome.HeaderStyle should be bold")
 	}
 }

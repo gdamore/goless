@@ -620,6 +620,29 @@ func (v *Viewer) runSetCommand(text string) bool {
 			v.message = v.text.CommandUnknown(text)
 			return true
 		}
+		v.message = ""
+		return true
+	case "headers", "headerlines":
+		switch fields[2] {
+		case "on", "true":
+			v.SetHeaderLines(1)
+		case "off", "false":
+			v.SetHeaderLines(0)
+		case "toggle":
+			if v.HeaderLines() > 0 {
+				v.SetHeaderLines(0)
+			} else {
+				v.SetHeaderLines(1)
+			}
+		default:
+			count, err := strconv.Atoi(fields[2])
+			if err != nil || count < 0 {
+				v.message = v.text.CommandUnknown(text)
+				return true
+			}
+			v.SetHeaderLines(count)
+		}
+		v.message = ""
 		return true
 	default:
 		return false

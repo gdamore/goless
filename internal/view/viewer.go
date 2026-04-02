@@ -23,6 +23,7 @@ type Config struct {
 	SearchCase       SearchCaseMode
 	SearchMode       SearchMode
 	LineNumbers      bool
+	HeaderLines      int
 	Theme            Theme
 	Visualization    Visualization
 	HyperlinkHandler HyperlinkHandler
@@ -116,6 +117,31 @@ func (v *Viewer) ToggleLineNumbers() {
 // LineNumbers reports whether the adaptive line-number gutter is enabled.
 func (v *Viewer) LineNumbers() bool {
 	return v.cfg.LineNumbers
+}
+
+// SetHeaderLines updates how many leading logical lines stay fixed at the top of the viewport.
+func (v *Viewer) SetHeaderLines(count int) {
+	if count < 0 {
+		count = 0
+	}
+	if v.cfg.HeaderLines == count {
+		return
+	}
+	v.ensureLayout()
+	anchor := v.firstVisibleAnchor()
+	v.cfg.HeaderLines = count
+	v.relayout()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+		return
+	}
+	v.restoreAnchor(anchor)
+}
+
+// HeaderLines reports how many leading logical lines stay fixed at the top of the viewport.
+func (v *Viewer) HeaderLines() int {
+	return v.cfg.HeaderLines
 }
 
 // SetVisualization updates how hidden structure markers are drawn.
@@ -299,11 +325,11 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 	v.drawLineNumberGutter(screen)
 	lineHyperlinks := v.resolveVisibleHyperlinks()
 	for y := 0; y < bodyHeight; y++ {
-		rowIndex := v.rowOffset + y
-		if rowIndex >= len(v.layout.Rows) {
+		rowIndex, header, ok := v.visibleLayoutRowAt(y)
+		if !ok {
 			break
 		}
-		v.drawRow(screen, bodyX, bodyY+y, v.layout.Rows[rowIndex], lineHyperlinks)
+		v.drawRow(screen, bodyX, bodyY+y, v.layout.Rows[rowIndex], header, lineHyperlinks)
 	}
 
 	if v.height > 0 {
@@ -438,25 +464,25 @@ func (v *Viewer) ScrollLeft(n int) {
 
 // PageDown moves the viewport down by roughly one page.
 func (v *Viewer) PageDown() {
-	step := max(v.bodyHeight()-1, 1)
+	step := max(v.scrollBodyHeight()-1, 1)
 	v.ScrollDown(step)
 }
 
 // HalfPageDown moves the viewport down by roughly half a page.
 func (v *Viewer) HalfPageDown() {
-	step := max(v.bodyHeight()/2, 1)
+	step := max(v.scrollBodyHeight()/2, 1)
 	v.ScrollDown(step)
 }
 
 // PageUp moves the viewport up by roughly one page.
 func (v *Viewer) PageUp() {
-	step := max(v.bodyHeight()-1, 1)
+	step := max(v.scrollBodyHeight()-1, 1)
 	v.ScrollUp(step)
 }
 
 // HalfPageUp moves the viewport up by roughly half a page.
 func (v *Viewer) HalfPageUp() {
-	step := max(v.bodyHeight()/2, 1)
+	step := max(v.scrollBodyHeight()/2, 1)
 	v.ScrollUp(step)
 }
 
@@ -478,7 +504,7 @@ func (v *Viewer) GoBottom() {
 // GoPercent moves the viewport so the first visible row is near the requested percentage.
 func (v *Viewer) GoPercent(percent int) bool {
 	v.ensureLayout()
-	if len(v.layout.Rows) == 0 {
+	if v.scrollableRowCount() == 0 {
 		return false
 	}
 	if percent < 0 {
@@ -488,7 +514,7 @@ func (v *Viewer) GoPercent(percent int) bool {
 		percent = 100
 	}
 	v.follow = false
-	v.rowOffset = ((len(v.layout.Rows) - 1) * percent) / 100
+	v.rowOffset = ((v.scrollableRowCount() - 1) * percent) / 100
 	v.clampOffsets()
 	return true
 }
@@ -510,7 +536,7 @@ func (v *Viewer) Position() Position {
 
 	row := 0
 	if len(v.layout.Rows) > 0 {
-		row = min(v.rowOffset+1, len(v.layout.Rows))
+		row = min(v.scrollableRowStartIndex()+v.rowOffset+1, len(v.layout.Rows))
 	}
 	return Position{
 		Row:    row,
@@ -560,7 +586,10 @@ func (v *Viewer) clampOffsets() {
 }
 
 func (v *Viewer) maxRowOffset() int {
-	return max(len(v.layout.Rows)-v.bodyHeight(), 0)
+	if v.scrollBodyHeight() <= 0 {
+		return 0
+	}
+	return max(v.scrollableRowCount()-v.scrollBodyHeight(), 0)
 }
 
 func (v *Viewer) maxColOffset() int {
@@ -583,19 +612,64 @@ func (v *Viewer) bodyHeight() int {
 	return h
 }
 
+func (v *Viewer) headerLineCount() int {
+	return min(max(v.cfg.HeaderLines, 0), len(v.lines))
+}
+
+func (v *Viewer) headerRowCount() int {
+	count := 0
+	for _, row := range v.layout.Rows {
+		if row.LineIndex >= v.headerLineCount() {
+			break
+		}
+		count++
+	}
+	return count
+}
+
+func (v *Viewer) visibleHeaderRowCount() int {
+	return min(v.headerRowCount(), v.bodyHeight())
+}
+
+func (v *Viewer) scrollBodyHeight() int {
+	return max(v.bodyHeight()-v.visibleHeaderRowCount(), 0)
+}
+
+func (v *Viewer) scrollableRowStartIndex() int {
+	return v.headerRowCount()
+}
+
+func (v *Viewer) scrollableRowCount() int {
+	return max(len(v.layout.Rows)-v.scrollableRowStartIndex(), 0)
+}
+
+func (v *Viewer) visibleLayoutRowAt(y int) (rowIndex int, header bool, ok bool) {
+	if y < 0 || y >= v.bodyHeight() {
+		return 0, false, false
+	}
+	headerRows := v.visibleHeaderRowCount()
+	if y < headerRows {
+		rowIndex = y
+		return rowIndex, true, rowIndex < len(v.layout.Rows)
+	}
+	rowIndex = v.scrollableRowStartIndex() + v.rowOffset + (y - headerRows)
+	if rowIndex < 0 || rowIndex >= len(v.layout.Rows) {
+		return 0, false, false
+	}
+	return rowIndex, false, true
+}
+
 func (v *Viewer) firstVisibleAnchor() layout.Anchor {
-	if len(v.layout.Rows) == 0 {
+	rowIndex := v.scrollableRowStartIndex() + v.rowOffset
+	if len(v.layout.Rows) == 0 || rowIndex < 0 || rowIndex >= len(v.layout.Rows) {
 		return layout.Anchor{}
 	}
-	if v.rowOffset < 0 || v.rowOffset >= len(v.layout.Rows) {
-		return layout.Anchor{}
-	}
-	return v.layout.AnchorForRow(v.rowOffset)
+	return v.layout.AnchorForRow(rowIndex)
 }
 
 func (v *Viewer) restoreAnchor(anchor layout.Anchor) {
 	if rowIndex := v.layout.RowIndexForAnchor(anchor); rowIndex >= 0 {
-		v.rowOffset = rowIndex
+		v.rowOffset = max(rowIndex-v.scrollableRowStartIndex(), 0)
 	}
 	v.clampOffsets()
 }
@@ -607,21 +681,26 @@ func (v *Viewer) revealAnchor(anchor layout.Anchor) {
 	}
 
 	bodyHeight := max(v.bodyHeight(), 1)
+	headerRows := v.visibleHeaderRowCount()
+	scrollBodyHeight := max(bodyHeight-headerRows, 1)
+	scrollRowIndex := rowIndex - v.scrollableRowStartIndex()
 	switch {
-	case rowIndex < v.rowOffset:
-		v.rowOffset = rowIndex
-	case rowIndex >= v.rowOffset+bodyHeight:
-		v.rowOffset = rowIndex - bodyHeight + 1
+	case scrollRowIndex < v.rowOffset:
+		v.rowOffset = scrollRowIndex
+	case scrollRowIndex >= v.rowOffset+scrollBodyHeight:
+		v.rowOffset = scrollRowIndex - scrollBodyHeight + 1
 	}
 	v.clampOffsets()
 }
 
-func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow, lineHyperlinks map[int]rowHyperlinks) {
+func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow, header bool, lineHyperlinks map[int]rowHyperlinks) {
 	if row.LineIndex < 0 || row.LineIndex >= len(v.lines) {
 		return
 	}
 	line := v.lines[row.LineIndex]
 	hyperlinks := lineHyperlinks[row.LineIndex]
+	rowStyle := v.rowBaseStyle(header)
+	screen.PutStrStyled(baseX, y, padRightToWidth("", v.contentWidth()), rowStyle)
 	for _, segment := range row.Segments {
 		if segment.LogicalGraphemeIndex < 0 || segment.LogicalGraphemeIndex >= len(line.Graphemes) {
 			continue
@@ -629,6 +708,9 @@ func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow
 		grapheme := line.Graphemes[segment.LogicalGraphemeIndex]
 		ansiStyle := styleForGrapheme(line, grapheme.RuneStart)
 		cellStyle := v.toTCellStyle(ansiStyle)
+		if header {
+			cellStyle = applyChromeStyle(cellStyle, v.cfg.Chrome.HeaderStyle)
+		}
 		if hyperlink, ok := hyperlinks.byGrapheme[segment.LogicalGraphemeIndex]; ok {
 			cellStyle = applyHyperlinkDecisionStyle(cellStyle, hyperlink.decision, hyperlink.span)
 		}
@@ -659,7 +741,7 @@ func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow
 
 		screen.Put(x, y, grapheme.Text, cellStyle)
 	}
-	v.drawTrailingMarkers(screen, baseX, y, row, line)
+	v.drawTrailingMarkers(screen, baseX, y, row, line, rowStyle, header)
 }
 
 type hyperlinkSpan struct {
@@ -689,8 +771,8 @@ func (v *Viewer) resolveVisibleHyperlinks() map[int]rowHyperlinks {
 	result := make(map[int]rowHyperlinks)
 	bodyHeight := max(v.bodyHeight(), 0)
 	for y := 0; y < bodyHeight; y++ {
-		rowIndex := v.rowOffset + y
-		if rowIndex >= len(v.layout.Rows) {
+		rowIndex, _, ok := v.visibleLayoutRowAt(y)
+		if !ok {
 			break
 		}
 		lineIndex := v.layout.Rows[rowIndex].LineIndex
@@ -802,7 +884,7 @@ func (v *Viewer) visualizedSegment(row layout.VisualRow, line model.Line, segmen
 	return "", tcell.StyleDefault, false
 }
 
-func (v *Viewer) drawTrailingMarkers(screen tcell.Screen, baseX, y int, row layout.VisualRow, line model.Line) {
+func (v *Viewer) drawTrailingMarkers(screen tcell.Screen, baseX, y int, row layout.VisualRow, line model.Line, rowStyle tcell.Style, header bool) {
 	markers := v.trailingMarkers(row, line)
 	if markers == "" {
 		return
@@ -822,7 +904,7 @@ func (v *Viewer) drawTrailingMarkers(screen tcell.Screen, baseX, y int, row layo
 	if markers == "" {
 		return
 	}
-	style := v.visualizationStyle(v.toTCellStyle(ansi.DefaultStyle()))
+	style := v.visualizationStyle(rowStyle)
 	screen.PutStrStyled(baseX+start, y, truncateToWidth(markers, width-start), style)
 }
 
@@ -956,13 +1038,17 @@ func (v *Viewer) drawLineNumberGutter(screen tcell.Screen) {
 		return
 	}
 
-	fillStyle, textStyle := v.lineNumberStyles()
+	fillStyle, _ := v.lineNumberStyles()
 	blank := padRightToWidth("", gutterWidth)
 	for y := 0; y < gutterHeight; y++ {
-		screen.PutStrStyled(gutterX, gutterY+y, blank, fillStyle)
-
-		rowIndex := v.rowOffset + y
-		if rowIndex >= len(v.layout.Rows) {
+		rowIndex, header, ok := v.visibleLayoutRowAt(y)
+		rowFillStyle := fillStyle
+		if header {
+			rowFillStyle = applyChromeStyle(rowFillStyle, v.cfg.Chrome.HeaderStyle)
+		}
+		rowTextStyle := applyChromeStyle(rowFillStyle, v.cfg.Chrome.LineNumberStyle)
+		screen.PutStrStyled(gutterX, gutterY+y, blank, rowFillStyle)
+		if !ok {
 			continue
 		}
 		row := v.layout.Rows[rowIndex]
@@ -970,13 +1056,21 @@ func (v *Viewer) drawLineNumberGutter(screen tcell.Screen) {
 			continue
 		}
 		label := padRightToWidth(fmt.Sprintf("%*d", gutterWidth-1, row.LineIndex+1), gutterWidth)
-		screen.PutStrStyled(gutterX, gutterY+y, label, textStyle)
+		screen.PutStrStyled(gutterX, gutterY+y, label, rowTextStyle)
 	}
 }
 
 func (v *Viewer) lineNumberStyles() (fill, text tcell.Style) {
 	base := v.toTCellStyle(ansi.DefaultStyle())
 	return base, applyChromeStyle(base, v.cfg.Chrome.LineNumberStyle)
+}
+
+func (v *Viewer) rowBaseStyle(header bool) tcell.Style {
+	style := v.toTCellStyle(ansi.DefaultStyle())
+	if header {
+		style = applyChromeStyle(style, v.cfg.Chrome.HeaderStyle)
+	}
+	return style
 }
 
 func applyChromeStyle(base, overlay tcell.Style) tcell.Style {
