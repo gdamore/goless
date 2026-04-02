@@ -182,7 +182,7 @@ func TestParserLiteralShowsRawC0ControlsVisibly(t *testing.T) {
 	recv := &recordReceiver{}
 	p := NewParserWithMode(recv, RenderLiteral)
 
-	input := []byte{'A', '\v', '\f', 0x07, 'B'}
+	input := []byte{'A', '\v', '\f', 0x07, 0x7f, 'B'}
 	if _, err := p.Write(input); err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestParserLiteralShowsRawC0ControlsVisibly(t *testing.T) {
 			text.WriteRune(ev.r)
 		}
 	}
-	if got, want := text.String(), "A␋␌␇B"; got != want {
+	if got, want := text.String(), "A␋␌␇␡B"; got != want {
 		t.Fatalf("text = %q, want %q", got, want)
 	}
 }
@@ -202,7 +202,7 @@ func TestParserHybridSuppressesRawC0Controls(t *testing.T) {
 	recv := &recordReceiver{}
 	p := NewParserWithMode(recv, RenderHybrid)
 
-	input := []byte{'A', '\v', '\f', 0x07, 'B'}
+	input := []byte{'A', '\v', '\f', 0x07, 0x7f, 'B'}
 	if _, err := p.Write(input); err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
@@ -217,6 +217,26 @@ func TestParserHybridSuppressesRawC0Controls(t *testing.T) {
 		}
 	}
 	if got, want := text.String(), "AB"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+}
+
+func TestParserLiteralShowsC1STTerminatorAsHexByte(t *testing.T) {
+	recv := &recordReceiver{}
+	p := NewParserWithMode(recv, RenderLiteral)
+
+	input := []byte{'x', 0x1b, ']', '0', ';', 't', 'i', 't', 'l', 'e', 0x9c, 'y'}
+	if _, err := p.Write(input); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	var text strings.Builder
+	for _, ev := range recv.events {
+		if ev.kind == "print" {
+			text.WriteRune(ev.r)
+		}
+	}
+	if got, want := text.String(), "x␛]0;title\\x9cy"; got != want {
 		t.Fatalf("text = %q, want %q", got, want)
 	}
 }
