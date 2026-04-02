@@ -233,7 +233,7 @@ func demoHyperlinkHandler(live bool) goless.HyperlinkHandler {
 		return goless.HyperlinkDecision{
 			Style: info.Style.
 				Foreground(tcolor.Blue).
-				Underline(true),
+				Underline(tcell.UnderlineStyleSolid),
 			Live:     live,
 			StyleSet: true,
 		}
