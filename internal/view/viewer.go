@@ -61,6 +61,8 @@ type Viewer struct {
 type KeyResult struct {
 	Handled bool
 	Quit    bool
+	Action  KeyAction
+	Context KeyContext
 }
 
 // Position summarizes the current visible viewport state.
@@ -389,9 +391,10 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 		return v.handlePromptKey(ev)
 	}
 
-	switch v.keys.normalAction(ev) {
+	a := v.keys.normalAction(ev)
+	switch a {
 	case actionQuit:
-		return KeyResult{Handled: true, Quit: true}
+		return KeyResult{Handled: true, Quit: true, Action: KeyActionQuit, Context: KeyContextNormal}
 	case actionScrollUp:
 		v.ScrollUp(1)
 	case actionScrollDown:
@@ -442,7 +445,7 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 		return KeyResult{}
 	}
 
-	return KeyResult{Handled: true}
+	return KeyResult{Handled: true, Action: KeyAction(a), Context: KeyContextNormal}
 }
 
 // ToggleWrap switches between horizontal scrolling and soft wrap modes.
@@ -457,9 +460,12 @@ func (v *Viewer) ToggleWrap() {
 // ScrollDown moves the viewport down.
 func (v *Viewer) ScrollDown(n int) {
 	v.ensureLayout()
+	wasFollowing := v.follow
 	v.rowOffset += max(n, 0)
 	v.clampOffsets()
-	v.updateFollowAtBottom()
+	if wasFollowing {
+		v.updateFollowAtBottom()
+	}
 }
 
 // ScrollUp moves the viewport up.
@@ -556,6 +562,16 @@ func (v *Viewer) Follow() {
 // Following reports whether follow mode is active.
 func (v *Viewer) Following() bool {
 	return v.follow
+}
+
+// EOFVisible reports whether the last layout row is currently visible.
+func (v *Viewer) EOFVisible() bool {
+	v.ensureLayout()
+	if len(v.layout.Rows) == 0 {
+		return true
+	}
+	rowIndex, ok := v.lastVisibleLayoutRow()
+	return ok && rowIndex >= len(v.layout.Rows)-1
 }
 
 // Position reports the current visible row, total row count, and horizontal offset.
@@ -700,6 +716,16 @@ func (v *Viewer) visibleLayoutRowAt(y int) (rowIndex int, header bool, ok bool) 
 		return 0, false, false
 	}
 	return rowIndex, false, true
+}
+
+func (v *Viewer) lastVisibleLayoutRow() (int, bool) {
+	for y := v.bodyHeight() - 1; y >= 0; y-- {
+		rowIndex, _, ok := v.visibleLayoutRowAt(y)
+		if ok {
+			return rowIndex, true
+		}
+	}
+	return 0, false
 }
 
 func (v *Viewer) firstVisibleAnchor() layout.Anchor {
@@ -1433,18 +1459,19 @@ func (v *Viewer) helpFrameTitle() string {
 }
 
 func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
-	switch v.keys.helpAction(ev) {
+	a := v.keys.helpAction(ev)
+	switch a {
 	case actionQuit:
-		return KeyResult{Handled: true, Quit: true}
+		return KeyResult{Handled: true, Quit: true, Action: KeyActionQuit, Context: KeyContextHelp}
 	case actionToggleHelp:
 		v.toggleHelp()
-		return KeyResult{Handled: true}
+		return KeyResult{Handled: true, Action: KeyActionToggleHelp, Context: KeyContextHelp}
 	case actionCycleSearchCase:
 		v.CycleSearchCaseMode()
-		return KeyResult{Handled: true}
+		return KeyResult{Handled: true, Action: KeyActionCycleSearchCase, Context: KeyContextHelp}
 	case actionCycleSearchMode:
 		v.CycleSearchMode()
-		return KeyResult{Handled: true}
+		return KeyResult{Handled: true, Action: KeyActionCycleSearchMode, Context: KeyContextHelp}
 	case actionScrollUp:
 		v.helpOffset--
 	case actionScrollDown:
@@ -1465,7 +1492,7 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 		return KeyResult{}
 	}
 	v.clampHelpOffset()
-	return KeyResult{Handled: true}
+	return KeyResult{Handled: true, Action: KeyAction(a), Context: KeyContextHelp}
 }
 
 func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
@@ -1476,7 +1503,7 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 	switch ev.Key() {
 	case tcell.KeyEscape:
 		v.cancelPrompt()
-		return KeyResult{Handled: true}
+		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyEnter:
 		return v.commitPrompt()
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
@@ -1484,19 +1511,19 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 			v.prompt.buffer = v.prompt.buffer[:len(v.prompt.buffer)-1]
 		}
 		v.updatePromptPreview()
-		return KeyResult{Handled: true}
+		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyCtrlU:
 		if v.prompt != nil {
 			v.prompt.buffer = v.prompt.buffer[:0]
 		}
 		v.updatePromptPreview()
-		return KeyResult{Handled: true}
+		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyRune:
 		if v.prompt != nil {
 			v.prompt.buffer = append(v.prompt.buffer, []rune(ev.Str())...)
 		}
 		v.updatePromptPreview()
-		return KeyResult{Handled: true}
+		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	}
 	return KeyResult{}
 }
@@ -1504,13 +1531,13 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 func (v *Viewer) handlePromptMappedAction(a action) (KeyResult, bool) {
 	switch a {
 	case actionQuit:
-		return KeyResult{Handled: true, Quit: true}, true
+		return KeyResult{Handled: true, Quit: true, Action: KeyActionQuit, Context: KeyContextPrompt}, true
 	case actionCycleSearchCase:
 		v.CycleSearchCaseMode()
-		return KeyResult{Handled: true}, true
+		return KeyResult{Handled: true, Action: KeyActionCycleSearchCase, Context: KeyContextPrompt}, true
 	case actionCycleSearchMode:
 		v.CycleSearchMode()
-		return KeyResult{Handled: true}, true
+		return KeyResult{Handled: true, Action: KeyActionCycleSearchMode, Context: KeyContextPrompt}, true
 	default:
 		return KeyResult{}, false
 	}

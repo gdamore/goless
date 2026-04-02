@@ -1068,6 +1068,24 @@ func TestRefreshWithoutFollowKeepsViewportWhenAppended(t *testing.T) {
 	}
 }
 
+func TestScrollDownToBottomDoesNotEnableFollowMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.ScrollDown(10)
+
+	if v.Following() {
+		t.Fatalf("follow mode = true, want false")
+	}
+	if got, want := v.rowOffset, v.maxRowOffset(); got != want {
+		t.Fatalf("row offset after ScrollDown = %d, want %d", got, want)
+	}
+}
+
 func TestFollowKeyEnablesFollowMode(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {

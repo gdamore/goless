@@ -16,6 +16,14 @@ import (
 	tcolor "github.com/gdamore/tcell/v3/color"
 )
 
+type demoQuitAtEOFPolicy int
+
+const (
+	demoQuitAtEOFNever demoQuitAtEOFPolicy = iota
+	demoQuitAtEOFOnForwardEOF
+	demoQuitAtEOFWhenVisible
+)
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -28,16 +36,22 @@ func run() error {
 	var hidden bool
 	var liveLinks bool
 	var presetName string
+	var quitAtEOF bool
+	var quitAtEOFFirst bool
 	var renderName string
 	var title string
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-title text] [+line|+/pattern] [file ...]\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-e|-E] [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-title text] [+line|+/pattern] [file ...]\n")
 	}
+	flag.BoolVar(&quitAtEOF, "e", false, "quit on the first forward command at EOF")
+	flag.BoolVar(&quitAtEOFFirst, "E", false, "quit when EOF is already visible on screen")
 	flag.StringVar(&presetName, "preset", "none", "visual preset: none, dark, light, plain, pretty")
 	flag.StringVar(&chromeName, "chrome", "auto", "chrome override: auto, none, single, rounded")
 	flag.BoolVar(&hidden, "hidden", false, "show tabs, line endings, carriage returns, and EOF markers")
 	flag.BoolVar(&liveLinks, "live-links", false, "enable live OSC 8 hyperlinks in the demo")
+	flag.BoolVar(&quitAtEOF, "quit-at-eof", false, "long form of -e")
+	flag.BoolVar(&quitAtEOFFirst, "QUIT-AT-EOF", false, "long form of -E")
 	flag.StringVar(&renderName, "render", "hybrid", "render mode: hybrid, literal, presentation")
 	flag.StringVar(&title, "title", "", "frame title")
 	flag.Parse()
@@ -55,6 +69,7 @@ func run() error {
 		return err
 	}
 	session := newDemoSession(files, startup)
+	quitAtEOFPolicy := demoQuitAtEOFPolicyFromFlags(quitAtEOF, quitAtEOFFirst)
 	chromeCfg, err := demoChrome(chromeName, title, preset.Chrome)
 	if err != nil {
 		return err
@@ -64,7 +79,7 @@ func run() error {
 		return fmt.Errorf("stdin is a terminal; specify a file or pipe input")
 	}
 
-	screen, err := tcell.NewScreen()
+	screen, err := newDemoScreen(quitAtEOFPolicy)
 	if err != nil {
 		return err
 	}
@@ -121,6 +136,14 @@ func run() error {
 		go readIntoPager(pager, os.Stdin, screen.EventQ(), readResult)
 	}
 	pager.Draw(screen)
+	quit, err := handleDemoVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, readResult == nil, reloadCurrent)
+	if err != nil {
+		return err
+	}
+	pager.Draw(screen)
+	if quit {
+		return demoExit(screen, quitAtEOFPolicy)
+	}
 
 	for {
 		ev := <-screen.EventQ()
@@ -149,8 +172,33 @@ func run() error {
 				pager.SetVisualization(demoVisualization(hidden))
 				break
 			}
-			if pager.HandleKey(event) {
-				return nil
+			before := pager.Position()
+			beforeFollowing := pager.Following()
+			result := pager.HandleKeyResult(event)
+			if result.Quit {
+				return demoExit(screen, quitAtEOFPolicy)
+			}
+			quit, err := handleDemoVisibleEOFAction(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, result, readResult == nil, reloadCurrent)
+			if err != nil {
+				return err
+			}
+			pager.Draw(screen)
+			if quit {
+				return demoExit(screen, quitAtEOFPolicy)
+			}
+			if quit, err := applyDemoQuitAtEOF(
+				quitAtEOFPolicy,
+				session,
+				result,
+				readResult == nil,
+				beforeFollowing,
+				before,
+				pager.Position(),
+				reloadCurrent,
+			); err != nil {
+				return err
+			} else if quit {
+				return demoExit(screen, quitAtEOFPolicy)
 			}
 		case *tcell.EventInterrupt:
 			if readResult != nil {
@@ -161,12 +209,154 @@ func run() error {
 					}
 					applyStartupCommand(pager, startup)
 					readResult = nil
+					quit, err := handleDemoVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, true, reloadCurrent)
+					if err != nil {
+						return err
+					}
+					pager.Draw(screen)
+					if quit {
+						return demoExit(screen, quitAtEOFPolicy)
+					}
 				default:
 				}
 			}
 		}
 		pager.Draw(screen)
 	}
+}
+
+func demoQuitAtEOFPolicyFromFlags(quitAtEOF, quitAtEOFFirst bool) demoQuitAtEOFPolicy {
+	if quitAtEOFFirst {
+		return demoQuitAtEOFWhenVisible
+	}
+	if quitAtEOF {
+		return demoQuitAtEOFOnForwardEOF
+	}
+	return demoQuitAtEOFNever
+}
+
+func demoExit(screen tcell.Screen, policy demoQuitAtEOFPolicy) error {
+	if policy == demoQuitAtEOFWhenVisible {
+		clearDemoStatusLine(screen)
+	}
+	return nil
+}
+
+func clearDemoStatusLine(screen tcell.Screen) {
+	if screen == nil {
+		return
+	}
+	width, height := screen.Size()
+	if width <= 0 || height <= 0 {
+		return
+	}
+	y := height - 1
+	for x := 0; x < width; x++ {
+		screen.SetContent(x, y, ' ', nil, tcell.StyleDefault)
+	}
+	screen.Show()
+}
+
+func newDemoScreen(policy demoQuitAtEOFPolicy) (tcell.Screen, error) {
+	if policy == demoQuitAtEOFWhenVisible {
+		return tcell.NewTerminfoScreen(tcell.OptAltScreen(false))
+	}
+	return tcell.NewScreen()
+}
+
+func applyDemoQuitAtEOF(
+	policy demoQuitAtEOFPolicy,
+	session *demoSession,
+	result goless.KeyResult,
+	inputComplete bool,
+	following bool,
+	before goless.Position,
+	after goless.Position,
+	reload func() error,
+) (bool, error) {
+	if policy != demoQuitAtEOFOnForwardEOF || !inputComplete {
+		return false, nil
+	}
+	if result.Context != goless.NormalKeyContext || !result.Handled {
+		return false, nil
+	}
+	if following {
+		return false, nil
+	}
+	if !isDemoQuitAtEOFAction(result.Action) {
+		return false, nil
+	}
+	if demoPositionChanged(before, after) {
+		return false, nil
+	}
+	return advanceDemoSessionOrQuit(session, reload)
+}
+
+func isDemoQuitAtEOFAction(action goless.KeyAction) bool {
+	switch action {
+	case goless.KeyActionScrollDown, goless.KeyActionHalfPageDown, goless.KeyActionPageDown, goless.KeyActionGoBottom:
+		return true
+	default:
+		return false
+	}
+}
+
+func demoPositionChanged(before, after goless.Position) bool {
+	return before.Row != after.Row || before.Rows != after.Rows || before.Column != after.Column
+}
+
+func handleDemoVisibleEOFAction(
+	policy demoQuitAtEOFPolicy,
+	session *demoSession,
+	currentPager func() *goless.Pager,
+	result goless.KeyResult,
+	inputComplete bool,
+	reload func() error,
+) (bool, error) {
+	if policy != demoQuitAtEOFWhenVisible || !inputComplete {
+		return false, nil
+	}
+	if result.Context != goless.NormalKeyContext || !result.Handled || !isDemoQuitAtEOFAction(result.Action) {
+		return false, nil
+	}
+	return handleDemoVisibleEOF(policy, session, currentPager, inputComplete, reload)
+}
+
+func handleDemoVisibleEOF(
+	policy demoQuitAtEOFPolicy,
+	session *demoSession,
+	currentPager func() *goless.Pager,
+	inputComplete bool,
+	reload func() error,
+) (bool, error) {
+	pager := currentPager()
+	if policy != demoQuitAtEOFWhenVisible || !inputComplete || pager == nil || pager.Following() {
+		return false, nil
+	}
+	for pager.EOFVisible() {
+		quit, err := advanceDemoSessionOrQuit(session, reload)
+		if err != nil || quit {
+			return quit, err
+		}
+		pager = currentPager()
+		if pager == nil || pager.Following() {
+			return false, nil
+		}
+	}
+	return false, nil
+}
+
+func advanceDemoSessionOrQuit(session *demoSession, reload func() error) (bool, error) {
+	if session != nil && session.canNext() {
+		index := session.index
+		session.next()
+		if err := reload(); err != nil {
+			session.index = index
+			return false, err
+		}
+		return false, nil
+	}
+	return true, nil
 }
 
 func appendFromReader(pager *goless.Pager, r io.Reader, onChunk func()) error {

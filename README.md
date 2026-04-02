@@ -263,6 +263,8 @@ printf 'hello\n\033[31mworld\033[0m\n' | go run ./cmd/goless-demo
 
 Demo flags:
 
+- `-e` or `--quit-at-eof` to quit on the first forward command at EOF
+- `-E` or `--QUIT-AT-EOF` to quit when EOF is already visible on screen
 - `-preset none|dark|light|plain|pretty`
 - `-chrome auto|none|single|rounded`
 - `-hidden`

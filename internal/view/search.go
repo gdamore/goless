@@ -275,9 +275,9 @@ func (v *Viewer) commitPrompt() KeyResult {
 		v.cancelPrompt()
 	}
 	if quit {
-		return KeyResult{Handled: true, Quit: true}
+		return KeyResult{Handled: true, Quit: true, Context: KeyContextPrompt}
 	}
-	return KeyResult{Handled: true}
+	return KeyResult{Handled: true, Context: KeyContextPrompt}
 }
 
 func (v *Viewer) commitPromptSearch(text string, forward bool) bool {
