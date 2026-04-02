@@ -3,10 +3,13 @@
 
 package view
 
-import "github.com/gdamore/tcell/v3"
+import (
+	"github.com/gdamore/goless/internal/ansi"
+	"github.com/gdamore/tcell/v3"
+)
 
 func (v *Viewer) drawHelp(screen tcell.Screen) {
-	bodyStyle := tcell.StyleDefault
+	bodyStyle := v.toTCellStyle(ansi.DefaultStyle())
 	if !v.cfg.Chrome.Frame.enabled() && v.width > 0 {
 		titleStyle := tcell.StyleDefault.Reverse(true)
 		title := " " + v.text.HelpTitle + "  " + v.text.HelpClose
@@ -16,6 +19,7 @@ func (v *Viewer) drawHelp(screen tcell.Screen) {
 	lines := v.text.helpLines()
 	bodyX, bodyY, bodyWidth, bodyHeight := v.contentRect()
 	for y := 0; y < bodyHeight; y++ {
+		screen.PutStrStyled(bodyX, bodyY+y, padRightToWidth("", bodyWidth), bodyStyle)
 		lineIndex := v.helpOffset + y
 		if lineIndex >= len(lines) {
 			break
