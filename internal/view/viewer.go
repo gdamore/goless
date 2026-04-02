@@ -642,6 +642,12 @@ func (v *Viewer) firstVisibleRow() int {
 	if len(v.layout.Rows) == 0 {
 		return 0
 	}
+	if v.visibleHeaderRowCount() > 0 {
+		rowIndex := v.scrollableRowStartIndex() + v.rowOffset
+		if rowIndex >= 0 && rowIndex < len(v.layout.Rows) {
+			return rowIndex + 1
+		}
+	}
 	rowIndex, _, ok := v.visibleLayoutRowAt(0)
 	if !ok || rowIndex < 0 {
 		return 0
