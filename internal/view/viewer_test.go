@@ -1631,6 +1631,40 @@ func TestHelpFrameTitleUsesConfiguredAlignment(t *testing.T) {
 	}
 }
 
+func TestHelpBodyUsesThemedDefaultBackground(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Theme: Theme{
+			DefaultFG: tcolor.NewRGBColor(0x65, 0x7b, 0x83),
+			DefaultBG: tcolor.NewRGBColor(0xfd, 0xf6, 0xe3),
+		},
+		Chrome: Chrome{
+			Frame: Frame{
+				Horizontal:  "─",
+				Vertical:    "│",
+				TopLeft:     "┌",
+				TopRight:    "┐",
+				BottomLeft:  "└",
+				BottomRight: "┘",
+			},
+		},
+	})
+	v.SetSize(20, 6)
+	v.toggleHelp()
+
+	_, screen := newMockScreen(t, 20, 6)
+	defer screen.Fini()
+
+	v.Draw(screen)
+
+	_, style, _ := screen.Get(2, 1)
+	if got, want := style.GetBackground(), tcolor.NewRGBColor(0xfd, 0xf6, 0xe3); got != want {
+		t.Fatalf("help body background = %v, want %v", got, want)
+	}
+}
+
 func keyRune(s string) *tcell.EventKey {
 	return tcell.NewEventKey(tcell.KeyRune, s, tcell.ModNone)
 }
