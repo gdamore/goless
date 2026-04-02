@@ -172,7 +172,7 @@ The main config knobs are:
   or prompt contexts
 - `Chrome`: optional frame/title styling plus title alignment and status/prompt style slots
 - `Chrome.LineNumberStyle`: optional style for the adaptive line-number gutter
-- `Chrome.HeaderStyle`: optional style for fixed header rows
+- `Chrome.HeaderStyle`: optional style for fixed header rows and columns
 - `Text`: override help text, status text, prompt text, and UI strings
 
 `Pager.SetTheme`, `Pager.SetVisualization`, `Pager.SetHyperlinkHandler`, and
@@ -199,6 +199,7 @@ The built-in pager UI exposes search mode controls directly:
 - `:set searchmode sub|word|regex` is available as a fallback
 - `:set numbers on|off|toggle` is available as a fallback
 - `:set headers on|off|toggle|<n>` is available as a fallback
+- `:set headercols on|off|toggle|<n>` is available as a fallback
 - invalid regexes stay in the search prompt and are marked visibly until fixed
 
 Embedders are not locked to the bundled keys. They can:

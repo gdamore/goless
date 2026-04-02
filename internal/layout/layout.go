@@ -23,6 +23,7 @@ type Config struct {
 	TabWidth         int
 	WrapMode         WrapMode
 	HorizontalOffset int
+	LeadingColumns   int
 }
 
 // Anchor identifies an approximate visible position that can be preserved across relayout.
@@ -78,7 +79,7 @@ func Build(lines []model.Line, cfg Config) Result {
 		lineLayout := measureLine(line, cfg.TabWidth)
 		result.Lines[i] = lineLayout
 		if cfg.WrapMode == SoftWrap {
-			result.Rows = append(result.Rows, buildWrappedRows(i, line, lineLayout, cfg.Width)...)
+			result.Rows = append(result.Rows, buildWrappedRows(i, line, lineLayout, cfg.Width, cfg.LeadingColumns)...)
 			continue
 		}
 		result.Rows = append(result.Rows, buildScrolledRow(i, line, lineLayout, cfg.Width, cfg.HorizontalOffset))
@@ -97,13 +98,20 @@ func (r Result) AnchorForRow(rowIndex int) Anchor {
 
 // RowIndexForAnchor returns the first row that contains the given anchor.
 func (r Result) RowIndexForAnchor(anchor Anchor) int {
+	firstForLine := -1
 	for i, row := range r.Rows {
 		if row.LineIndex != anchor.LineIndex {
 			continue
 		}
+		if firstForLine < 0 {
+			firstForLine = i
+		}
 		if row.ContainsLogicalGrapheme(anchor.GraphemeIndex) {
 			return i
 		}
+	}
+	if firstForLine >= 0 {
+		return firstForLine
 	}
 	return -1
 }
@@ -171,6 +179,9 @@ func normalizeConfig(cfg Config) Config {
 	if cfg.HorizontalOffset < 0 {
 		cfg.HorizontalOffset = 0
 	}
+	if cfg.LeadingColumns < 0 {
+		cfg.LeadingColumns = 0
+	}
 	return cfg
 }
 
@@ -191,36 +202,88 @@ func measureLine(line model.Line, tabWidth int) LineLayout {
 	return info
 }
 
-func buildWrappedRows(lineIndex int, line model.Line, info LineLayout, width int) []VisualRow {
+func buildWrappedRows(lineIndex int, line model.Line, info LineLayout, width int, leadingColumns int) []VisualRow {
 	if len(line.Graphemes) == 0 {
 		return []VisualRow{{LineIndex: lineIndex}}
 	}
 
-	var rows []VisualRow
-	rowStart := 0
-	rowCellStart := 0
-	rowWidth := 0
-
-	for i := range line.Graphemes {
-		gw := info.GraphemeCellEnds[i] - info.GraphemeCellStarts[i]
-		if rowStart < i && rowWidth+gw > width {
-			rows = append(rows, makeRow(lineIndex, info, rowStart, i, rowCellStart))
-			rowStart = i
-			rowCellStart = info.GraphemeCellStarts[i]
-			rowWidth = 0
-		}
-		if rowStart == i && gw > width {
-			rows = append(rows, makeRow(lineIndex, info, i, i+1, info.GraphemeCellStarts[i]))
-			rowStart = i + 1
-			rowCellStart = info.GraphemeCellEnds[i]
-			rowWidth = 0
-			continue
-		}
-		rowWidth += gw
+	start := 0
+	for start < len(line.Graphemes) && info.GraphemeCellEnds[start] <= leadingColumns {
+		start++
+	}
+	if start >= len(line.Graphemes) {
+		return []VisualRow{{
+			LineIndex:       lineIndex,
+			SourceCellStart: leadingColumns,
+			SourceCellEnd:   leadingColumns,
+		}}
 	}
 
-	if rowStart < len(line.Graphemes) {
-		rows = append(rows, makeRow(lineIndex, info, rowStart, len(line.Graphemes), rowCellStart))
+	var rows []VisualRow
+	row := VisualRow{
+		LineIndex:       lineIndex,
+		SourceCellStart: leadingColumns,
+		SourceCellEnd:   leadingColumns,
+		Segments:        make([]VisualSegment, 0, max(len(line.Graphemes)-start, 0)),
+	}
+	renderX := 0
+	if info.GraphemeCellStarts[start] < leadingColumns {
+		visibleWidth := max(info.GraphemeCellEnds[start]-leadingColumns, 0)
+		if visibleWidth > 0 {
+			row.Segments = append(row.Segments, VisualSegment{
+				LogicalGraphemeIndex: start,
+				SourceCellStart:      info.GraphemeCellStarts[start],
+				SourceCellEnd:        info.GraphemeCellEnds[start],
+				RenderedCellFrom:     renderX,
+				RenderedCellTo:       renderX + visibleWidth,
+				Display:              spaces(visibleWidth),
+			})
+			renderX += visibleWidth
+		}
+		row.SourceCellEnd = leadingColumns
+		start++
+	}
+
+	if renderX >= width {
+		return []VisualRow{finalizeScrolledRow(row, renderX)}
+	}
+
+	for i := start; i < len(line.Graphemes); i++ {
+		gw := info.GraphemeCellEnds[i] - info.GraphemeCellStarts[i]
+		if row.SourceCellStart < info.GraphemeCellStarts[i] && renderX+gw > width {
+			rows = append(rows, finalizeScrolledRow(row, renderX))
+			row = VisualRow{
+				LineIndex:       lineIndex,
+				SourceCellStart: info.GraphemeCellStarts[i],
+				SourceCellEnd:   info.GraphemeCellStarts[i],
+				Segments:        make([]VisualSegment, 0, max(len(line.Graphemes)-i, 0)),
+			}
+			renderX = 0
+		}
+		if renderX == 0 && gw > width {
+			rows = append(rows, makeRow(lineIndex, info, i, i+1, info.GraphemeCellStarts[i]))
+			row = VisualRow{
+				LineIndex:       lineIndex,
+				SourceCellStart: info.GraphemeCellEnds[i],
+				SourceCellEnd:   info.GraphemeCellEnds[i],
+				Segments:        make([]VisualSegment, 0, max(len(line.Graphemes)-i-1, 0)),
+			}
+			continue
+		}
+
+		row.Segments = append(row.Segments, VisualSegment{
+			LogicalGraphemeIndex: i,
+			SourceCellStart:      info.GraphemeCellStarts[i],
+			SourceCellEnd:        info.GraphemeCellEnds[i],
+			RenderedCellFrom:     renderX,
+			RenderedCellTo:       renderX + gw,
+		})
+		renderX += gw
+		row.SourceCellEnd = info.GraphemeCellEnds[i]
+	}
+
+	if len(row.Segments) > 0 || row.SourceCellStart == leadingColumns {
+		rows = append(rows, finalizeScrolledRow(row, renderX))
 	}
 	if len(rows) == 0 {
 		rows = append(rows, VisualRow{LineIndex: lineIndex})

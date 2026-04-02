@@ -18,6 +18,7 @@ Commands
 :50%: jump to 50%
 :set numbers on|off|toggle
 :set headers on|off|toggle|<n>
+:set headercols on|off|toggle|<n>
 :set searchcase smart|case|nocase
 :set searchmode sub|word|regex
 
