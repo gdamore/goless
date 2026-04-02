@@ -33,6 +33,7 @@ type Config struct {
 	SearchCase       SearchCaseMode              // SearchCase selects smart-case, case-sensitive, or case-insensitive literal search behavior.
 	SearchMode       SearchMode                  // SearchMode selects substring, whole-word, or regex search behavior.
 	LineNumbers      bool                        // LineNumbers enables an adaptive line-number gutter.
+	HeaderLines      int                         // HeaderLines pins the first N logical lines at the top of the viewport.
 	Theme            Theme                       // Theme remaps content default colors and ANSI 0-15 without affecting chrome.
 	Visualization    Visualization               // Visualization overlays optional markers for tabs, line endings, carriage returns, and EOF.
 	HyperlinkHandler HyperlinkHandler            // HyperlinkHandler controls how parsed OSC 8 hyperlink spans are rendered.
@@ -100,6 +101,7 @@ func New(cfg Config) *Pager {
 			SearchCase:       toInternalSearchCaseMode(cfg.SearchCase),
 			SearchMode:       toInternalSearchMode(cfg.SearchMode),
 			LineNumbers:      cfg.LineNumbers,
+			HeaderLines:      cfg.HeaderLines,
 			Theme:            toInternalTheme(cfg.Theme),
 			Visualization:    toInternalVisualization(cfg.Visualization),
 			HyperlinkHandler: toInternalHyperlinkHandler(cfg.HyperlinkHandler),
@@ -194,6 +196,16 @@ func (p *Pager) ToggleLineNumbers() {
 // LineNumbers reports whether the adaptive line-number gutter is enabled.
 func (p *Pager) LineNumbers() bool {
 	return p.viewer.LineNumbers()
+}
+
+// SetHeaderLines updates how many leading logical lines stay fixed at the top of the viewport.
+func (p *Pager) SetHeaderLines(count int) {
+	p.viewer.SetHeaderLines(count)
+}
+
+// HeaderLines reports how many leading logical lines are fixed at the top of the viewport.
+func (p *Pager) HeaderLines() int {
+	return p.viewer.HeaderLines()
 }
 
 // SetVisualization updates how hidden structure markers are drawn.
@@ -711,6 +723,7 @@ func toInternalChrome(chrome Chrome) iview.Chrome {
 		TitleStyle:       chrome.TitleStyle,
 		StatusStyle:      chrome.StatusStyle,
 		LineNumberStyle:  chrome.LineNumberStyle,
+		HeaderStyle:      chrome.HeaderStyle,
 		PromptStyle:      chrome.PromptStyle,
 		PromptErrorStyle: chrome.PromptErrorStyle,
 		Frame: iview.Frame{

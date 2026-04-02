@@ -534,6 +534,18 @@ func TestPagerLineNumberToggle(t *testing.T) {
 	}
 }
 
+func TestPagerHeaderLines(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	if got, want := pager.HeaderLines(), 0; got != want {
+		t.Fatalf("HeaderLines() = %d, want %d", got, want)
+	}
+
+	pager.SetHeaderLines(2)
+	if got, want := pager.HeaderLines(), 2; got != want {
+		t.Fatalf("HeaderLines() after SetHeaderLines(2) = %d, want %d", got, want)
+	}
+}
+
 func TestPagerSearchForwardSmartCase(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
