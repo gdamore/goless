@@ -47,6 +47,10 @@ const (
 	KeyActionScrollLeft
 	// KeyActionScrollRight scrolls right by one cell.
 	KeyActionScrollRight
+	// KeyActionHalfPageUp scrolls up by roughly half a page.
+	KeyActionHalfPageUp
+	// KeyActionHalfPageDown scrolls down by roughly half a page.
+	KeyActionHalfPageDown
 	// KeyActionPageUp scrolls up by roughly one page.
 	KeyActionPageUp
 	// KeyActionPageDown scrolls down by roughly one page.

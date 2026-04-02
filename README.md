@@ -145,8 +145,8 @@ The current exported `Pager` API is controller-oriented.
 - Content loading: `Append`, `AppendString`, `ReadFrom`, `Flush`, `Len`
 - Rendering: `SetSize`, `Draw`, `Refresh`
 - Key-driven integration: `HandleKey`
-- Navigation: `ScrollUp`, `ScrollDown`, `ScrollLeft`, `ScrollRight`, `PageUp`,
-  `PageDown`, `GoTop`, `GoBottom`, `JumpToLine`
+- Navigation: `ScrollUp`, `ScrollDown`, `ScrollLeft`, `ScrollRight`, `HalfPageUp`,
+  `HalfPageDown`, `PageUp`, `PageDown`, `GoTop`, `GoBottom`, `GoPercent`, `JumpToLine`
 - Mode control: `ToggleWrap`, `SetWrapMode`, `WrapMode`, `Follow`, `Following`
 - Search: `SearchForward`, `SearchBackward`, `SearchNext`, `SearchPrev`,
   `SearchForwardWithCase`, `SearchBackwardWithCase`, `SetSearchCaseMode`,
@@ -266,6 +266,7 @@ The default key group is intentionally less-like. Common bindings include:
 
 - `q` or `Esc` to quit
 - `j`/`k` or arrow keys to scroll
+- `u`/`d` or `Ctrl-U`/`Ctrl-D` for half-page up/down
 - `space`/`b` for page down/up
 - `g`/`G` for top/bottom
 - `w` to toggle wrap
@@ -276,6 +277,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `F4` to cycle visual presets in the demo program
 - `F5` to toggle hidden-character markers in the demo program
 - `:` then a number to jump to a line
+- `:50%` to jump near the middle of the document
 - `:next` / `:prev` to move through a multi-file demo session
 - `:set searchcase smart|case|nocase` to set search mode directly
 - `:set searchmode sub|word|regex` to set search mode directly

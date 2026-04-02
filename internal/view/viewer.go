@@ -315,6 +315,10 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 		v.ScrollLeft(1)
 	case actionScrollRight:
 		v.ScrollRight(1)
+	case actionHalfPageUp:
+		v.HalfPageUp()
+	case actionHalfPageDown:
+		v.HalfPageDown()
 	case actionPageUp:
 		v.PageUp()
 	case actionPageDown:
@@ -407,9 +411,21 @@ func (v *Viewer) PageDown() {
 	v.ScrollDown(step)
 }
 
+// HalfPageDown moves the viewport down by roughly half a page.
+func (v *Viewer) HalfPageDown() {
+	step := max(v.bodyHeight()/2, 1)
+	v.ScrollDown(step)
+}
+
 // PageUp moves the viewport up by roughly one page.
 func (v *Viewer) PageUp() {
 	step := max(v.bodyHeight()-1, 1)
+	v.ScrollUp(step)
+}
+
+// HalfPageUp moves the viewport up by roughly half a page.
+func (v *Viewer) HalfPageUp() {
+	step := max(v.bodyHeight()/2, 1)
 	v.ScrollUp(step)
 }
 
@@ -426,6 +442,24 @@ func (v *Viewer) GoBottom() {
 	v.follow = false
 	v.rowOffset = v.maxRowOffset()
 	v.clampOffsets()
+}
+
+// GoPercent moves the viewport so the first visible row is near the requested percentage.
+func (v *Viewer) GoPercent(percent int) bool {
+	v.ensureLayout()
+	if len(v.layout.Rows) == 0 {
+		return false
+	}
+	if percent < 0 {
+		percent = 0
+	}
+	if percent > 100 {
+		percent = 100
+	}
+	v.follow = false
+	v.rowOffset = ((len(v.layout.Rows) - 1) * percent) / 100
+	v.clampOffsets()
+	return true
 }
 
 // Follow enables follow mode and pins the viewport to the end of the document.
@@ -1068,6 +1102,10 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 		v.helpOffset -= max(v.height-2, 1)
 	case actionPageDown:
 		v.helpOffset += max(v.height-2, 1)
+	case actionHalfPageUp:
+		v.helpOffset -= max((v.height-2)/2, 1)
+	case actionHalfPageDown:
+		v.helpOffset += max((v.height-2)/2, 1)
 	case actionGoTop:
 		v.helpOffset = 0
 	case actionGoBottom:
