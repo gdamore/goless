@@ -1257,12 +1257,12 @@ func TestStatusTextAndPositionAgreeWithFixedHeaders(t *testing.T) {
 	v.relayout()
 
 	pos := v.Position()
-	if got, want := pos.Row, 1; got != want {
+	if got, want := pos.Row, 3; got != want {
 		t.Fatalf("Position().Row with fixed headers filling viewport = %d, want %d", got, want)
 	}
 	_, rightText := v.statusText()
-	if !strings.Contains(rightText, "row 1/4") {
-		t.Fatalf("right status text = %q, want row indicator for first visible row", rightText)
+	if !strings.Contains(rightText, "row 3/4") {
+		t.Fatalf("right status text = %q, want row indicator for first visible body row", rightText)
 	}
 }
 
