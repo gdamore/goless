@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/gdamore/goless"
 	"github.com/gdamore/tcell/v3"
@@ -30,7 +32,7 @@ func run() error {
 	var title string
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-title text] [file]\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-title text] [+line|+/pattern] [file]\n")
 	}
 	flag.StringVar(&presetName, "preset", "none", "visual preset: none, dark, light, plain, pretty")
 	flag.StringVar(&chromeName, "chrome", "auto", "chrome override: auto, none, single, rounded")
@@ -64,23 +66,25 @@ func run() error {
 		ShowStatus:       true,
 	})
 
+	startup, fileArg, err := demoInputs(flag.Args())
+	if err != nil {
+		return err
+	}
+
 	var (
 		input io.Reader = os.Stdin
 		file  *os.File
 	)
-	if flag.NArg() > 1 {
-		return fmt.Errorf("usage: goless-demo [file]")
-	}
-	if flag.NArg() == 1 {
+	if fileArg != "" {
 		var err error
-		file, err = os.Open(flag.Arg(0))
+		file, err = os.Open(fileArg)
 		if err != nil {
 			return err
 		}
 		defer file.Close()
 		input = file
 	}
-	if flag.NArg() == 0 && stdinIsTerminal() {
+	if fileArg == "" && stdinIsTerminal() {
 		return fmt.Errorf("stdin is a terminal; specify a file or pipe input")
 	}
 
@@ -140,6 +144,7 @@ func run() error {
 				if err != nil {
 					return err
 				}
+				applyStartupCommand(pager, startup)
 			default:
 			}
 		}
@@ -175,6 +180,65 @@ func readIntoPager(pager *goless.Pager, r io.Reader, eventQ chan tcell.Event, re
 	pager.Flush()
 	result <- err
 	eventQ <- tcell.NewEventInterrupt(nil)
+}
+
+type demoStartup struct {
+	line  int
+	query string
+}
+
+func demoInputs(args []string) (demoStartup, string, error) {
+	var startup demoStartup
+	positional := args
+	if len(positional) > 0 && positional[0] == "--" {
+		positional = positional[1:]
+	}
+	if len(positional) > 0 && strings.HasPrefix(positional[0], "+") {
+		parsedStartup, err := parseStartup(positional[0])
+		if err != nil {
+			return demoStartup{}, "", err
+		}
+		startup = parsedStartup
+		positional = positional[1:]
+		if len(positional) > 0 && positional[0] == "--" {
+			positional = positional[1:]
+		}
+	}
+	switch len(positional) {
+	case 0:
+		return startup, "", nil
+	case 1:
+		return startup, positional[0], nil
+	default:
+		return demoStartup{}, "", fmt.Errorf("usage: goless-demo [+line|+/pattern] [file]")
+	}
+}
+
+func parseStartup(arg string) (demoStartup, error) {
+	if arg == "" || !strings.HasPrefix(arg, "+") {
+		return demoStartup{}, fmt.Errorf("invalid startup directive %q", arg)
+	}
+	if query, ok := strings.CutPrefix(arg, "+/"); ok {
+		if query == "" {
+			return demoStartup{}, fmt.Errorf("invalid startup search %q", arg)
+		}
+		return demoStartup{query: query}, nil
+	}
+	line, err := strconv.Atoi(arg[1:])
+	if err != nil || line <= 0 {
+		return demoStartup{}, fmt.Errorf("invalid startup line %q", arg)
+	}
+	return demoStartup{line: line}, nil
+}
+
+func applyStartupCommand(pager *goless.Pager, startup demoStartup) {
+	if startup.line > 0 {
+		pager.JumpToLine(startup.line)
+		return
+	}
+	if startup.query != "" {
+		pager.SearchForward(startup.query)
+	}
 }
 
 func stdinIsTerminal() bool {
