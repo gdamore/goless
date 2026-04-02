@@ -546,6 +546,18 @@ func TestPagerHeaderLines(t *testing.T) {
 	}
 }
 
+func TestPagerHeaderColumns(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	if got, want := pager.HeaderColumns(), 0; got != want {
+		t.Fatalf("HeaderColumns() = %d, want %d", got, want)
+	}
+
+	pager.SetHeaderColumns(3)
+	if got, want := pager.HeaderColumns(), 3; got != want {
+		t.Fatalf("HeaderColumns() after SetHeaderColumns(3) = %d, want %d", got, want)
+	}
+}
+
 func TestPagerSearchForwardSmartCase(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)

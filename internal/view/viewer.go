@@ -24,6 +24,7 @@ type Config struct {
 	SearchMode       SearchMode
 	LineNumbers      bool
 	HeaderLines      int
+	HeaderColumns    int
 	Theme            Theme
 	Visualization    Visualization
 	HyperlinkHandler HyperlinkHandler
@@ -142,6 +143,31 @@ func (v *Viewer) SetHeaderLines(count int) {
 // HeaderLines reports how many leading logical lines stay fixed at the top of the viewport.
 func (v *Viewer) HeaderLines() int {
 	return v.cfg.HeaderLines
+}
+
+// SetHeaderColumns updates how many leading display columns stay fixed at the left edge of the viewport.
+func (v *Viewer) SetHeaderColumns(count int) {
+	if count < 0 {
+		count = 0
+	}
+	if v.cfg.HeaderColumns == count {
+		return
+	}
+	v.ensureLayout()
+	anchor := v.firstVisibleAnchor()
+	v.cfg.HeaderColumns = count
+	v.relayout()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+		return
+	}
+	v.restoreAnchor(anchor)
+}
+
+// HeaderColumns reports how many leading display columns stay fixed at the left edge of the viewport.
+func (v *Viewer) HeaderColumns() int {
+	return v.cfg.HeaderColumns
 }
 
 // SetVisualization updates how hidden structure markers are drawn.
@@ -329,7 +355,9 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 		if !ok {
 			break
 		}
-		v.drawRow(screen, bodyX, bodyY+y, v.layout.Rows[rowIndex], header, lineHyperlinks)
+		row := v.layout.Rows[rowIndex]
+		v.drawHeaderColumns(screen, bodyY+y, row, header, lineHyperlinks)
+		v.drawRow(screen, bodyX, bodyY+y, row, header, lineHyperlinks)
 	}
 
 	if v.height > 0 {
@@ -554,10 +582,11 @@ func (v *Viewer) ensureLayout() {
 func (v *Viewer) relayout() {
 	v.lines = v.doc.Lines()
 	v.layout = layout.Build(v.lines, layout.Config{
-		Width:            max(v.contentWidth(), 1),
+		Width:            max(v.bodyContentWidth(), 1),
 		TabWidth:         v.cfg.TabWidth,
 		WrapMode:         v.cfg.WrapMode,
 		HorizontalOffset: v.horizontalOffset(),
+		LeadingColumns:   v.headerColumnWidth(v.rawContentWidth()),
 	})
 	v.rebuildSearch()
 	v.clampOffsets()
@@ -565,7 +594,7 @@ func (v *Viewer) relayout() {
 
 func (v *Viewer) horizontalOffset() int {
 	if v.cfg.WrapMode == layout.NoWrap {
-		return max(v.colOffset, 0)
+		return v.headerColumnWidth(v.rawContentWidth()) + max(v.colOffset, 0)
 	}
 	return 0
 }
@@ -597,6 +626,7 @@ func (v *Viewer) maxColOffset() int {
 		return 0
 	}
 
+	frozen := v.headerColumnWidth(v.rawContentWidth())
 	maxCells := 0
 	for i, line := range v.layout.Lines {
 		totalCells := line.TotalCells + v.trailingMarkerCellWidth(i)
@@ -604,7 +634,7 @@ func (v *Viewer) maxColOffset() int {
 			maxCells = totalCells
 		}
 	}
-	return max(maxCells-max(v.contentWidth(), 1), 0)
+	return max(maxCells-frozen-max(v.bodyContentWidth(), 1), 0)
 }
 
 func (v *Viewer) bodyHeight() int {
@@ -742,6 +772,58 @@ func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow
 		screen.Put(x, y, grapheme.Text, cellStyle)
 	}
 	v.drawTrailingMarkers(screen, baseX, y, row, line, rowStyle, header)
+}
+
+func (v *Viewer) drawHeaderColumns(screen tcell.Screen, y int, row layout.VisualRow, header bool, lineHyperlinks map[int]rowHyperlinks) {
+	baseX, _, width, _ := v.headerColumnRect()
+	if width <= 0 || row.LineIndex < 0 || row.LineIndex >= len(v.lines) {
+		return
+	}
+
+	style := v.rowBaseStyle(true)
+	screen.PutStrStyled(baseX, y, padRightToWidth("", width), style)
+	if v.cfg.WrapMode == layout.SoftWrap && row.SourceCellStart > width {
+		return
+	}
+
+	line := v.lines[row.LineIndex]
+	hyperlinks := lineHyperlinks[row.LineIndex]
+	info := v.layout.Lines[row.LineIndex]
+	for i, grapheme := range line.Graphemes {
+		sourceStart := info.GraphemeCellStarts[i]
+		sourceEnd := info.GraphemeCellEnds[i]
+		if sourceStart >= width {
+			break
+		}
+		if sourceEnd <= 0 {
+			continue
+		}
+
+		cellStyle := v.toTCellStyle(styleForGrapheme(line, grapheme.RuneStart))
+		cellStyle = applyChromeStyle(cellStyle, v.cfg.Chrome.HeaderStyle)
+		if hyperlink, ok := hyperlinks.byGrapheme[i]; ok {
+			cellStyle = applyHyperlinkDecisionStyle(cellStyle, hyperlink.decision, hyperlink.span)
+		}
+		matched, current := v.graphemeMatched(line, row.LineIndex, grapheme)
+		if matched {
+			cellStyle = applyMatchCellStyle(cellStyle, current)
+		}
+
+		switch {
+		case sourceEnd > width:
+			if grapheme.Text == "\t" {
+				visible := max(width-sourceStart, 0)
+				screen.PutStrStyled(baseX+sourceStart, y, strings.Repeat(" ", visible), cellStyle)
+				return
+			}
+			screen.PutStrStyled(baseX+sourceStart, y, ">", cellStyle)
+			return
+		case grapheme.Text == "\t":
+			screen.PutStrStyled(baseX+sourceStart, y, strings.Repeat(" ", sourceEnd-sourceStart), cellStyle)
+		default:
+			screen.Put(baseX+sourceStart, y, grapheme.Text, cellStyle)
+		}
+	}
 }
 
 type hyperlinkSpan struct {
@@ -1052,7 +1134,7 @@ func (v *Viewer) drawLineNumberGutter(screen tcell.Screen) {
 			continue
 		}
 		row := v.layout.Rows[rowIndex]
-		if !v.shouldShowLineNumber(row) {
+		if !v.shouldShowLineNumber(rowIndex) {
 			continue
 		}
 		label := padRightToWidth(fmt.Sprintf("%*d", gutterWidth-1, row.LineIndex+1), gutterWidth)
@@ -1102,11 +1184,14 @@ func applyChromeStyle(base, overlay tcell.Style) tcell.Style {
 	return base
 }
 
-func (v *Viewer) shouldShowLineNumber(row layout.VisualRow) bool {
-	if v.cfg.WrapMode == layout.NoWrap {
+func (v *Viewer) shouldShowLineNumber(rowIndex int) bool {
+	if rowIndex < 0 || rowIndex >= len(v.layout.Rows) {
+		return false
+	}
+	if v.cfg.WrapMode == layout.NoWrap || rowIndex == 0 {
 		return true
 	}
-	return row.SourceCellStart == 0
+	return v.layout.Rows[rowIndex-1].LineIndex != v.layout.Rows[rowIndex].LineIndex
 }
 
 func (v *Viewer) lineNumberGutterWidth(available int) int {
@@ -1118,20 +1203,50 @@ func (v *Viewer) lineNumberGutterWidth(available int) int {
 	return min(width, available-1)
 }
 
+func (v *Viewer) headerColumnWidth(available int) int {
+	if v.mode == modeHelp || available <= 1 {
+		return 0
+	}
+	return min(max(v.cfg.HeaderColumns, 0), available-1)
+}
+
 func (v *Viewer) gutterRect() (x, y, width, height int) {
 	x, y, totalWidth, height := v.baseContentRect()
 	width = v.lineNumberGutterWidth(totalWidth)
 	return x, y, width, height
 }
 
-func (v *Viewer) contentRect() (x, y, width, height int) {
+func (v *Viewer) rawContentWidth() int {
+	_, _, width, _ := v.baseContentRect()
+	width -= v.lineNumberGutterWidth(width)
+	if width < 0 {
+		width = 0
+	}
+	return width
+}
+
+func (v *Viewer) headerColumnRect() (x, y, width, height int) {
 	x, y, width, height = v.baseContentRect()
 	gutterWidth := v.lineNumberGutterWidth(width)
+	x += gutterWidth
 	width -= gutterWidth
 	if width < 0 {
 		width = 0
 	}
-	x += gutterWidth
+	headerWidth := v.headerColumnWidth(width)
+	return x, y, headerWidth, height
+}
+
+func (v *Viewer) contentRect() (x, y, width, height int) {
+	x, y, width, height = v.baseContentRect()
+	gutterWidth := v.lineNumberGutterWidth(width)
+	headerWidth := v.headerColumnWidth(width - gutterWidth)
+	width -= gutterWidth
+	width -= headerWidth
+	if width < 0 {
+		width = 0
+	}
+	x += gutterWidth + headerWidth
 	return x, y, width, height
 }
 
@@ -1170,6 +1285,10 @@ func (v *Viewer) baseContentRect() (x, y, width, height int) {
 func (v *Viewer) contentWidth() int {
 	_, _, width, _ := v.contentRect()
 	return width
+}
+
+func (v *Viewer) bodyContentWidth() int {
+	return v.contentWidth()
 }
 
 func (v *Viewer) bottomBarRows() int {

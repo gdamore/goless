@@ -34,6 +34,7 @@ type Config struct {
 	SearchMode       SearchMode                  // SearchMode selects substring, whole-word, or regex search behavior.
 	LineNumbers      bool                        // LineNumbers enables an adaptive line-number gutter.
 	HeaderLines      int                         // HeaderLines pins the first N logical lines at the top of the viewport.
+	HeaderColumns    int                         // HeaderColumns pins the first N display columns at the left edge of the viewport.
 	Theme            Theme                       // Theme remaps content default colors and ANSI 0-15 without affecting chrome.
 	Visualization    Visualization               // Visualization overlays optional markers for tabs, line endings, carriage returns, and EOF.
 	HyperlinkHandler HyperlinkHandler            // HyperlinkHandler controls how parsed OSC 8 hyperlink spans are rendered.
@@ -102,6 +103,7 @@ func New(cfg Config) *Pager {
 			SearchMode:       toInternalSearchMode(cfg.SearchMode),
 			LineNumbers:      cfg.LineNumbers,
 			HeaderLines:      cfg.HeaderLines,
+			HeaderColumns:    cfg.HeaderColumns,
 			Theme:            toInternalTheme(cfg.Theme),
 			Visualization:    toInternalVisualization(cfg.Visualization),
 			HyperlinkHandler: toInternalHyperlinkHandler(cfg.HyperlinkHandler),
@@ -206,6 +208,16 @@ func (p *Pager) SetHeaderLines(count int) {
 // HeaderLines reports how many leading logical lines are fixed at the top of the viewport.
 func (p *Pager) HeaderLines() int {
 	return p.viewer.HeaderLines()
+}
+
+// SetHeaderColumns updates how many leading display columns stay fixed at the left edge of the viewport.
+func (p *Pager) SetHeaderColumns(count int) {
+	p.viewer.SetHeaderColumns(count)
+}
+
+// HeaderColumns reports how many leading display columns are fixed at the left edge of the viewport.
+func (p *Pager) HeaderColumns() int {
+	return p.viewer.HeaderColumns()
 }
 
 // SetVisualization updates how hidden structure markers are drawn.

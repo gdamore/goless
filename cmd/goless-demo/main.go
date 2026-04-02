@@ -497,6 +497,8 @@ func demoChrome(name, title string, base goless.Chrome) (goless.Chrome, error) {
 		BorderStyle:      base.BorderStyle,
 		TitleStyle:       base.TitleStyle,
 		StatusStyle:      base.StatusStyle,
+		LineNumberStyle:  base.LineNumberStyle,
+		HeaderStyle:      base.HeaderStyle,
 		PromptStyle:      base.PromptStyle,
 		PromptErrorStyle: base.PromptErrorStyle,
 		Frame: goless.Frame{

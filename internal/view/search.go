@@ -500,8 +500,12 @@ func (v *Viewer) revealMatchHorizontally(match searchMatch) {
 		matchEnd = info.GraphemeCellEnds[match.EndGraph]
 	}
 
-	width := max(v.width, 1)
-	windowStart := v.colOffset
+	frozen := v.headerColumnWidth(v.rawContentWidth())
+	if matchEnd <= frozen {
+		return
+	}
+	width := max(v.bodyContentWidth(), 1)
+	windowStart := frozen + v.colOffset
 	windowEnd := windowStart + width
 	if matchStart >= windowStart && matchEnd <= windowEnd {
 		return
@@ -509,11 +513,11 @@ func (v *Viewer) revealMatchHorizontally(match searchMatch) {
 
 	switch {
 	case matchEnd-matchStart >= width:
-		v.colOffset = matchStart
+		v.colOffset = max(matchStart-frozen, 0)
 	case matchStart < windowStart:
-		v.colOffset = matchStart
+		v.colOffset = max(matchStart-frozen, 0)
 	case matchEnd > windowEnd:
-		v.colOffset = matchEnd - width
+		v.colOffset = max(matchEnd-frozen-width, 0)
 	}
 
 	v.relayout()
@@ -641,6 +645,28 @@ func (v *Viewer) runSetCommand(text string) bool {
 				return true
 			}
 			v.SetHeaderLines(count)
+		}
+		v.message = ""
+		return true
+	case "headercols", "headercolumns":
+		switch fields[2] {
+		case "on", "true":
+			v.SetHeaderColumns(1)
+		case "off", "false":
+			v.SetHeaderColumns(0)
+		case "toggle":
+			if v.HeaderColumns() > 0 {
+				v.SetHeaderColumns(0)
+			} else {
+				v.SetHeaderColumns(1)
+			}
+		default:
+			count, err := strconv.Atoi(fields[2])
+			if err != nil || count < 0 {
+				v.message = v.text.CommandUnknown(text)
+				return true
+			}
+			v.SetHeaderColumns(count)
 		}
 		v.message = ""
 		return true

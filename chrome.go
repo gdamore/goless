@@ -50,7 +50,7 @@ type Chrome struct {
 	StatusStyle tcell.Style
 	// LineNumberStyle controls the style used when drawing the optional line-number gutter.
 	LineNumberStyle tcell.Style
-	// HeaderStyle controls the style used when drawing fixed header rows.
+	// HeaderStyle controls the style used when drawing fixed header rows and columns.
 	HeaderStyle tcell.Style
 	// PromptStyle controls the style used when drawing the prompt line.
 	PromptStyle tcell.Style
