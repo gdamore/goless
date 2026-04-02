@@ -40,6 +40,7 @@ type Chrome struct {
 	BorderStyle      tcell.Style
 	TitleStyle       tcell.Style
 	StatusStyle      tcell.Style
+	LineNumberStyle  tcell.Style
 	PromptStyle      tcell.Style
 	PromptErrorStyle tcell.Style
 }
@@ -53,6 +54,9 @@ func (c Chrome) withDefaults() Chrome {
 	}
 	if c.StatusStyle == tcell.StyleDefault {
 		c.StatusStyle = statusBarStyle
+	}
+	if c.LineNumberStyle == tcell.StyleDefault {
+		c.LineNumberStyle = tcell.StyleDefault.Foreground(tcolor.PaletteColor(8)).Dim(true)
 	}
 	if c.PromptStyle == tcell.StyleDefault {
 		c.PromptStyle = tcell.StyleDefault.Reverse(true)

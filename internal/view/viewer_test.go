@@ -133,6 +133,28 @@ func TestCommandPercentJump(t *testing.T) {
 	}
 }
 
+func TestSetNumbersCommand(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	for _, command := range []string{"set numbers on", "set numbers toggle"} {
+		v.HandleKey(keyRune(":"))
+		for _, s := range command {
+			v.HandleKey(keyRune(string(s)))
+		}
+		v.HandleKey(keyKey(tcell.KeyEnter))
+	}
+
+	if v.LineNumbers() {
+		t.Fatalf("LineNumbers after on+toggle = true, want false")
+	}
+}
+
 func TestKeyBindingMatchesRequireExactNoModifierByDefault(t *testing.T) {
 	binding := keyBinding{
 		key:    tcell.KeyRune,
@@ -1662,6 +1684,52 @@ func TestHelpBodyUsesThemedDefaultBackground(t *testing.T) {
 	_, style, _ := screen.Get(2, 1)
 	if got, want := style.GetBackground(), tcolor.NewRGBColor(0xfd, 0xf6, 0xe3); got != want {
 		t.Fatalf("help body background = %v, want %v", got, want)
+	}
+}
+
+func TestDrawLineNumbersUsesAdaptiveGutterWidth(t *testing.T) {
+	doc := model.NewDocument(4)
+	var lines strings.Builder
+	for i := 0; i < 12; i++ {
+		lines.WriteString("x\n")
+	}
+	if err := doc.Append([]byte(lines.String())); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, LineNumbers: true})
+	v.SetSize(10, 4)
+
+	_, screen := newMockScreen(t, 10, 4)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got := cellRune(screen, 1, 0); got != '1' {
+		t.Fatalf("line number rune = %q, want %q", got, '1')
+	}
+	if got := cellRune(screen, 2, 0); got != ' ' {
+		t.Fatalf("gutter separator rune = %q, want space", got)
+	}
+}
+
+func TestDrawLineNumbersBlankOnWrappedContinuationRows(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefghij\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.SoftWrap, LineNumbers: true})
+	v.SetSize(6, 4)
+
+	_, screen := newMockScreen(t, 6, 4)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got := cellRune(screen, 0, 0); got != '1' {
+		t.Fatalf("first wrapped row line number rune = %q, want %q", got, '1')
+	}
+	if got := cellRune(screen, 0, 1); got != ' ' {
+		t.Fatalf("continuation row gutter rune = %q, want space", got)
 	}
 }
 

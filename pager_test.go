@@ -517,6 +517,23 @@ func TestPagerHalfPageAndPercentNavigation(t *testing.T) {
 	}
 }
 
+func TestPagerLineNumberToggle(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	if pager.LineNumbers() {
+		t.Fatal("LineNumbers() = true, want false by default")
+	}
+
+	pager.SetLineNumbers(true)
+	if !pager.LineNumbers() {
+		t.Fatal("LineNumbers() = false, want true after SetLineNumbers(true)")
+	}
+
+	pager.ToggleLineNumbers()
+	if pager.LineNumbers() {
+		t.Fatal("LineNumbers() = true, want false after ToggleLineNumbers()")
+	}
+}
+
 func TestPagerSearchForwardSmartCase(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
