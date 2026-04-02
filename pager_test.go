@@ -981,7 +981,7 @@ func TestPagerRendersOSC8HyperlinkStyleOverride(t *testing.T) {
 			return HyperlinkDecision{
 				Style: info.Style.
 					Foreground(tcolor.Blue).
-					Underline(true),
+					Underline(tcell.UnderlineStyleSolid),
 				StyleSet: true,
 			}
 		},
