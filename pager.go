@@ -56,6 +56,8 @@ type Config struct {
 type KeyResult struct {
 	Handled bool
 	Quit    bool
+	Action  KeyAction
+	Context KeyContext
 }
 
 // Command describes a ':' command entered through the built-in prompt.
@@ -249,6 +251,8 @@ func (p *Pager) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 	return KeyResult{
 		Handled: result.Handled,
 		Quit:    result.Quit,
+		Action:  KeyAction(result.Action),
+		Context: KeyContext(result.Context),
 	}
 }
 
@@ -330,6 +334,11 @@ func (p *Pager) Follow() {
 // Following reports whether follow mode is active.
 func (p *Pager) Following() bool {
 	return p.viewer.Following()
+}
+
+// EOFVisible reports whether the end of the document is currently visible.
+func (p *Pager) EOFVisible() bool {
+	return p.viewer.EOFVisible()
 }
 
 // SetSearchCaseMode updates the default case behavior for new and active searches.

@@ -73,6 +73,9 @@ func TestPagerHandleKeyResult(t *testing.T) {
 	if result.Quit {
 		t.Fatal("HandleKeyResult(x).Quit = true, want false")
 	}
+	if got, want := result.Action, KeyActionNone; got != want {
+		t.Fatalf("HandleKeyResult(x).Action = %v, want %v", got, want)
+	}
 
 	result = pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "q", tcell.ModNone))
 	if !result.Handled {
@@ -80,6 +83,38 @@ func TestPagerHandleKeyResult(t *testing.T) {
 	}
 	if !result.Quit {
 		t.Fatal("HandleKeyResult(q).Quit = false, want true")
+	}
+	if got, want := result.Action, KeyActionQuit; got != want {
+		t.Fatalf("HandleKeyResult(q).Action = %v, want %v", got, want)
+	}
+	if got, want := result.Context, NormalKeyContext; got != want {
+		t.Fatalf("HandleKeyResult(q).Context = %v, want %v", got, want)
+	}
+}
+
+func TestPagerHandleKeyResultPromptContext(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 4)
+	if err := pager.AppendString("hello\nworld\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if got := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "/", tcell.ModNone)); !got.Handled {
+		t.Fatal("HandleKeyResult(/).Handled = false, want true")
+	}
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "f", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(f).Handled = false, want true in prompt")
+	}
+	if result.Quit {
+		t.Fatal("HandleKeyResult(f).Quit = true, want false in prompt")
+	}
+	if got, want := result.Action, KeyActionNone; got != want {
+		t.Fatalf("HandleKeyResult(f).Action = %v, want %v in prompt", got, want)
+	}
+	if got, want := result.Context, PromptKeyContext; got != want {
+		t.Fatalf("HandleKeyResult(f).Context = %v, want %v", got, want)
 	}
 }
 

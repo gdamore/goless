@@ -111,6 +111,7 @@ The library should:
 - Read from stdin or file arguments.
 - Expose a subset of familiar keys.
 - Avoid any feature that would compromise embeddability or security.
+- Future demo work: if stdout is not a terminal, pass input through unchanged like `cat`.
 
 ## Internal Model
 
