@@ -279,6 +279,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `:` then a number to jump to a line
 - `:50%` to jump near the middle of the document
 - `:next` / `:prev` to move through a multi-file demo session
+- `:first`, `:last`, and `:file` for demo file-session control
 - `:set searchcase smart|case|nocase` to set search mode directly
 - `:set searchmode sub|word|regex` to set search mode directly
 - `F` to enable follow mode

@@ -228,6 +228,13 @@ func (s *demoSession) currentFile() string {
 	return s.files[s.index]
 }
 
+func (s *demoSession) currentFileLabel() string {
+	if !s.hasFiles() {
+		return "stdin"
+	}
+	return fmt.Sprintf("%s (%d/%d)", s.currentFile(), s.index+1, len(s.files))
+}
+
 func (s *demoSession) chrome(base goless.Chrome) goless.Chrome {
 	chrome := base
 	if s.hasFiles() {
@@ -264,11 +271,29 @@ func (s *demoSession) prev() bool {
 	return true
 }
 
+func (s *demoSession) first() bool {
+	if !s.hasFiles() || s.index == 0 {
+		return false
+	}
+	s.index = 0
+	return true
+}
+
+func (s *demoSession) last() bool {
+	if !s.hasFiles() || s.index == len(s.files)-1 {
+		return false
+	}
+	s.index = len(s.files) - 1
+	return true
+}
+
 func (s *demoSession) commandHandler(reload func() error) func(goless.Command) goless.CommandResult {
 	return func(cmd goless.Command) goless.CommandResult {
 		switch cmd.Name {
 		case "q", "quit":
 			return goless.CommandResult{Handled: true, Quit: true}
+		case "file", "f":
+			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
 		case "next", "n":
 			if !s.canNext() {
 				return goless.CommandResult{Handled: true, Message: "already at last file"}
@@ -279,7 +304,7 @@ func (s *demoSession) commandHandler(reload func() error) func(goless.Command) g
 				s.index = index
 				return goless.CommandResult{Handled: true, Message: err.Error()}
 			}
-			return goless.CommandResult{Handled: true, Message: s.currentFile()}
+			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
 		case "prev", "p", "previous":
 			if !s.canPrev() {
 				return goless.CommandResult{Handled: true, Message: "already at first file"}
@@ -290,7 +315,29 @@ func (s *demoSession) commandHandler(reload func() error) func(goless.Command) g
 				s.index = index
 				return goless.CommandResult{Handled: true, Message: err.Error()}
 			}
-			return goless.CommandResult{Handled: true, Message: s.currentFile()}
+			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
+		case "first", "rewind":
+			if !s.hasFiles() || s.index == 0 {
+				return goless.CommandResult{Handled: true, Message: "already at first file"}
+			}
+			index := s.index
+			s.first()
+			if err := reload(); err != nil {
+				s.index = index
+				return goless.CommandResult{Handled: true, Message: err.Error()}
+			}
+			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
+		case "last":
+			if !s.hasFiles() || s.index == len(s.files)-1 {
+				return goless.CommandResult{Handled: true, Message: "already at last file"}
+			}
+			index := s.index
+			s.last()
+			if err := reload(); err != nil {
+				s.index = index
+				return goless.CommandResult{Handled: true, Message: err.Error()}
+			}
+			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
 		default:
 			return goless.CommandResult{}
 		}
