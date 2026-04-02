@@ -160,6 +160,7 @@ The main config knobs are:
 - `SearchCase`: `SearchSmartCase`, `SearchCaseSensitive`, or
   `SearchCaseInsensitive`
 - `SearchMode`: `SearchSubstring`, `SearchWholeWord`, or `SearchRegex`
+- `LineNumbers`: enable an adaptive line-number gutter
 - `Theme`: remap content default colors and ANSI 0-15 without affecting chrome
 - `Visualization`: show tabs, line endings, carriage returns, and EOF with pager-added markers
 - `HyperlinkHandler`: inspect OSC 8 links, decide whether they go live,
@@ -169,6 +170,7 @@ The main config knobs are:
 - `UnbindKeys` and `KeyBindings`: remove or prepend bindings in normal, help,
   or prompt contexts
 - `Chrome`: optional frame/title styling plus title alignment and status/prompt style slots
+- `Chrome.LineNumberStyle`: optional style for the adaptive line-number gutter
 - `Text`: override help text, status text, prompt text, and UI strings
 
 `Pager.SetTheme`, `Pager.SetVisualization`, `Pager.SetHyperlinkHandler`, and
@@ -193,6 +195,7 @@ The built-in pager UI exposes search mode controls directly:
 - the current mode is shown in the status bar and search prompt
 - `:set searchcase smart|case|nocase` is available as a fallback
 - `:set searchmode sub|word|regex` is available as a fallback
+- `:set numbers on|off|toggle` is available as a fallback
 - invalid regexes stay in the search prompt and are marked visibly until fixed
 
 Embedders are not locked to the bundled keys. They can:

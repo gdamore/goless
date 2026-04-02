@@ -48,6 +48,8 @@ type Chrome struct {
 	TitleStyle tcell.Style
 	// StatusStyle controls the style used when drawing the status bar.
 	StatusStyle tcell.Style
+	// LineNumberStyle controls the style used when drawing the optional line-number gutter.
+	LineNumberStyle tcell.Style
 	// PromptStyle controls the style used when drawing the prompt line.
 	PromptStyle tcell.Style
 	// PromptErrorStyle controls the style used for prompt-side error text.

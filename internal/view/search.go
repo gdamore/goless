@@ -608,6 +608,19 @@ func (v *Viewer) runSetCommand(text string) bool {
 
 		v.SetSearchMode(mode)
 		return true
+	case "numbers", "number", "linenumbers":
+		switch fields[2] {
+		case "on", "true":
+			v.SetLineNumbers(true)
+		case "off", "false":
+			v.SetLineNumbers(false)
+		case "toggle":
+			v.ToggleLineNumbers()
+		default:
+			v.message = v.text.CommandUnknown(text)
+			return true
+		}
+		return true
 	default:
 		return false
 	}

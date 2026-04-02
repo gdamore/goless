@@ -4,6 +4,8 @@
 package view
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/gdamore/goless/internal/ansi"
@@ -20,6 +22,7 @@ type Config struct {
 	WrapMode         layout.WrapMode
 	SearchCase       SearchCaseMode
 	SearchMode       SearchMode
+	LineNumbers      bool
 	Theme            Theme
 	Visualization    Visualization
 	HyperlinkHandler HyperlinkHandler
@@ -86,6 +89,33 @@ func New(doc *model.Document, cfg Config) *Viewer {
 // SetTheme updates how document content colors are rendered.
 func (v *Viewer) SetTheme(theme Theme) {
 	v.cfg.Theme = theme
+}
+
+// SetLineNumbers updates whether the adaptive line-number gutter is shown.
+func (v *Viewer) SetLineNumbers(enabled bool) {
+	if v.cfg.LineNumbers == enabled {
+		return
+	}
+	v.ensureLayout()
+	anchor := v.firstVisibleAnchor()
+	v.cfg.LineNumbers = enabled
+	v.relayout()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+		return
+	}
+	v.restoreAnchor(anchor)
+}
+
+// ToggleLineNumbers shows or hides the adaptive line-number gutter.
+func (v *Viewer) ToggleLineNumbers() {
+	v.SetLineNumbers(!v.cfg.LineNumbers)
+}
+
+// LineNumbers reports whether the adaptive line-number gutter is enabled.
+func (v *Viewer) LineNumbers() bool {
+	return v.cfg.LineNumbers
 }
 
 // SetVisualization updates how hidden structure markers are drawn.
@@ -266,6 +296,7 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 	v.drawFrame(screen, v.cfg.Chrome.Title)
 
 	bodyX, bodyY, _, bodyHeight := v.contentRect()
+	v.drawLineNumberGutter(screen)
 	lineHyperlinks := v.resolveVisibleHyperlinks()
 	for y := 0; y < bodyHeight; y++ {
 		rowIndex := v.rowOffset + y
@@ -916,7 +947,101 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 	}
 }
 
+func (v *Viewer) drawLineNumberGutter(screen tcell.Screen) {
+	if v.mode == modeHelp || !v.cfg.LineNumbers {
+		return
+	}
+	gutterX, gutterY, gutterWidth, gutterHeight := v.gutterRect()
+	if gutterWidth <= 0 || gutterHeight <= 0 {
+		return
+	}
+
+	fillStyle, textStyle := v.lineNumberStyles()
+	blank := padRightToWidth("", gutterWidth)
+	for y := 0; y < gutterHeight; y++ {
+		screen.PutStrStyled(gutterX, gutterY+y, blank, fillStyle)
+
+		rowIndex := v.rowOffset + y
+		if rowIndex >= len(v.layout.Rows) {
+			continue
+		}
+		row := v.layout.Rows[rowIndex]
+		if !v.shouldShowLineNumber(row) {
+			continue
+		}
+		label := padRightToWidth(fmt.Sprintf("%*d", gutterWidth-1, row.LineIndex+1), gutterWidth)
+		screen.PutStrStyled(gutterX, gutterY+y, label, textStyle)
+	}
+}
+
+func (v *Viewer) lineNumberStyles() (fill, text tcell.Style) {
+	base := v.toTCellStyle(ansi.DefaultStyle())
+	return base, applyChromeStyle(base, v.cfg.Chrome.LineNumberStyle)
+}
+
+func applyChromeStyle(base, overlay tcell.Style) tcell.Style {
+	if fg := overlay.GetForeground(); fg != tcolor.Default {
+		base = base.Foreground(fg)
+	}
+	if bg := overlay.GetBackground(); bg != tcolor.Default {
+		base = base.Background(bg)
+	}
+	if overlay.HasBold() {
+		base = base.Bold(true)
+	}
+	if overlay.HasDim() {
+		base = base.Dim(true)
+	}
+	if overlay.HasItalic() {
+		base = base.Italic(true)
+	}
+	if overlay.HasReverse() {
+		base = base.Reverse(true)
+	}
+	if ul := overlay.GetUnderlineStyle(); ul != tcell.UnderlineStyleNone {
+		if uc := overlay.GetUnderlineColor(); uc != tcolor.Default {
+			base = base.Underline(ul, uc)
+		} else {
+			base = base.Underline(ul)
+		}
+	}
+	return base
+}
+
+func (v *Viewer) shouldShowLineNumber(row layout.VisualRow) bool {
+	if v.cfg.WrapMode == layout.NoWrap {
+		return true
+	}
+	return row.SourceCellStart == 0
+}
+
+func (v *Viewer) lineNumberGutterWidth(available int) int {
+	if !v.cfg.LineNumbers || v.mode == modeHelp || available <= 1 {
+		return 0
+	}
+	digits := len(strconv.Itoa(max(len(v.lines), 1)))
+	width := digits + 1
+	return min(width, available-1)
+}
+
+func (v *Viewer) gutterRect() (x, y, width, height int) {
+	x, y, totalWidth, height := v.baseContentRect()
+	width = v.lineNumberGutterWidth(totalWidth)
+	return x, y, width, height
+}
+
 func (v *Viewer) contentRect() (x, y, width, height int) {
+	x, y, width, height = v.baseContentRect()
+	gutterWidth := v.lineNumberGutterWidth(width)
+	width -= gutterWidth
+	if width < 0 {
+		width = 0
+	}
+	x += gutterWidth
+	return x, y, width, height
+}
+
+func (v *Viewer) baseContentRect() (x, y, width, height int) {
 	width = v.width
 	height = v.height - v.bottomBarRows()
 	if height < 0 {

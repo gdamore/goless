@@ -32,6 +32,7 @@ type Config struct {
 	WrapMode         WrapMode                    // WrapMode selects horizontal scrolling or soft wrapping.
 	SearchCase       SearchCaseMode              // SearchCase selects smart-case, case-sensitive, or case-insensitive literal search behavior.
 	SearchMode       SearchMode                  // SearchMode selects substring, whole-word, or regex search behavior.
+	LineNumbers      bool                        // LineNumbers enables an adaptive line-number gutter.
 	Theme            Theme                       // Theme remaps content default colors and ANSI 0-15 without affecting chrome.
 	Visualization    Visualization               // Visualization overlays optional markers for tabs, line endings, carriage returns, and EOF.
 	HyperlinkHandler HyperlinkHandler            // HyperlinkHandler controls how parsed OSC 8 hyperlink spans are rendered.
@@ -98,6 +99,7 @@ func New(cfg Config) *Pager {
 			WrapMode:         toInternalWrapMode(cfg.WrapMode),
 			SearchCase:       toInternalSearchCaseMode(cfg.SearchCase),
 			SearchMode:       toInternalSearchMode(cfg.SearchMode),
+			LineNumbers:      cfg.LineNumbers,
 			Theme:            toInternalTheme(cfg.Theme),
 			Visualization:    toInternalVisualization(cfg.Visualization),
 			HyperlinkHandler: toInternalHyperlinkHandler(cfg.HyperlinkHandler),
@@ -177,6 +179,21 @@ func (p *Pager) Refresh() {
 // SetTheme updates how document content colors are rendered.
 func (p *Pager) SetTheme(theme Theme) {
 	p.viewer.SetTheme(toInternalTheme(theme))
+}
+
+// SetLineNumbers updates whether the adaptive line-number gutter is shown.
+func (p *Pager) SetLineNumbers(enabled bool) {
+	p.viewer.SetLineNumbers(enabled)
+}
+
+// ToggleLineNumbers shows or hides the adaptive line-number gutter.
+func (p *Pager) ToggleLineNumbers() {
+	p.viewer.ToggleLineNumbers()
+}
+
+// LineNumbers reports whether the adaptive line-number gutter is enabled.
+func (p *Pager) LineNumbers() bool {
+	return p.viewer.LineNumbers()
 }
 
 // SetVisualization updates how hidden structure markers are drawn.
@@ -693,6 +710,7 @@ func toInternalChrome(chrome Chrome) iview.Chrome {
 		BorderStyle:      chrome.BorderStyle,
 		TitleStyle:       chrome.TitleStyle,
 		StatusStyle:      chrome.StatusStyle,
+		LineNumberStyle:  chrome.LineNumberStyle,
 		PromptStyle:      chrome.PromptStyle,
 		PromptErrorStyle: chrome.PromptErrorStyle,
 		Frame: iview.Frame{
