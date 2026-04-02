@@ -544,6 +544,11 @@ func TestPagerHeaderLines(t *testing.T) {
 	if got, want := pager.HeaderLines(), 2; got != want {
 		t.Fatalf("HeaderLines() after SetHeaderLines(2) = %d, want %d", got, want)
 	}
+
+	pager.SetHeaderLines(-1)
+	if got, want := pager.HeaderLines(), 0; got != want {
+		t.Fatalf("HeaderLines() after SetHeaderLines(-1) = %d, want %d", got, want)
+	}
 }
 
 func TestPagerHeaderColumns(t *testing.T) {
@@ -555,6 +560,11 @@ func TestPagerHeaderColumns(t *testing.T) {
 	pager.SetHeaderColumns(3)
 	if got, want := pager.HeaderColumns(), 3; got != want {
 		t.Fatalf("HeaderColumns() after SetHeaderColumns(3) = %d, want %d", got, want)
+	}
+
+	pager.SetHeaderColumns(-1)
+	if got, want := pager.HeaderColumns(), 0; got != want {
+		t.Fatalf("HeaderColumns() after SetHeaderColumns(-1) = %d, want %d", got, want)
 	}
 }
 

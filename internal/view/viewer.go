@@ -561,13 +561,8 @@ func (v *Viewer) Following() bool {
 // Position reports the current visible row, total row count, and horizontal offset.
 func (v *Viewer) Position() Position {
 	v.ensureLayout()
-
-	row := 0
-	if len(v.layout.Rows) > 0 {
-		row = min(v.scrollableRowStartIndex()+v.rowOffset+1, len(v.layout.Rows))
-	}
 	return Position{
-		Row:    row,
+		Row:    v.firstVisibleRow(),
 		Rows:   len(v.layout.Rows),
 		Column: v.colOffset,
 	}
@@ -640,6 +635,18 @@ func (v *Viewer) maxColOffset() int {
 func (v *Viewer) bodyHeight() int {
 	_, _, _, h := v.contentRect()
 	return h
+}
+
+func (v *Viewer) firstVisibleRow() int {
+	v.ensureLayout()
+	if len(v.layout.Rows) == 0 {
+		return 0
+	}
+	rowIndex, _, ok := v.visibleLayoutRowAt(0)
+	if !ok || rowIndex < 0 {
+		return 0
+	}
+	return min(rowIndex+1, len(v.layout.Rows))
 }
 
 func (v *Viewer) headerLineCount() int {
@@ -732,44 +739,7 @@ func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow
 	rowStyle := v.rowBaseStyle(header)
 	screen.PutStrStyled(baseX, y, padRightToWidth("", v.contentWidth()), rowStyle)
 	for _, segment := range row.Segments {
-		if segment.LogicalGraphemeIndex < 0 || segment.LogicalGraphemeIndex >= len(line.Graphemes) {
-			continue
-		}
-		grapheme := line.Graphemes[segment.LogicalGraphemeIndex]
-		ansiStyle := styleForGrapheme(line, grapheme.RuneStart)
-		cellStyle := v.toTCellStyle(ansiStyle)
-		if header {
-			cellStyle = applyChromeStyle(cellStyle, v.cfg.Chrome.HeaderStyle)
-		}
-		if hyperlink, ok := hyperlinks.byGrapheme[segment.LogicalGraphemeIndex]; ok {
-			cellStyle = applyHyperlinkDecisionStyle(cellStyle, hyperlink.decision, hyperlink.span)
-		}
-		matched, current := v.graphemeMatched(line, row.LineIndex, grapheme)
-		if matched {
-			cellStyle = applyMatchCellStyle(cellStyle, current)
-		}
-		x := segment.RenderedCellFrom
-		if x >= v.contentWidth() {
-			break
-		}
-		x += baseX
-
-		if display, style, ok := v.visualizedSegment(row, line, segment, grapheme, cellStyle); ok {
-			screen.PutStrStyled(x, y, display, style)
-			continue
-		}
-
-		if segment.Display != "" {
-			screen.PutStrStyled(x, y, segment.Display, cellStyle)
-			continue
-		}
-
-		if grapheme.Text == "\t" {
-			screen.PutStrStyled(x, y, strings.Repeat(" ", segment.RenderedCellTo-segment.RenderedCellFrom), cellStyle)
-			continue
-		}
-
-		screen.Put(x, y, grapheme.Text, cellStyle)
+		v.drawSegment(screen, baseX, y, row, line, segment, header, hyperlinks, v.contentWidth())
 	}
 	v.drawTrailingMarkers(screen, baseX, y, row, line, rowStyle, header)
 }
@@ -782,14 +752,66 @@ func (v *Viewer) drawHeaderColumns(screen tcell.Screen, y int, row layout.Visual
 
 	style := v.rowBaseStyle(true)
 	screen.PutStrStyled(baseX, y, padRightToWidth("", width), style)
-	if v.cfg.WrapMode == layout.SoftWrap && row.SourceCellStart > width {
+	line := v.lines[row.LineIndex]
+	hyperlinks := lineHyperlinks[row.LineIndex]
+	for _, segment := range v.headerColumnSegments(row, width) {
+		v.drawSegment(screen, baseX, y, row, line, segment, true, hyperlinks, width)
+	}
+}
+
+func (v *Viewer) drawSegment(screen tcell.Screen, baseX, y int, row layout.VisualRow, line model.Line, segment layout.VisualSegment, header bool, hyperlinks rowHyperlinks, maxWidth int) {
+	if segment.LogicalGraphemeIndex < 0 || segment.LogicalGraphemeIndex >= len(line.Graphemes) {
+		return
+	}
+	grapheme := line.Graphemes[segment.LogicalGraphemeIndex]
+	cellStyle := v.toTCellStyle(styleForGrapheme(line, grapheme.RuneStart))
+	if header {
+		cellStyle = applyChromeStyle(cellStyle, v.cfg.Chrome.HeaderStyle)
+	}
+	if hyperlink, ok := hyperlinks.byGrapheme[segment.LogicalGraphemeIndex]; ok {
+		cellStyle = applyHyperlinkDecisionStyle(cellStyle, hyperlink.decision, hyperlink.span)
+	}
+	matched, current := v.graphemeMatched(line, row.LineIndex, grapheme)
+	if matched {
+		cellStyle = applyMatchCellStyle(cellStyle, current)
+	}
+
+	x := segment.RenderedCellFrom
+	if x >= maxWidth {
+		return
+	}
+	x += baseX
+
+	if display, style, ok := v.visualizedSegment(row, line, segment, grapheme, cellStyle); ok {
+		screen.PutStrStyled(x, y, truncateToWidth(display, maxWidth-segment.RenderedCellFrom), style)
 		return
 	}
 
-	line := v.lines[row.LineIndex]
-	hyperlinks := lineHyperlinks[row.LineIndex]
+	if segment.Display != "" {
+		screen.PutStrStyled(x, y, truncateToWidth(segment.Display, maxWidth-segment.RenderedCellFrom), cellStyle)
+		return
+	}
+
+	if grapheme.Text == "\t" {
+		width := min(segment.RenderedCellTo-segment.RenderedCellFrom, maxWidth-segment.RenderedCellFrom)
+		screen.PutStrStyled(x, y, strings.Repeat(" ", width), cellStyle)
+		return
+	}
+
+	screen.Put(x, y, grapheme.Text, cellStyle)
+}
+
+func (v *Viewer) headerColumnSegments(row layout.VisualRow, width int) []layout.VisualSegment {
+	if width <= 0 || row.LineIndex < 0 || row.LineIndex >= len(v.layout.Lines) {
+		return nil
+	}
+	if v.cfg.WrapMode == layout.SoftWrap && row.SourceCellStart > width {
+		return nil
+	}
+
 	info := v.layout.Lines[row.LineIndex]
-	for i, grapheme := range line.Graphemes {
+	segments := make([]layout.VisualSegment, 0, width+1)
+	for i := range info.GraphemeCellStarts {
 		sourceStart := info.GraphemeCellStarts[i]
 		sourceEnd := info.GraphemeCellEnds[i]
 		if sourceStart >= width {
@@ -799,31 +821,28 @@ func (v *Viewer) drawHeaderColumns(screen tcell.Screen, y int, row layout.Visual
 			continue
 		}
 
-		cellStyle := v.toTCellStyle(styleForGrapheme(line, grapheme.RuneStart))
-		cellStyle = applyChromeStyle(cellStyle, v.cfg.Chrome.HeaderStyle)
-		if hyperlink, ok := hyperlinks.byGrapheme[i]; ok {
-			cellStyle = applyHyperlinkDecisionStyle(cellStyle, hyperlink.decision, hyperlink.span)
+		segment := layout.VisualSegment{
+			LogicalGraphemeIndex: i,
+			SourceCellStart:      sourceStart,
+			SourceCellEnd:        sourceEnd,
+			RenderedCellFrom:     sourceStart,
+			RenderedCellTo:       min(sourceEnd, width),
 		}
-		matched, current := v.graphemeMatched(line, row.LineIndex, grapheme)
-		if matched {
-			cellStyle = applyMatchCellStyle(cellStyle, current)
-		}
-
-		switch {
-		case sourceEnd > width:
-			if grapheme.Text == "\t" {
-				visible := max(width-sourceStart, 0)
-				screen.PutStrStyled(baseX+sourceStart, y, strings.Repeat(" ", visible), cellStyle)
-				return
+		if sourceEnd > width {
+			visibleWidth := max(width-sourceStart, 0)
+			if visibleWidth <= 0 {
+				continue
 			}
-			screen.PutStrStyled(baseX+sourceStart, y, ">", cellStyle)
-			return
-		case grapheme.Text == "\t":
-			screen.PutStrStyled(baseX+sourceStart, y, strings.Repeat(" ", sourceEnd-sourceStart), cellStyle)
-		default:
-			screen.Put(baseX+sourceStart, y, grapheme.Text, cellStyle)
+			if v.lines[row.LineIndex].Graphemes[i].Text == "\t" {
+				segment.Display = strings.Repeat(" ", visibleWidth)
+			} else {
+				segment.Display = ">"
+				segment.RenderedCellTo = sourceStart + 1
+			}
 		}
+		segments = append(segments, segment)
 	}
+	return segments
 }
 
 type hyperlinkSpan struct {
@@ -1120,15 +1139,11 @@ func (v *Viewer) drawLineNumberGutter(screen tcell.Screen) {
 		return
 	}
 
-	fillStyle, _ := v.lineNumberStyles()
 	blank := padRightToWidth("", gutterWidth)
 	for y := 0; y < gutterHeight; y++ {
 		rowIndex, header, ok := v.visibleLayoutRowAt(y)
-		rowFillStyle := fillStyle
-		if header {
-			rowFillStyle = applyChromeStyle(rowFillStyle, v.cfg.Chrome.HeaderStyle)
-		}
-		rowTextStyle := applyChromeStyle(rowFillStyle, v.cfg.Chrome.LineNumberStyle)
+		rowFillStyle := applyChromeStyle(v.rowBaseStyle(header), v.cfg.Chrome.LineNumberStyle)
+		rowTextStyle := rowFillStyle
 		screen.PutStrStyled(gutterX, gutterY+y, blank, rowFillStyle)
 		if !ok {
 			continue
@@ -1140,11 +1155,6 @@ func (v *Viewer) drawLineNumberGutter(screen tcell.Screen) {
 		label := padRightToWidth(fmt.Sprintf("%*d", gutterWidth-1, row.LineIndex+1), gutterWidth)
 		screen.PutStrStyled(gutterX, gutterY+y, label, rowTextStyle)
 	}
-}
-
-func (v *Viewer) lineNumberStyles() (fill, text tcell.Style) {
-	base := v.toTCellStyle(ansi.DefaultStyle())
-	return base, applyChromeStyle(base, v.cfg.Chrome.LineNumberStyle)
 }
 
 func (v *Viewer) rowBaseStyle(header bool) tcell.Style {
@@ -1332,10 +1342,7 @@ func (v *Viewer) statusText() (left, right string) {
 		left += v.message
 	}
 
-	current := 0
-	if len(v.layout.Rows) > 0 {
-		current = min(v.rowOffset+1, len(v.layout.Rows))
-	}
+	current := v.firstVisibleRow()
 	right = v.text.StatusPosition(current, len(v.layout.Rows), v.colOffset)
 	if v.text.StatusLine != nil {
 		return v.text.StatusLine(StatusInfo{

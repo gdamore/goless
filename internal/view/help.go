@@ -22,7 +22,7 @@ func (v *Viewer) drawHelp(screen tcell.Screen) {
 		screen.PutStrStyled(bodyX, bodyY+y, padRightToWidth("", bodyWidth), bodyStyle)
 		lineIndex := v.helpOffset + y
 		if lineIndex >= len(lines) {
-			break
+			continue
 		}
 		screen.PutStrStyled(bodyX, bodyY+y, truncateToWidth(lines[lineIndex], bodyWidth), bodyStyle)
 	}
