@@ -1602,6 +1602,33 @@ func TestRefreshInFollowModeStaysAtBottomAfterAppend(t *testing.T) {
 	}
 }
 
+func TestSetSizeInFollowModeRepinsToEOF(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+	v.Follow()
+
+	if !v.EOFVisible() {
+		t.Fatal("EOF visible before resize = false, want true")
+	}
+
+	v.SetSize(20, 2)
+
+	if !v.Following() {
+		t.Fatalf("follow mode after resize = false, want true")
+	}
+	if !v.EOFVisible() {
+		t.Fatal("EOF visible after resize = false, want true")
+	}
+	if got, want := v.rowOffset, v.maxRowOffset(); got != want {
+		t.Fatalf("row offset after resize = %d, want %d", got, want)
+	}
+}
+
 func TestScrollUpExitsFollowMode(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
