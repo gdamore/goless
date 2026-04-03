@@ -336,9 +336,10 @@ The default key group is intentionally less-like. Common bindings include:
 - `q` or `Esc` to quit
 - `j`/`k` or arrow keys to scroll
 - `u`/`d` or `Ctrl-U`/`Ctrl-D` for half-page up/down
-- `space`/`b` for page down/up, plus `Ctrl-B` and `Alt-V` for page up
+- `space` for page down and `b`/`w` for page up, plus `Ctrl-B` and `Alt-V`
 - `g`/`G` for top/bottom
-- `w` to toggle wrap
+- `W` to toggle wrap
+- `r` or `Ctrl-L` to repaint the screen
 - `/` and `?` to search forward/backward
 - `n` and `N` to repeat search
 - `F2` to cycle search case mode in the bundled key group
@@ -348,7 +349,9 @@ The default key group is intentionally less-like. Common bindings include:
 - `:` then a number to jump to a line
 - `:50%` to jump near the middle of the document
 - `:next` / `:prev` to move through a multi-file session
-- `:first`, `:last`, and `:file` for file-session control
+- `:first`, `:last`, `:x`, and `:file` for file-session control
+- `:Q` as an additional quit command
+- `=` or `Ctrl-G` to show current file/session status in the standalone program
 - `:set searchcase smart|case|nocase` to set search mode directly
 - `:set searchmode sub|word|regex` to set search mode directly
 - `F` to enable follow mode

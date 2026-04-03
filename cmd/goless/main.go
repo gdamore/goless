@@ -179,6 +179,10 @@ func run() error {
 			before := pager.Position()
 			beforeFollowing := pager.Following()
 			result := pager.HandleKeyResult(event)
+			if !result.Handled && handleProgramStatusKey(pager, event) {
+				pager.Draw(screen)
+				break
+			}
 			if result.Quit {
 				return programExit(screen, quitAtEOFPolicy)
 			}
@@ -635,7 +639,7 @@ func (s *programSession) last() bool {
 func (s *programSession) commandHandler(reload func() error) func(goless.Command) goless.CommandResult {
 	return func(cmd goless.Command) goless.CommandResult {
 		switch cmd.Name {
-		case "q", "quit":
+		case "q", "Q", "quit":
 			return goless.CommandResult{Handled: true, Quit: true}
 		case "file", "f":
 			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
@@ -661,7 +665,7 @@ func (s *programSession) commandHandler(reload func() error) func(goless.Command
 				return goless.CommandResult{Handled: true, Message: err.Error()}
 			}
 			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
-		case "first", "rewind":
+		case "first", "rewind", "x":
 			if !s.hasFiles() || s.index == 0 {
 				return goless.CommandResult{Handled: true, Message: "already at first file"}
 			}
@@ -687,6 +691,27 @@ func (s *programSession) commandHandler(reload func() error) func(goless.Command
 			return goless.CommandResult{}
 		}
 	}
+}
+
+func handleProgramStatusKey(pager *goless.Pager, ev *tcell.EventKey) bool {
+	if pager == nil || ev == nil {
+		return false
+	}
+	if ev.Key() != tcell.KeyCtrlG && !(ev.Key() == tcell.KeyRune && ev.Str() == "=" && ev.Modifiers() == tcell.ModNone) {
+		return false
+	}
+
+	for _, step := range []*tcell.EventKey{
+		tcell.NewEventKey(tcell.KeyRune, ":", tcell.ModNone),
+		tcell.NewEventKey(tcell.KeyRune, "f", tcell.ModNone),
+		tcell.NewEventKey(tcell.KeyRune, "i", tcell.ModNone),
+		tcell.NewEventKey(tcell.KeyRune, "l", tcell.ModNone),
+		tcell.NewEventKey(tcell.KeyRune, "e", tcell.ModNone),
+		tcell.NewEventKey(tcell.KeyEnter, "", tcell.ModNone),
+	} {
+		pager.HandleKeyResult(step)
+	}
+	return true
 }
 
 func programInputs(args []string) (programStartup, []string, error) {

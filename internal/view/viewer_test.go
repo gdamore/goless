@@ -178,6 +178,7 @@ func TestLessKeyMapPageAliases(t *testing.T) {
 		{name: "Ctrl-V", ev: keyKey(tcell.KeyCtrlV), want: 3},
 		{name: "Alt-V", ev: keyRuneMod("v", tcell.ModAlt), want: 1},
 		{name: "Ctrl-B", ev: keyKey(tcell.KeyCtrlB), want: 1},
+		{name: "w", ev: keyRune("w"), want: 1},
 	}
 
 	for _, tt := range events {
@@ -190,6 +191,61 @@ func TestLessKeyMapPageAliases(t *testing.T) {
 			v.HandleKey(tt.ev)
 			if got := v.Position().Row; got != tt.want {
 				t.Fatalf("Position().Row after %s = %d, want %d", tt.name, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLessKeyMapUppercaseWTogglesWrap(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("ab界cd")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(3, 2)
+	v.colOffset = 2
+	v.relayout()
+
+	before := v.firstVisibleAnchor()
+	v.HandleKey(keyRune("W"))
+	after := v.firstVisibleAnchor()
+
+	if got, want := v.cfg.WrapMode, layout.SoftWrap; got != want {
+		t.Fatalf("wrap mode after W = %v, want %v", got, want)
+	}
+	if got, want := after, before; got != want {
+		t.Fatalf("anchor after W = %+v, want %+v", got, want)
+	}
+}
+
+func TestLessKeyMapRefreshAliases(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	events := []struct {
+		name string
+		ev   *tcell.EventKey
+	}{
+		{name: "r", ev: keyRune("r")},
+		{name: "Ctrl-L key", ev: keyKey(tcell.KeyCtrlL)},
+	}
+
+	for _, tt := range events {
+		t.Run(tt.name, func(t *testing.T) {
+			v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+			v.SetSize(20, 2)
+			v.HandleKey(keyRune("j"))
+			before := v.Position()
+			result := v.HandleKeyResult(tt.ev)
+			after := v.Position()
+			if !result.Handled || result.Action != KeyActionRefresh || result.Context != KeyContextNormal {
+				t.Fatalf("HandleKeyResult(%s) = %+v, want handled refresh in normal context", tt.name, result)
+			}
+			if after != before {
+				t.Fatalf("position after %s = %+v, want %+v", tt.name, after, before)
 			}
 		})
 	}
@@ -256,6 +312,39 @@ func TestLessKeyMapHelpUsesNormalNavigationKeys(t *testing.T) {
 	v.HandleKey(keyRune("g"))
 	if got, want := v.helpOffset, 0; got != want {
 		t.Fatalf("help offset after g = %d, want %d", got, want)
+	}
+}
+
+func TestLessKeyMapHelpRefreshAliases(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Text: Text{
+			HelpBody: "one\ntwo\nthree\nfour\nfive\nsix\n",
+		},
+	})
+	v.SetSize(20, 4)
+	v.mode = modeHelp
+	v.helpOffset = 2
+
+	for _, tt := range []struct {
+		name string
+		ev   *tcell.EventKey
+	}{
+		{name: "r", ev: keyRune("r")},
+		{name: "Ctrl-L", ev: keyKey(tcell.KeyCtrlL)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			before := v.helpOffset
+			result := v.HandleKeyResult(tt.ev)
+			if !result.Handled || result.Action != KeyActionRefresh || result.Context != KeyContextHelp {
+				t.Fatalf("HandleKeyResult(%s) = %+v, want handled refresh in help context", tt.name, result)
+			}
+			if got := v.helpOffset; got != before {
+				t.Fatalf("help offset after %s = %d, want %d", tt.name, got, before)
+			}
+		})
 	}
 }
 

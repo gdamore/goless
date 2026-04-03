@@ -89,6 +89,7 @@ const (
 	actionPromptCommand
 	actionSearchNext
 	actionSearchPrev
+	actionRefresh
 	actionToggleHelp
 	actionFollow
 	actionCycleSearchCase

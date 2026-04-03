@@ -528,6 +528,7 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 			v.follow = false
 		}
 		v.repeatSearch(!v.search.Forward)
+	case actionRefresh:
 	case actionToggleHelp:
 		v.toggleHelp()
 	case actionFollow:
@@ -1848,6 +1849,7 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 	case actionCycleSearchMode:
 		v.CycleSearchMode()
 		return KeyResult{Handled: true, Action: KeyActionCycleSearchMode, Context: KeyContextHelp}
+	case actionRefresh:
 	case actionScrollUp:
 		v.helpOffset--
 	case actionScrollDown:

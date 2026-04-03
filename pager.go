@@ -594,6 +594,8 @@ func toInternalKeyAction(a KeyAction) iview.KeyAction {
 		return iview.KeyActionSearchNext
 	case KeyActionSearchPrev:
 		return iview.KeyActionSearchPrev
+	case KeyActionRefresh:
+		return iview.KeyActionRefresh
 	case KeyActionToggleHelp:
 		return iview.KeyActionToggleHelp
 	case KeyActionFollow:
