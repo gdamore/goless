@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gdamore/goless"
 	"github.com/gdamore/tcell/v3"
@@ -84,7 +85,7 @@ func run() error {
 		return passThroughProgramInputs(os.Stdout, os.Stdin, files)
 	}
 
-	if !session.hasFiles() && stdinIsTerminal() {
+	if stdinIsTerminal() && (!session.hasFiles() || programInputsUseStdin(files)) {
 		return fmt.Errorf("stdin is a terminal; specify a file or pipe input")
 	}
 
@@ -125,16 +126,9 @@ func run() error {
 			}),
 		)
 	}
-
 	if session.hasFiles() {
 		reloadCurrent = func() error {
-			nextPager := buildProgramPager()
-			nextPager.SetSize(width, height)
-			if err := loadProgramInput(nextPager, inputLoader, session.currentFile(), session.startup); err != nil {
-				return err
-			}
-			pager = nextPager
-			return nil
+			return reloadProgramInput(session, inputLoader, &pager, buildProgramPager, width, height, screen.EventQ(), &readResult)
 		}
 		if err := reloadCurrent(); err != nil {
 			return err
@@ -142,8 +136,7 @@ func run() error {
 	} else {
 		pager = buildProgramPager()
 		pager.SetSize(width, height)
-		readResult = make(chan error, 1)
-		go readIntoPager(pager, os.Stdin, screen.EventQ(), readResult)
+		readResult = startProgramRead(pager, os.Stdin, screen.EventQ(), nil)
 	}
 	pager.Draw(screen)
 	quit, err := handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, readResult == nil, reloadCurrent)
@@ -391,12 +384,25 @@ func appendFromReader(pager *goless.Pager, r io.Reader, onChunk func()) error {
 }
 
 func readIntoPager(pager *goless.Pager, r io.Reader, eventQ chan tcell.Event, result chan<- error) {
+	readIntoPagerWithAfter(pager, r, eventQ, result, nil)
+}
+
+func readIntoPagerWithAfter(pager *goless.Pager, r io.Reader, eventQ chan tcell.Event, result chan<- error, after func(error)) {
 	err := appendFromReader(pager, r, func() {
 		eventQ <- tcell.NewEventInterrupt(nil)
 	})
 	pager.Flush()
+	if after != nil {
+		after(err)
+	}
 	result <- err
 	eventQ <- tcell.NewEventInterrupt(nil)
+}
+
+func startProgramRead(target *goless.Pager, reader io.Reader, eventQ chan tcell.Event, after func(error)) chan error {
+	result := make(chan error, 1)
+	go readIntoPagerWithAfter(target, reader, eventQ, result, after)
+	return result
 }
 
 func passThroughProgramInputs(dst io.Writer, stdin io.Reader, files []string) error {
@@ -433,7 +439,9 @@ func copyProgramInput(dst io.Writer, src io.Reader) error {
 type programInputLoader struct {
 	stdin       io.Reader
 	stdinLoaded bool
+	stdinActive bool
 	stdinData   []byte
+	mu          sync.Mutex
 }
 
 func newProgramInputLoader(stdin io.Reader) *programInputLoader {
@@ -456,6 +464,78 @@ func (l *programInputLoader) open(path string) (io.ReadCloser, error) {
 		l.stdinLoaded = true
 	}
 	return io.NopCloser(bytes.NewReader(l.stdinData)), nil
+}
+
+func (l *programInputLoader) canStream(path string) bool {
+	if !isProgramStdinInput(path) || l == nil {
+		return false
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.stdin != nil && !l.stdinLoaded && !l.stdinActive
+}
+
+func (l *programInputLoader) startStdinStream() (io.Reader, func(error, []byte), error) {
+	if l == nil || l.stdin == nil {
+		return nil, nil, fmt.Errorf("stdin unavailable")
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.stdinLoaded {
+		return nil, nil, fmt.Errorf("stdin already cached")
+	}
+	if l.stdinActive {
+		return nil, nil, fmt.Errorf("stdin already reading")
+	}
+	l.stdinActive = true
+	return l.stdin, func(err error, data []byte) {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		if err == nil {
+			l.stdinData = bytes.Clone(data)
+			l.stdinLoaded = true
+		}
+		l.stdinActive = false
+	}, nil
+}
+
+func reloadProgramInput(
+	session *programSession,
+	loader *programInputLoader,
+	pager **goless.Pager,
+	buildPager func() *goless.Pager,
+	width, height int,
+	eventQ chan tcell.Event,
+	readResult *chan error,
+) error {
+	if readResult != nil && *readResult != nil {
+		return fmt.Errorf("stdin still reading")
+	}
+	nextPager := buildPager()
+	nextPager.SetSize(width, height)
+	currentPath := session.currentFile()
+	if loader != nil && loader.canStream(currentPath) {
+		reader, finish, err := loader.startStdinStream()
+		if err != nil {
+			return err
+		}
+		var cache bytes.Buffer
+		*pager = nextPager
+		if readResult != nil {
+			*readResult = startProgramRead(*pager, io.TeeReader(reader, &cache), eventQ, func(err error) {
+				finish(err, cache.Bytes())
+			})
+		}
+		return nil
+	}
+	if err := loadProgramInput(nextPager, loader, currentPath, session.startup); err != nil {
+		return err
+	}
+	*pager = nextPager
+	if readResult != nil {
+		*readResult = nil
+	}
+	return nil
 }
 
 type programStartup struct {
@@ -625,6 +705,15 @@ func programInputs(args []string) (programStartup, []string, error) {
 		files = nil
 	}
 	return startup, files, nil
+}
+
+func programInputsUseStdin(files []string) bool {
+	for _, path := range files {
+		if isProgramStdinInput(path) {
+			return true
+		}
+	}
+	return false
 }
 
 func parseStartup(arg string) (programStartup, error) {

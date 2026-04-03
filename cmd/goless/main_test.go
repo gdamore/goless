@@ -10,8 +10,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gdamore/goless"
+	"github.com/gdamore/tcell/v3"
 	tcolor "github.com/gdamore/tcell/v3/color"
 )
 
@@ -503,6 +505,32 @@ func TestDemoSessionLabelsExplicitStdin(t *testing.T) {
 	}
 }
 
+func TestDemoSessionChromeLabelsExplicitStdin(t *testing.T) {
+	session := newProgramSession([]string{"-"}, programStartup{})
+	chrome := session.chrome(goless.Chrome{Title: "Demo"})
+	if got, want := chrome.Title, "Demo - stdin"; got != want {
+		t.Fatalf("chrome.Title = %q, want %q", got, want)
+	}
+}
+
+func TestDemoSessionCommandHandlerBlocksNavigationWhileStdinReading(t *testing.T) {
+	session := newProgramSession([]string{"one.txt", "-"}, programStartup{})
+	handler := session.commandHandler(func() error {
+		return fmt.Errorf("stdin still reading")
+	})
+
+	result := handler(goless.Command{Name: "next"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("next command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "stdin still reading"; got != want {
+		t.Fatalf("next command message = %q, want %q", got, want)
+	}
+	if got, want := session.currentFile(), "one.txt"; got != want {
+		t.Fatalf("current file after blocked reload = %q, want %q", got, want)
+	}
+}
+
 func TestDemoSessionCommandHandlerReloadFailureRestoresIndex(t *testing.T) {
 	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
 	handler := session.commandHandler(func() error {
@@ -588,6 +616,27 @@ func TestDemoInputs(t *testing.T) {
 				if got, want := files[i], tt.wantFiles[i]; got != want {
 					t.Fatalf("files[%d] = %q, want %q", i, got, want)
 				}
+			}
+		})
+	}
+}
+
+func TestProgramInputsUseStdin(t *testing.T) {
+	tests := []struct {
+		name  string
+		files []string
+		want  bool
+	}{
+		{name: "none"},
+		{name: "file only", files: []string{"sample.txt"}},
+		{name: "stdin only", files: []string{"-"}, want: true},
+		{name: "mixed", files: []string{"sample.txt", "-", "other.txt"}, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := programInputsUseStdin(tt.files); got != tt.want {
+				t.Fatalf("programInputsUseStdin(%v) = %v, want %v", tt.files, got, tt.want)
 			}
 		})
 	}
@@ -716,5 +765,254 @@ func TestProgramInputLoaderCachesExplicitStdin(t *testing.T) {
 	}
 	if got, want := string(secondData), "alpha\nbeta\n"; got != want {
 		t.Fatalf("second stdin read = %q, want %q", got, want)
+	}
+}
+
+func TestProgramInputLoaderRejectsUnavailableExplicitStdin(t *testing.T) {
+	loader := newProgramInputLoader(nil)
+	if loader.canStream("-") {
+		t.Fatal("loader.canStream(-) = true with nil stdin, want false")
+	}
+	if _, err := loader.open("-"); err == nil {
+		t.Fatal("loader.open(-) with nil stdin = nil error, want error")
+	}
+}
+
+func TestProgramInputLoaderStreamsAndCachesExplicitStdin(t *testing.T) {
+	loader := newProgramInputLoader(bytes.NewBufferString("alpha\nbeta\n"))
+	if !loader.canStream("-") {
+		t.Fatal("loader.canStream(-) = false, want true")
+	}
+
+	reader, finish, err := loader.startStdinStream()
+	if err != nil {
+		t.Fatalf("loader.startStdinStream() failed: %v", err)
+	}
+	if loader.canStream("-") {
+		t.Fatal("loader.canStream(-) = true while stdin is active, want false")
+	}
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll(stream) failed: %v", err)
+	}
+	finish(nil, data)
+
+	if got, want := string(data), "alpha\nbeta\n"; got != want {
+		t.Fatalf("stream data = %q, want %q", got, want)
+	}
+
+	cached, err := loader.open("-")
+	if err != nil {
+		t.Fatalf("loader.open(-) after stream failed: %v", err)
+	}
+	cachedData, err := io.ReadAll(cached)
+	if err != nil {
+		t.Fatalf("ReadAll(cached) failed: %v", err)
+	}
+	if err := cached.Close(); err != nil {
+		t.Fatalf("Close(cached) failed: %v", err)
+	}
+	if got, want := string(cachedData), "alpha\nbeta\n"; got != want {
+		t.Fatalf("cached data = %q, want %q", got, want)
+	}
+}
+
+func TestProgramInputLoaderStartStdinStreamErrors(t *testing.T) {
+	if _, _, err := (*programInputLoader)(nil).startStdinStream(); err == nil {
+		t.Fatal("nil loader startStdinStream = nil error, want error")
+	}
+
+	loader := newProgramInputLoader(bytes.NewBufferString("alpha\n"))
+	reader, finish, err := loader.startStdinStream()
+	if err != nil {
+		t.Fatalf("loader.startStdinStream() failed: %v", err)
+	}
+	if _, _, err := loader.startStdinStream(); err == nil {
+		t.Fatal("second startStdinStream while active = nil error, want error")
+	}
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll(stream) failed: %v", err)
+	}
+	finish(nil, data)
+	if _, _, err := loader.startStdinStream(); err == nil {
+		t.Fatal("startStdinStream after cache = nil error, want error")
+	}
+}
+
+func TestReadIntoPagerWithAfterRunsHook(t *testing.T) {
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	events := make(chan tcell.Event, 8)
+	result := make(chan error, 1)
+	done := make(chan error, 1)
+
+	go readIntoPagerWithAfter(pager, bytes.NewBufferString("alpha\nbeta\n"), events, result, func(err error) {
+		done <- err
+	})
+
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("readIntoPagerWithAfter result = %v, want nil", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for read result")
+	}
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("readIntoPagerWithAfter hook = %v, want nil", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for after hook")
+	}
+
+	if got, want := pager.Position().Rows, 2; got != want {
+		t.Fatalf("Position().Rows = %d, want %d", got, want)
+	}
+}
+
+func TestStartProgramReadReturnsResultChannel(t *testing.T) {
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	events := make(chan tcell.Event, 8)
+
+	result := startProgramRead(pager, bytes.NewBufferString("alpha\nbeta\n"), events, nil)
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("startProgramRead result = %v, want nil", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for startProgramRead result")
+	}
+}
+
+func TestLoadProgramInputFromFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	if err := os.WriteFile(path, []byte("one\ntwo\nthree\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(sample) failed: %v", err)
+	}
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := loadProgramInput(pager, nil, path, programStartup{line: 3}); err != nil {
+		t.Fatalf("loadProgramInput(file) failed: %v", err)
+	}
+	if got, want := pager.Position().Row, 3; got != want {
+		t.Fatalf("Position().Row = %d, want %d", got, want)
+	}
+}
+
+func TestLoadProgramInputFromCachedStdin(t *testing.T) {
+	loader := newProgramInputLoader(bytes.NewBufferString("alpha\nbeta\n"))
+	reader, finish, err := loader.startStdinStream()
+	if err != nil {
+		t.Fatalf("loader.startStdinStream() failed: %v", err)
+	}
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll(stream) failed: %v", err)
+	}
+	finish(nil, data)
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := loadProgramInput(pager, loader, "-", programStartup{query: "beta"}); err != nil {
+		t.Fatalf("loadProgramInput(stdin) failed: %v", err)
+	}
+	state := pager.SearchState()
+	if got, want := state.Query, "beta"; got != want {
+		t.Fatalf("SearchState().Query = %q, want %q", got, want)
+	}
+}
+
+func TestReloadProgramInputStreamsExplicitStdin(t *testing.T) {
+	session := newProgramSession([]string{"-"}, programStartup{})
+	loader := newProgramInputLoader(bytes.NewBufferString("alpha\nbeta\n"))
+	events := make(chan tcell.Event, 8)
+	var pager *goless.Pager
+	var readResult chan error
+
+	buildPager := func() *goless.Pager {
+		next := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+		next.SetSize(20, 3)
+		return next
+	}
+
+	if err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, events, &readResult); err != nil {
+		t.Fatalf("reloadProgramInput(stream) failed: %v", err)
+	}
+	if pager == nil {
+		t.Fatal("reloadProgramInput(stream) left pager nil")
+	}
+	if readResult == nil {
+		t.Fatal("reloadProgramInput(stream) left readResult nil")
+	}
+	select {
+	case err := <-readResult:
+		if err != nil {
+			t.Fatalf("reloadProgramInput(stream) result = %v, want nil", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for streamed stdin read")
+	}
+
+	if !loader.stdinLoaded {
+		t.Fatal("loader.stdinLoaded = false after streamed read, want true")
+	}
+}
+
+func TestReloadProgramInputBlocksWhileReading(t *testing.T) {
+	session := newProgramSession([]string{"-"}, programStartup{})
+	loader := newProgramInputLoader(bytes.NewBufferString("alpha\n"))
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	readResult := make(chan error, 1)
+
+	err := reloadProgramInput(session, loader, &pager, func() *goless.Pager {
+		return goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	}, 20, 3, make(chan tcell.Event, 1), &readResult)
+	if err == nil {
+		t.Fatal("reloadProgramInput while readResult active = nil error, want error")
+	}
+	if got, want := err.Error(), "stdin still reading"; got != want {
+		t.Fatalf("reloadProgramInput error = %q, want %q", got, want)
+	}
+}
+
+func TestReloadProgramInputLoadsCachedStdinSynchronously(t *testing.T) {
+	session := newProgramSession([]string{"-"}, programStartup{query: "beta"})
+	loader := newProgramInputLoader(bytes.NewBufferString("alpha\nbeta\n"))
+	reader, finish, err := loader.startStdinStream()
+	if err != nil {
+		t.Fatalf("loader.startStdinStream() failed: %v", err)
+	}
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll(stream) failed: %v", err)
+	}
+	finish(nil, data)
+
+	var pager *goless.Pager
+	var readResult chan error
+	buildPager := func() *goless.Pager {
+		return goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	}
+
+	if err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, make(chan tcell.Event, 1), &readResult); err != nil {
+		t.Fatalf("reloadProgramInput(cached) failed: %v", err)
+	}
+	if pager == nil {
+		t.Fatal("reloadProgramInput(cached) left pager nil")
+	}
+	if readResult != nil {
+		t.Fatal("reloadProgramInput(cached) set readResult, want nil")
+	}
+	if got, want := pager.SearchState().Query, "beta"; got != want {
+		t.Fatalf("SearchState().Query = %q, want %q", got, want)
 	}
 }
