@@ -3,14 +3,14 @@
   q Esc           quit
 
 [1;4mNavigation[0m
-  Up Down j k     move one line
+  ↑ ↓ j k         move one line
   PgDn f Space    forward one page
   PgUp b          backward one page
   Ctrl-D d        forward half page
   Ctrl-U u        backward half page
   Home g          jump to top
   End G           jump to bottom
-  Left Right h l  scroll horizontally
+  ← → h l         scroll horizontally
   w               toggle wrap
   F               follow the end of the document
 

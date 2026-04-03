@@ -123,6 +123,49 @@ func TestLessKeyMapHelpScrollsAndCloses(t *testing.T) {
 	}
 }
 
+func TestLessKeyMapHelpUsesNormalNavigationKeys(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Text: Text{
+			HelpBody: "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\n",
+		},
+	})
+	v.SetSize(20, 4)
+	v.mode = modeHelp
+
+	v.HandleKey(keyRune("j"))
+	if got, want := v.helpOffset, 1; got != want {
+		t.Fatalf("help offset after j = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("d"))
+	if got, want := v.helpOffset, 2; got != want {
+		t.Fatalf("help offset after d = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune(" "))
+	if got, want := v.helpOffset, 5; got != want {
+		t.Fatalf("help offset after space = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("b"))
+	if got, want := v.helpOffset, 2; got != want {
+		t.Fatalf("help offset after b = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("G"))
+	if got, want := v.helpOffset, v.maxHelpOffset(); got != want {
+		t.Fatalf("help offset after G = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("g"))
+	if got, want := v.helpOffset, 0; got != want {
+		t.Fatalf("help offset after g = %d, want %d", got, want)
+	}
+}
+
 func TestCommandPercentJump(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n")); err != nil {
