@@ -1,0 +1,24 @@
+{{ $src := .Get "src" }}
+{{ $poster := .Get "poster" | default "" }}
+{{ $rows := .Get "rows" | default "26" }}
+{{ $cols := .Get "cols" | default "100" }}
+{{ $id := printf "asciinema-%s" (md5 $src) }}
+{{ if not $src }}
+  <div class="cast-placeholder">
+    <strong>Asciinema placeholder</strong>
+    <p>Add a <code>src</code> path once a <code>.cast</code> recording exists in <code>site/static/casts/</code>.</p>
+  </div>
+{{ else }}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/asciinema-player@3.10.0/dist/bundle/asciinema-player.css">
+  <script src="https://cdn.jsdelivr.net/npm/asciinema-player@3.10.0/dist/bundle/asciinema-player.min.js"></script>
+  <div id="{{ $id }}" class="cast-player"></div>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      AsciinemaPlayer.create("{{ $src }}", document.getElementById("{{ $id }}"), {
+        cols: {{ $cols }},
+        rows: {{ $rows }},
+        poster: "{{ $poster }}"
+      });
+    });
+  </script>
+{{ end }}

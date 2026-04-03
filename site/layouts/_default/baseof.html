@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ if .IsHome }}{{ .Site.Title }}{{ else }}{{ .Title }} | {{ .Site.Title }}{{ end }}</title>
+    <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
+    <link rel="icon" type="image/png" href="{{ .Site.Params.favicon | relURL }}">
+    <link rel="stylesheet" href="{{ "styles.css" | relURL }}">
+  </head>
+  <body class="page-kind-{{ .Kind }}">
+    <div class="page-shell">
+      <header class="site-header">
+        <nav class="topbar">
+          <a class="brand" href="{{ "/" | relURL }}">
+            <span class="wordmark">{{ .Site.Title }}</span>
+          </a>
+          <div class="topbar-links">
+            {{ range .Site.Menus.main }}
+              <a href="{{ .URL }}">{{ .Name }}</a>
+            {{ end }}
+            <a href="{{ .Site.Params.repoURL }}">GitHub</a>
+            <a href="{{ .Site.Params.pkgURL }}">pkg.go.dev</a>
+          </div>
+        </nav>
+      </header>
+      {{ block "main" . }}{{ end }}
+      <footer class="site-footer">
+        <p>{{ .Site.Title }} docs: end-user manual and embedder guide.</p>
+      </footer>
+    </div>
+  </body>
+</html>

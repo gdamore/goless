@@ -1,0 +1,34 @@
+baseURL = "https://example.org/"
+languageCode = "en-us"
+title = "goless"
+enableRobotsTXT = true
+disableKinds = ["taxonomy", "term"]
+
+[params]
+  description = "goless is an embeddable pure-Go pager core for rendering textual content onto a tcell.Screen with behavior similar to less."
+  repoURL = "https://github.com/gdamore/goless"
+  pkgURL = "https://pkg.go.dev/github.com/gdamore/goless"
+  tagline = "Embeddable pager core for modern terminal applications"
+  hero = "A modern pager for applications that want more than less."
+  intro = "goless is embeddable, intuitive, secure, Unicode-aware, and customizable, with practical search, scrolling, chrome, and terminal-native presentation."
+  lightLogo = "/assets/logos/goless-light-transparent.png"
+  darkLogo = "/assets/logos/goless-dark-transparent.png"
+  favicon = "/assets/logos/goless-favicon-transparent.png"
+
+[caches]
+  [caches.images]
+    dir = ":cacheDir/images"
+
+[markup]
+  [markup.goldmark.renderer]
+    unsafe = true
+
+[menu]
+  [[menu.main]]
+    name = "User Manual"
+    pageRef = "/user-manual"
+    weight = 10
+  [[menu.main]]
+    name = "Developer Guide"
+    pageRef = "/developer-guide"
+    weight = 20

@@ -1,5 +1,9 @@
 # goless
 
+<p align="center">
+  <img src="site/static/assets/logos/goless-light-transparent.png" alt="goless logo" width="240">
+</p>
+
 `goless` is an embeddable pure-Go pager core for rendering textual content onto
 a `tcell.Screen` with behavior broadly similar to `less`.
 
@@ -14,6 +18,21 @@ This project is still early-stage and not production-ready yet.
 The public API is usable for experimentation, but compatibility is not stable
 yet. Expect breaking changes while the library surface and internal model are
 still settling.
+
+## Documentation Site
+
+Project documentation now lives in the Hugo site under `site/`.
+
+The intended structure is:
+
+- a user manual for the standalone `goless` program
+- a developer guide for applications embedding the pager library
+
+To preview the site locally:
+
+```bash
+hugo server --source site
+```
 
 ## What It Does Today
 
