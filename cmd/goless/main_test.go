@@ -628,6 +628,9 @@ func TestDemoInputs(t *testing.T) {
 		{name: "startup with separator", args: []string{"+7", "--", "sample.txt"}, wantLine: 7, wantFiles: []string{"sample.txt"}},
 		{name: "separator only", args: []string{"--", "sample.txt"}, wantFiles: []string{"sample.txt"}},
 		{name: "separator stdin", args: []string{"--", "-"}},
+		{name: "duplicate explicit stdin", args: []string{"-", "-"}, wantErr: true},
+		{name: "duplicate explicit stdin among files", args: []string{"a.txt", "-", "b.txt", "-"}, wantErr: true},
+		{name: "duplicate explicit stdin with startup", args: []string{"+42", "--", "-", "sample.txt", "-"}, wantErr: true},
 		{name: "bad startup", args: []string{"+bogus"}, wantErr: true},
 		{name: "bad startup search", args: []string{"+/"}, wantErr: true},
 	}

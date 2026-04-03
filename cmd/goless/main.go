@@ -707,6 +707,15 @@ func programInputs(args []string) (programStartup, []string, error) {
 		}
 	}
 	files := append([]string(nil), positional...)
+	stdinCount := 0
+	for _, path := range files {
+		if isProgramStdinInput(path) {
+			stdinCount++
+		}
+	}
+	if stdinCount > 1 {
+		return programStartup{}, nil, fmt.Errorf("stdin may be specified at most once")
+	}
 	if len(files) == 1 && isProgramStdinInput(files[0]) {
 		files = nil
 	}
