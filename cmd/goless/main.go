@@ -880,25 +880,7 @@ func newProgramPager(
 }
 
 func programChrome(name, title string, base goless.Chrome) (goless.Chrome, error) {
-	chrome := goless.Chrome{
-		TitleAlign:       base.TitleAlign,
-		Title:            base.Title,
-		BorderStyle:      base.BorderStyle,
-		TitleStyle:       base.TitleStyle,
-		StatusStyle:      base.StatusStyle,
-		LineNumberStyle:  base.LineNumberStyle,
-		HeaderStyle:      base.HeaderStyle,
-		PromptStyle:      base.PromptStyle,
-		PromptErrorStyle: base.PromptErrorStyle,
-		Frame: goless.Frame{
-			Horizontal:  base.Frame.Horizontal,
-			Vertical:    base.Frame.Vertical,
-			TopLeft:     base.Frame.TopLeft,
-			TopRight:    base.Frame.TopRight,
-			BottomLeft:  base.Frame.BottomLeft,
-			BottomRight: base.Frame.BottomRight,
-		},
-	}
+	chrome := base
 	if title != "" {
 		chrome.Title = title
 	}

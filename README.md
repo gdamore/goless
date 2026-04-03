@@ -324,6 +324,7 @@ Program flags:
 - `-hidden`
 - `-live-links`
 - `-render hybrid|literal|presentation`
+- `-squeeze` to collapse repeated blank lines in the current view
 - `-title text`
 - optional `+line` or `+/pattern` startup directive before paths
 - `-` as an explicit stdin path
