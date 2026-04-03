@@ -354,6 +354,10 @@ func (v *Viewer) SetSize(width, height int) {
 	v.height = height
 	v.relayout()
 	v.clampHelpOffset()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+	}
 }
 
 // Refresh rebuilds the derived layout using the current document contents.
