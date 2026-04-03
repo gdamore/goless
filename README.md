@@ -294,6 +294,9 @@ It can also read from stdin:
 printf 'hello\n\033[31mworld\033[0m\n' | go run ./cmd/goless
 ```
 
+If `stdout` is not a terminal, `goless` skips the full-screen UI and copies the
+selected input to `stdout` unchanged.
+
 Program flags:
 
 - `-e` or `--quit-at-eof` to quit on the first forward command at EOF

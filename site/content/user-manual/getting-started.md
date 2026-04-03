@@ -16,6 +16,9 @@ You can also pipe content directly into it:
 printf 'hello\nworld\n' | go run ./cmd/goless
 ```
 
+When `stdout` is redirected or piped, `goless` falls back to pass-through mode
+and writes the selected input unchanged instead of opening the full-screen UI.
+
 ## What Users Need First
 
 The first user-facing page should answer these questions quickly:
