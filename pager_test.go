@@ -1508,6 +1508,44 @@ func TestPagerRegexSearch(t *testing.T) {
 	}
 }
 
+func TestPagerEmptySearchPromptClearsSearchQuietly(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\nalpha\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if !pager.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true")
+	}
+	if got, want := pager.SearchState().Query, "alpha"; got != want {
+		t.Fatalf("SearchState().Query after search = %q, want %q", got, want)
+	}
+
+	if result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "/", tcell.ModNone)); !result.Handled {
+		t.Fatal("HandleKeyResult(/).Handled = false, want true")
+	}
+	if result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyEnter, "", tcell.ModNone)); !result.Handled {
+		t.Fatal("HandleKeyResult(Enter).Handled = false, want true")
+	}
+
+	state := pager.SearchState()
+	if got, want := state.Query, ""; got != want {
+		t.Fatalf("SearchState().Query after empty prompt = %q, want empty", got)
+	}
+	if got, want := state.MatchCount, 0; got != want {
+		t.Fatalf("SearchState().MatchCount after empty prompt = %d, want %d", got, want)
+	}
+
+	screen := newPagerMockScreen(t, 30, 2)
+	defer screen.Fini()
+	pager.Draw(screen)
+	if got := pagerRowString(screen, 1, 30); strings.Contains(got, "empty search") {
+		t.Fatalf("status line = %q, want quiet clear", got)
+	}
+}
+
 func TestPagerSearchPreservesWhitespace(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)

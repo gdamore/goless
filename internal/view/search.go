@@ -421,7 +421,7 @@ func (v *Viewer) SearchBackwardWithCase(query string, mode SearchCaseMode) bool 
 
 func (v *Viewer) clearSearch() {
 	v.search = searchState{}
-	v.message = v.text.SearchEmpty
+	v.message = ""
 }
 
 // ClearSearch removes any active search state.
