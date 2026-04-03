@@ -22,17 +22,46 @@ const (
 type promptState struct {
 	kind    promptKind
 	prefix  string
-	buffer  []rune
+	editor  lineEditor
 	seeded  bool
 	preview *searchState
 	errText string
+	history promptHistoryState
 }
 
 func (p *promptState) String() string {
 	if p == nil {
 		return ""
 	}
-	return p.prefix + string(p.buffer)
+	return p.prefix + p.input()
+}
+
+func (p *promptState) input() string {
+	if p == nil {
+		return ""
+	}
+	return p.editor.String()
+}
+
+func (p *promptState) cursor() int {
+	if p == nil {
+		return 0
+	}
+	return p.editor.Cursor()
+}
+
+type promptHistoryKind int
+
+const (
+	promptHistorySearch promptHistoryKind = iota
+	promptHistoryCommand
+	promptHistoryKindCount
+)
+
+type promptHistoryState struct {
+	kind  promptHistoryKind
+	index int
+	draft string
 }
 
 type action int

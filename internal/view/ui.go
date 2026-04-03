@@ -27,6 +27,9 @@ type PromptInfo struct {
 	Kind        PromptKind
 	Prefix      string
 	Input       string
+	Cursor      int
+	Overwrite   bool
+	Seeded      bool
 	Error       string
 	Search      SearchSnapshot
 	DefaultText string

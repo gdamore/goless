@@ -93,7 +93,7 @@ func (v *Viewer) SearchSnapshot() SearchSnapshot {
 		switch v.prompt.kind {
 		case promptSearchForward, promptSearchBackward:
 			snapshot := SearchSnapshot{
-				Query:        string(v.prompt.buffer),
+				Query:        v.prompt.input(),
 				Forward:      v.prompt.kind == promptSearchForward,
 				CaseMode:     normalizeSearchCaseMode(v.cfg.SearchCase),
 				Mode:         normalizeSearchMode(v.cfg.SearchMode),
@@ -258,9 +258,15 @@ func (v *Viewer) beginPrompt(kind promptKind) {
 	switch kind {
 	case promptSearchForward, promptSearchBackward:
 		if v.search.Query != "" {
-			v.prompt.buffer = []rune(v.search.Query)
+			v.prompt.editor.SetText(v.search.Query)
 			v.prompt.seeded = true
 		}
+	}
+	historyKind := historyKindForPrompt(kind)
+	v.prompt.history = promptHistoryState{
+		kind:  historyKind,
+		index: len(v.history[historyKind]),
+		draft: v.prompt.input(),
 	}
 	v.updatePromptPrefix()
 	v.updatePromptPreview()
@@ -276,7 +282,8 @@ func (v *Viewer) commitPrompt() KeyResult {
 		return KeyResult{}
 	}
 
-	text := string(v.prompt.buffer)
+	text := v.prompt.input()
+	seeded := v.prompt.seeded
 	commit := true
 	quit := false
 	switch v.prompt.kind {
@@ -288,6 +295,7 @@ func (v *Viewer) commitPrompt() KeyResult {
 		commit, quit = v.runCommand(text)
 	}
 	if commit {
+		v.recordPromptHistory(v.prompt.kind, text, seeded)
 		v.cancelPrompt()
 	}
 	if quit {
@@ -356,7 +364,7 @@ func (v *Viewer) updatePromptPreview() {
 		return
 	}
 
-	query := string(v.prompt.buffer)
+	query := v.prompt.input()
 	if query == "" {
 		v.prompt.preview = nil
 		v.prompt.errText = ""
@@ -572,6 +580,80 @@ func (v *Viewer) runCommand(text string) (commit bool, quit bool) {
 
 	v.message = v.text.CommandUnknown(text)
 	return true, false
+}
+
+func historyKindForPrompt(kind promptKind) promptHistoryKind {
+	switch kind {
+	case promptCommand:
+		return promptHistoryCommand
+	default:
+		return promptHistorySearch
+	}
+}
+
+func (v *Viewer) recordPromptHistory(kind promptKind, text string, seeded bool) {
+	historyKind := historyKindForPrompt(kind)
+	switch historyKind {
+	case promptHistoryCommand:
+		text = strings.TrimSpace(text)
+	default:
+		if seeded {
+			return
+		}
+	}
+	if text == "" {
+		return
+	}
+
+	entries := v.history[historyKind]
+	filtered := entries[:0]
+	for _, entry := range entries {
+		if entry != text {
+			filtered = append(filtered, entry)
+		}
+	}
+	filtered = append(filtered, text)
+	const maxPromptHistory = 16
+	if len(filtered) > maxPromptHistory {
+		filtered = filtered[len(filtered)-maxPromptHistory:]
+	}
+	v.history[historyKind] = filtered
+}
+
+func (v *Viewer) recallPromptHistory(step int) {
+	if v.prompt == nil || step == 0 {
+		return
+	}
+
+	entries := v.history[v.prompt.history.kind]
+	if len(entries) == 0 {
+		return
+	}
+
+	switch {
+	case step < 0:
+		if v.prompt.history.index <= 0 {
+			return
+		}
+		if v.prompt.history.index == len(entries) {
+			v.prompt.history.draft = v.prompt.input()
+		}
+		v.prompt.history.index--
+		v.prompt.editor.SetText(entries[v.prompt.history.index])
+	case step > 0:
+		if v.prompt.history.index >= len(entries) {
+			return
+		}
+		v.prompt.history.index++
+		if v.prompt.history.index == len(entries) {
+			v.prompt.editor.SetText(v.prompt.history.draft)
+		} else {
+			v.prompt.editor.SetText(entries[v.prompt.history.index])
+		}
+	}
+
+	v.prompt.seeded = false
+	v.updatePromptPreview()
 }
 
 func parsePercentCommand(text string) (int, bool) {
