@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -482,6 +483,26 @@ func TestDemoSessionAdditionalCommands(t *testing.T) {
 	}
 }
 
+func TestDemoSessionLabelsExplicitStdin(t *testing.T) {
+	session := newProgramSession([]string{"one.txt", "-", "three.txt"}, programStartup{})
+	reloads := 0
+	handler := session.commandHandler(func() error {
+		reloads++
+		return nil
+	})
+
+	result := handler(goless.Command{Name: "next"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("next command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "stdin (2/3)"; got != want {
+		t.Fatalf("next command message = %q, want %q", got, want)
+	}
+	if got, want := reloads, 1; got != want {
+		t.Fatalf("reload count after next = %d, want %d", got, want)
+	}
+}
+
 func TestDemoSessionCommandHandlerReloadFailureRestoresIndex(t *testing.T) {
 	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
 	handler := session.commandHandler(func() error {
@@ -530,11 +551,15 @@ func TestDemoInputs(t *testing.T) {
 		{name: "none", args: nil},
 		{name: "file only", args: []string{"sample.txt"}, wantFiles: []string{"sample.txt"}},
 		{name: "multiple files", args: []string{"a.txt", "b.txt"}, wantFiles: []string{"a.txt", "b.txt"}},
+		{name: "explicit stdin only", args: []string{"-"}},
+		{name: "explicit stdin among files", args: []string{"a.txt", "-", "b.txt"}, wantFiles: []string{"a.txt", "-", "b.txt"}},
 		{name: "startup only", args: []string{"+42"}, wantLine: 42},
 		{name: "startup and file", args: []string{"+42", "sample.txt"}, wantLine: 42, wantFiles: []string{"sample.txt"}},
+		{name: "startup and explicit stdin", args: []string{"+42", "-"}, wantLine: 42},
 		{name: "startup search and file", args: []string{"+/needle", "sample.txt"}, wantQuery: "needle", wantFiles: []string{"sample.txt"}},
 		{name: "startup with separator", args: []string{"+7", "--", "sample.txt"}, wantLine: 7, wantFiles: []string{"sample.txt"}},
 		{name: "separator only", args: []string{"--", "sample.txt"}, wantFiles: []string{"sample.txt"}},
+		{name: "separator stdin", args: []string{"--", "-"}},
 		{name: "bad startup", args: []string{"+bogus"}, wantErr: true},
 		{name: "bad startup search", args: []string{"+/"}, wantErr: true},
 	}
@@ -631,10 +656,65 @@ func TestPassThroughProgramInputsFromFiles(t *testing.T) {
 	}
 }
 
+func TestPassThroughProgramInputsFromMixedSources(t *testing.T) {
+	dir := t.TempDir()
+	first := filepath.Join(dir, "first.txt")
+	second := filepath.Join(dir, "second.txt")
+	if err := os.WriteFile(first, []byte("first\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(first) failed: %v", err)
+	}
+	if err := os.WriteFile(second, []byte("second\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(second) failed: %v", err)
+	}
+
+	var out bytes.Buffer
+	if err := passThroughProgramInputs(&out, bytes.NewBufferString("stdin\n"), []string{first, "-", second}); err != nil {
+		t.Fatalf("passThroughProgramInputs(mixed) failed: %v", err)
+	}
+	if got, want := out.String(), "first\nstdin\nsecond\n"; got != want {
+		t.Fatalf("output = %q, want %q", got, want)
+	}
+}
+
 func TestPassThroughProgramInputsReportsOpenError(t *testing.T) {
 	var out bytes.Buffer
 	err := passThroughProgramInputs(&out, bytes.NewBufferString("ignored\n"), []string{filepath.Join(t.TempDir(), "missing.txt")})
 	if err == nil {
 		t.Fatal("passThroughProgramInputs(...) = nil error, want error")
+	}
+}
+
+func TestProgramInputLoaderCachesExplicitStdin(t *testing.T) {
+	loader := newProgramInputLoader(bytes.NewBufferString("alpha\nbeta\n"))
+
+	first, err := loader.open("-")
+	if err != nil {
+		t.Fatalf("loader.open(-) failed: %v", err)
+	}
+	firstData, err := io.ReadAll(first)
+	if err != nil {
+		t.Fatalf("ReadAll(first) failed: %v", err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatalf("Close(first) failed: %v", err)
+	}
+
+	second, err := loader.open("-")
+	if err != nil {
+		t.Fatalf("loader.open(-) second time failed: %v", err)
+	}
+	secondData, err := io.ReadAll(second)
+	if err != nil {
+		t.Fatalf("ReadAll(second) failed: %v", err)
+	}
+	if err := second.Close(); err != nil {
+		t.Fatalf("Close(second) failed: %v", err)
+	}
+
+	if got, want := string(firstData), "alpha\nbeta\n"; got != want {
+		t.Fatalf("first stdin read = %q, want %q", got, want)
+	}
+	if got, want := string(secondData), "alpha\nbeta\n"; got != want {
+		t.Fatalf("second stdin read = %q, want %q", got, want)
 	}
 }

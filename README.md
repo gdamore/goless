@@ -300,6 +300,13 @@ It can also read from stdin:
 printf 'hello\n\033[31mworld\033[0m\n' | go run ./cmd/goless
 ```
 
+You can name stdin explicitly with `-`, including alongside files:
+
+```bash
+printf 'hello\n' | go run ./cmd/goless -- -
+printf 'hello\n' | go run ./cmd/goless -- a.txt - b.txt
+```
+
 If `stdout` is not a terminal, `goless` skips the full-screen UI and copies the
 selected input to `stdout` unchanged.
 
@@ -313,7 +320,8 @@ Program flags:
 - `-live-links`
 - `-render hybrid|literal|presentation`
 - `-title text`
-- optional `+line` or `+/pattern` startup directive before files
+- optional `+line` or `+/pattern` startup directive before paths
+- `-` as an explicit stdin path
 
 The default key group is intentionally less-like. Common bindings include:
 

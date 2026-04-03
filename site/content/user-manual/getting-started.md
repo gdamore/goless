@@ -16,6 +16,12 @@ You can also pipe content directly into it:
 printf 'hello\nworld\n' | go run ./cmd/goless
 ```
 
+If you want to spell stdin explicitly, use `-`:
+
+```bash
+printf 'hello\nworld\n' | go run ./cmd/goless -- -
+```
+
 When `stdout` is redirected or piped, `goless` falls back to pass-through mode
 and writes the selected input unchanged instead of opening the full-screen UI.
 

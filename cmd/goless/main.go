@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -24,6 +25,8 @@ const (
 	programQuitAtEOFWhenVisible
 )
 
+const programStdinInput = "-"
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -43,7 +46,7 @@ func run() error {
 	var title string
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless [-e|-E] [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [+line|+/pattern] [file ...]\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless [-e|-E] [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [+line|+/pattern] [path ...]\n")
 	}
 	flag.BoolVar(&quitAtEOF, "e", false, "quit on the first forward command at EOF")
 	flag.BoolVar(&quitAtEOFFirst, "E", false, "quit when EOF is already visible on screen")
@@ -71,6 +74,7 @@ func run() error {
 		return err
 	}
 	session := newProgramSession(files, startup)
+	inputLoader := newProgramInputLoader(os.Stdin)
 	quitAtEOFPolicy := programQuitAtEOFPolicyFromFlags(quitAtEOF, quitAtEOFFirst)
 	chromeCfg, err := programChrome(chromeName, title, preset.Chrome)
 	if err != nil {
@@ -126,7 +130,7 @@ func run() error {
 		reloadCurrent = func() error {
 			nextPager := buildProgramPager()
 			nextPager.SetSize(width, height)
-			if err := loadProgramFile(nextPager, session.currentFile(), session.startup); err != nil {
+			if err := loadProgramInput(nextPager, inputLoader, session.currentFile(), session.startup); err != nil {
 				return err
 			}
 			pager = nextPager
@@ -400,6 +404,12 @@ func passThroughProgramInputs(dst io.Writer, stdin io.Reader, files []string) er
 		return copyProgramInput(dst, stdin)
 	}
 	for _, path := range files {
+		if isProgramStdinInput(path) {
+			if err := copyProgramInput(dst, stdin); err != nil {
+				return err
+			}
+			continue
+		}
 		file, err := os.Open(path)
 		if err != nil {
 			return err
@@ -418,6 +428,34 @@ func passThroughProgramInputs(dst io.Writer, stdin io.Reader, files []string) er
 func copyProgramInput(dst io.Writer, src io.Reader) error {
 	_, err := io.Copy(dst, src)
 	return err
+}
+
+type programInputLoader struct {
+	stdin       io.Reader
+	stdinLoaded bool
+	stdinData   []byte
+}
+
+func newProgramInputLoader(stdin io.Reader) *programInputLoader {
+	return &programInputLoader{stdin: stdin}
+}
+
+func (l *programInputLoader) open(path string) (io.ReadCloser, error) {
+	if !isProgramStdinInput(path) {
+		return os.Open(path)
+	}
+	if l == nil || l.stdin == nil {
+		return nil, fmt.Errorf("stdin unavailable")
+	}
+	if !l.stdinLoaded {
+		data, err := io.ReadAll(l.stdin)
+		if err != nil {
+			return nil, err
+		}
+		l.stdinData = data
+		l.stdinLoaded = true
+	}
+	return io.NopCloser(bytes.NewReader(l.stdinData)), nil
 }
 
 type programStartup struct {
@@ -453,16 +491,16 @@ func (s *programSession) currentFileLabel() string {
 	if !s.hasFiles() {
 		return "stdin"
 	}
-	return fmt.Sprintf("%s (%d/%d)", s.currentFile(), s.index+1, len(s.files))
+	return fmt.Sprintf("%s (%d/%d)", programInputLabel(s.currentFile()), s.index+1, len(s.files))
 }
 
 func (s *programSession) chrome(base goless.Chrome) goless.Chrome {
 	chrome := base
 	if s.hasFiles() {
 		if chrome.Title == "" {
-			chrome.Title = s.currentFile()
+			chrome.Title = programInputLabel(s.currentFile())
 		} else {
-			chrome.Title = chrome.Title + " - " + s.currentFile()
+			chrome.Title = chrome.Title + " - " + programInputLabel(s.currentFile())
 		}
 	}
 	return chrome
@@ -582,7 +620,11 @@ func programInputs(args []string) (programStartup, []string, error) {
 			positional = positional[1:]
 		}
 	}
-	return startup, append([]string(nil), positional...), nil
+	files := append([]string(nil), positional...)
+	if len(files) == 1 && isProgramStdinInput(files[0]) {
+		files = nil
+	}
+	return startup, files, nil
 }
 
 func parseStartup(arg string) (programStartup, error) {
@@ -612,8 +654,18 @@ func applyStartupCommand(pager *goless.Pager, startup programStartup) {
 	}
 }
 
-func loadProgramFile(pager *goless.Pager, path string, startup programStartup) error {
-	file, err := os.Open(path)
+func loadProgramInput(pager *goless.Pager, loader *programInputLoader, path string, startup programStartup) error {
+	var (
+		file io.ReadCloser
+		err  error
+	)
+	if loader != nil {
+		file, err = loader.open(path)
+	} else if isProgramStdinInput(path) {
+		file = io.NopCloser(os.Stdin)
+	} else {
+		file, err = os.Open(path)
+	}
 	if err != nil {
 		return err
 	}
@@ -632,6 +684,17 @@ func stdinIsTerminal() bool {
 		return false
 	}
 	return info.Mode()&os.ModeCharDevice != 0
+}
+
+func isProgramStdinInput(path string) bool {
+	return path == programStdinInput
+}
+
+func programInputLabel(path string) string {
+	if isProgramStdinInput(path) {
+		return "stdin"
+	}
+	return path
 }
 
 func stdoutIsTerminal() bool {
