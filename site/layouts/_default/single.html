@@ -20,7 +20,11 @@
       <ul class="section-nav">
         {{ range .CurrentSection.Pages.ByWeight }}
           <li>
-            <a class="{{ if eq .RelPermalink $.RelPermalink }}active{{ end }}" href="{{ .RelPermalink }}">{{ .Title }}</a>
+            <a
+              class="{{ if eq .RelPermalink $.RelPermalink }}active{{ end }}"
+              href="{{ .RelPermalink }}"
+              {{ if eq .RelPermalink $.RelPermalink }}aria-current="page"{{ end }}
+            >{{ .Title }}</a>
           </li>
         {{ end }}
       </ul>

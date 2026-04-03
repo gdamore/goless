@@ -14,7 +14,8 @@
   --brand-soft: rgba(26, 167, 230, 0.14);
   --button-text: #f8fbff;
   --code-bg: #edf2f7;
-  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+
+  font-family: 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -56,7 +57,7 @@ a {
 
 code,
 pre {
-  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-family: SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 img {

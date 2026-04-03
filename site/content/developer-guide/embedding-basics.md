@@ -18,7 +18,9 @@ pager := goless.New(goless.Config{
     },
 })
 
-_, _ = pager.ReadFrom(strings.NewReader("hello\nworld\n"))
+if _, err := pager.ReadFrom(strings.NewReader("hello\nworld\n")); err != nil {
+    return err
+}
 pager.Flush()
 pager.SetSize(80, 24)
 pager.Draw(screen)
