@@ -14,3 +14,10 @@ The developer guide complements the API reference by focusing on decisions and p
 - how to feed content into the pager
 - how to configure rendering, search, chrome, and hyperlink policy
 - how to answer common integration questions with code
+
+It should also make the technical fit explicit:
+
+- pure Go implementation
+- no cgo dependency in the pager core
+- direct rendering to `tcell.Screen`
+- a clean path for applications already built on `tcell`

@@ -20,8 +20,8 @@
       <h2>Why goless</h2>
       <div class="value-grid">
         <article class="value-card">
-          <h3>Embeddable</h3>
-          <p>Built as a pager core for host applications, not as a shell escape hatch bolted onto your UI.</p>
+          <h3>Standalone And Embeddable</h3>
+          <p>Useful as a text viewer in its own right, but built so host applications can integrate the same core without shelling out.</p>
         </article>
         <article class="value-card">
           <h3>Modern</h3>
@@ -42,6 +42,24 @@
         <article class="value-card">
           <h3>Customizable</h3>
           <p>Themes, chrome, prompts, key bindings, render modes, and hyperlink decisions stay under embedder control.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Technical Fit</h2>
+      <div class="media-grid">
+        <article>
+          <h3>Pure Go</h3>
+          <p>Implemented in pure Go, without a cgo dependency in the pager core, so builds and cross-compilation stay straightforward.</p>
+        </article>
+        <article>
+          <h3>tcell-Native</h3>
+          <p>Designed to render onto <code>tcell.Screen</code>, which makes it a natural fit for applications already using the Go terminal UI ecosystem.</p>
+        </article>
+        <article>
+          <h3>Focused Core</h3>
+          <p>Built as a pager and viewer core rather than a terminal emulator, keeping the integration story tighter and the behavior easier to reason about.</p>
         </article>
       </div>
     </section>

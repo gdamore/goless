@@ -5,12 +5,12 @@ enableRobotsTXT = true
 disableKinds = ["taxonomy", "term"]
 
 [params]
-  description = "goless is an embeddable pure-Go pager core for rendering textual content onto a tcell.Screen with behavior similar to less."
+  description = "goless is a modern text viewer and embeddable pure-Go pager core for terminal applications."
   repoURL = "https://github.com/gdamore/goless"
   pkgURL = "https://pkg.go.dev/github.com/gdamore/goless"
-  tagline = "Embeddable pager core for modern terminal applications"
-  hero = "A modern pager for applications that want more than less."
-  intro = "goless is embeddable, intuitive, secure, Unicode-aware, and customizable, with practical search, scrolling, chrome, and terminal-native presentation."
+  tagline = "Modern text viewer and pager core for terminal applications"
+  hero = "A modern text viewer for the terminal, and a pager core for the apps built around it."
+  intro = "goless is shaping up as both a capable standalone viewer and an embeddable pager: intuitive, secure, Unicode-aware, customizable, pure Go, and built for modern terminal presentation."
   lightLogo = "/assets/logos/goless-light-transparent.png"
   darkLogo = "/assets/logos/goless-dark-transparent.png"
   favicon = "/assets/logos/goless-favicon-transparent.png"
