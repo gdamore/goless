@@ -1304,7 +1304,7 @@ func TestStatusTextPlacesPositionOnRight(t *testing.T) {
 	v.relayout()
 
 	leftText, rightText := v.statusText()
-	if got, want := leftText, ""; got != want {
+	if got, want := leftText, "F1 Help"; got != want {
 		t.Fatalf("left status text = %q, want %q", got, want)
 	}
 	if !strings.Contains(rightText, "row 1/2") || !strings.Contains(rightText, "col 0/5") || !strings.Contains(rightText, "⇆") {
@@ -1348,6 +1348,99 @@ func TestStatusTextUsesActiveSearchOverride(t *testing.T) {
 	leftText, _ := v.statusText()
 	if !strings.Contains(leftText, "search:nocase,sub") {
 		t.Fatalf("left status text = %q, want active override label", leftText)
+	}
+}
+
+func TestStatusTextCanReplaceHelpHint(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		Text: Text{
+			StatusHelpHint: "hilfe",
+		},
+	})
+	v.SetSize(20, 2)
+	v.relayout()
+
+	leftText, _ := v.statusText()
+	if got, want := leftText, "hilfe"; got != want {
+		t.Fatalf("left status text = %q, want %q", got, want)
+	}
+}
+
+func TestStatusTextCanHideHelpHint(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		Text: Text{
+			HideStatusHelpHint: true,
+		},
+	})
+	v.SetSize(20, 2)
+	v.relayout()
+
+	leftText, _ := v.statusText()
+	if got, want := leftText, ""; got != want {
+		t.Fatalf("left status text = %q, want %q", got, want)
+	}
+}
+
+func TestStatusHelpHintDoesNotShiftWhenLeftOverflowAppears(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(30, 2)
+	v.relayout()
+
+	_, screen := newMockScreen(t, 30, 2)
+	defer screen.Fini()
+
+	v.drawStatus(screen, 1)
+	if got := cellRune(screen, 3, 1); got != 'F' {
+		t.Fatalf("help hint start before scroll = %q, want %q", got, 'F')
+	}
+
+	v.colOffset = 1
+	v.relayout()
+	screen.Clear()
+	v.drawStatus(screen, 1)
+	if got := cellRune(screen, 1, 1); got != '◀' {
+		t.Fatalf("left overflow indicator = %q, want %q", got, '◀')
+	}
+	if got := cellRune(screen, 3, 1); got != 'F' {
+		t.Fatalf("help hint start after scroll = %q, want %q", got, 'F')
+	}
+}
+
+func TestStatusTextSuppressesHelpHintWhenMessagePresent(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.relayout()
+	v.message = "saved"
+
+	leftText, _ := v.statusText()
+	if got, want := leftText, "saved"; got != want {
+		t.Fatalf("left status text = %q, want %q", got, want)
 	}
 }
 
@@ -1456,11 +1549,57 @@ func TestStatusLineFormatterOverridesBuiltInStatusText(t *testing.T) {
 	v.relayout()
 
 	leftText, rightText := v.statusText()
-	if got, want := leftText, "L:"; got != want {
+	if got, want := leftText, "L:F1 Help"; got != want {
 		t.Fatalf("left status text = %q, want %q", got, want)
 	}
 	if !strings.HasPrefix(rightText, "R:row 1/2  col 0/5") {
 		t.Fatalf("right status text = %q, want prefix %q", rightText, "R:row 1/2  col 0/5")
+	}
+}
+
+func TestStatusHelpHintKeyUsesConfiguredStyle(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	keyStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(10)).Background(tcolor.PaletteColor(4)).Bold(true)
+	statusStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(15)).Background(tcolor.PaletteColor(2))
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		Text: Text{
+			StatusPosition: func(current, total, column, columns int) string {
+				return ""
+			},
+		},
+		Chrome: Chrome{
+			StatusStyle:        statusStyle,
+			StatusHelpKeyStyle: keyStyle,
+		},
+	})
+	v.SetSize(20, 2)
+	v.relayout()
+
+	_, screen := newMockScreen(t, 20, 2)
+	defer screen.Fini()
+	v.drawStatus(screen, 1)
+
+	_, gotKeyStyle, _ := screen.Get(3, 1)
+	if got, want := gotKeyStyle.GetForeground(), keyStyle.GetForeground(); got != want {
+		t.Fatalf("help key fg = %v, want %v", got, want)
+	}
+	if got, want := gotKeyStyle.GetBackground(), keyStyle.GetBackground(); got != want {
+		t.Fatalf("help key bg = %v, want %v", got, want)
+	}
+	if !gotKeyStyle.HasBold() {
+		t.Fatal("help key style lost bold attribute")
+	}
+
+	_, gotRestStyle, _ := screen.Get(6, 1)
+	if got, want := gotRestStyle.GetForeground(), statusStyle.GetForeground(); got != want {
+		t.Fatalf("help hint rest fg = %v, want %v", got, want)
 	}
 }
 

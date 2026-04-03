@@ -17,10 +17,12 @@ type Text struct {
 	HelpClose string
 	HelpBody  string
 
-	StatusSearchInfo func(query string, current, total int) string
-	StatusPosition   func(current, total, column, columns int) string
-	FollowMode       string
-	StatusLine       func(StatusInfo) (left, right string)
+	StatusSearchInfo   func(query string, current, total int) string
+	StatusPosition     func(current, total, column, columns int) string
+	StatusHelpHint     string
+	HideStatusHelpHint bool
+	FollowMode         string
+	StatusLine         func(StatusInfo) (left, right string)
 
 	SearchEmpty      string
 	SearchNotFound   func(query string) string
@@ -61,6 +63,9 @@ func (t Text) withDefaults() Text {
 	}
 	if t.StatusPosition == nil {
 		t.StatusPosition = defaults.StatusPosition
+	}
+	if !t.HideStatusHelpHint && t.StatusHelpHint == "" {
+		t.StatusHelpHint = defaults.StatusHelpHint
 	}
 	if t.FollowMode == "" {
 		t.FollowMode = defaults.FollowMode
@@ -110,8 +115,9 @@ func defaultText() Text {
 		StatusPosition: func(current, total, column, columns int) string {
 			return fmt.Sprintf("row %d/%d  col %d/%d", current, total, column, columns)
 		},
-		FollowMode:  "follow",
-		SearchEmpty: "empty search",
+		StatusHelpHint: "F1 Help",
+		FollowMode:     "follow",
+		SearchEmpty:    "empty search",
 		SearchNotFound: func(query string) string {
 			return fmt.Sprintf("%s not found", query)
 		},

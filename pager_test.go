@@ -885,7 +885,7 @@ func TestPagerTextHooksFormatStatusAndPrompt(t *testing.T) {
 	if !statusCalled {
 		t.Fatal("StatusLine hook was not called")
 	}
-	if got := pagerCellRune(screen, 2, 1); got != 'L' {
+	if got := pagerCellRune(screen, 3, 1); got != 'L' {
 		t.Fatalf("status text rune = %q, want %q", got, 'L')
 	}
 	if got, want := pagerCellStyle(screen, 0, 1).GetForeground(), statusStyle.GetForeground(); got != want {

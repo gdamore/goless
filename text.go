@@ -23,6 +23,10 @@ type Text struct {
 	StatusSearchInfo func(query string, current, total int) string
 	// StatusPosition formats the right-side position text in the status bar.
 	StatusPosition func(current, total, column, columns int) string
+	// StatusHelpHint is shown on the left side of the status bar when no other status text is active.
+	StatusHelpHint string
+	// HideStatusHelpHint suppresses the built-in idle help hint even when StatusHelpHint is empty.
+	HideStatusHelpHint bool
 	// FollowMode is appended to the status bar while follow mode is active.
 	FollowMode string
 	// StatusLine can override the full left and right status bar text.
@@ -68,8 +72,9 @@ func DefaultText() Text {
 		StatusPosition: func(current, total, column, columns int) string {
 			return fmt.Sprintf("row %d/%d  col %d/%d", current, total, column, columns)
 		},
-		FollowMode:  "follow",
-		SearchEmpty: "empty search",
+		StatusHelpHint: "F1 Help",
+		FollowMode:     "follow",
+		SearchEmpty:    "empty search",
 		SearchNotFound: func(query string) string {
 			return fmt.Sprintf("%s not found", query)
 		},

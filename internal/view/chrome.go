@@ -34,16 +34,17 @@ func (f Frame) enabled() bool {
 
 // Chrome configures optional decorative chrome around the viewer body.
 type Chrome struct {
-	TitleAlign       TitleAlign
-	Title            string
-	Frame            Frame
-	BorderStyle      tcell.Style
-	TitleStyle       tcell.Style
-	StatusStyle      tcell.Style
-	LineNumberStyle  tcell.Style
-	HeaderStyle      tcell.Style
-	PromptStyle      tcell.Style
-	PromptErrorStyle tcell.Style
+	TitleAlign         TitleAlign
+	Title              string
+	Frame              Frame
+	BorderStyle        tcell.Style
+	TitleStyle         tcell.Style
+	StatusStyle        tcell.Style
+	StatusHelpKeyStyle tcell.Style
+	LineNumberStyle    tcell.Style
+	HeaderStyle        tcell.Style
+	PromptStyle        tcell.Style
+	PromptErrorStyle   tcell.Style
 }
 
 func (c Chrome) withDefaults() Chrome {
@@ -55,6 +56,9 @@ func (c Chrome) withDefaults() Chrome {
 	}
 	if c.StatusStyle == tcell.StyleDefault {
 		c.StatusStyle = statusBarStyle
+	}
+	if c.StatusHelpKeyStyle == tcell.StyleDefault {
+		c.StatusHelpKeyStyle = c.StatusStyle.Foreground(tcolor.PaletteColor(11)).Bold(true)
 	}
 	if c.LineNumberStyle == tcell.StyleDefault {
 		c.LineNumberStyle = tcell.StyleDefault.Foreground(tcolor.PaletteColor(8)).Dim(true)
