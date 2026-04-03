@@ -4,12 +4,15 @@
   <img src="site/static/assets/logos/goless-light-transparent.png" alt="goless logo" width="240">
 </p>
 
-`goless` is an embeddable pure-Go pager core for rendering textual content onto
-a `tcell.Screen` with behavior broadly similar to `less`.
+`goless` is a modern terminal text viewer and embeddable pure-Go pager core
+for rendering textual content onto a `tcell.Screen` with behavior broadly
+similar to `less`.
 
-It is designed for applications that need to display untrusted text safely
-inside their own terminal UI, without shell escapes, subprocess hooks, or raw
-terminal control passthrough.
+It is designed both for applications that need to display untrusted text safely
+inside their own terminal UI and for the emerging standalone `goless` program,
+without shell escapes, subprocess hooks, or raw terminal control passthrough.
+It is implemented in pure Go, targets `tcell`, and does not rely on cgo in the
+pager core.
 
 ## Status
 

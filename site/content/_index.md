@@ -3,7 +3,7 @@ title = "goless"
 description = "Documentation for goless users and embedders."
 +++
 
-`goless` is an embeddable pure-Go pager core for terminal applications.
+`goless` is a modern terminal text viewer and an embeddable pure-Go pager core.
 
 This site is organized along two tracks:
 
