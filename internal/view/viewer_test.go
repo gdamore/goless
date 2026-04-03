@@ -844,7 +844,7 @@ func TestReenterSearchPromptPrefillsActiveQuery(t *testing.T) {
 	}
 
 	v.HandleKey(keyRune("/"))
-	if got, want := string(v.prompt.buffer), "alpha"; got != want {
+	if got, want := v.prompt.input(), "alpha"; got != want {
 		t.Fatalf("prompt buffer after reopening / = %q, want %q", got, want)
 	}
 	if !v.prompt.seeded {
@@ -854,14 +854,212 @@ func TestReenterSearchPromptPrefillsActiveQuery(t *testing.T) {
 		t.Fatalf("prompt preview after reopening / = %#v, want query alpha", v.prompt.preview)
 	}
 	v.HandleKey(keyRune("b"))
-	if got, want := string(v.prompt.buffer), "b"; got != want {
+	if got, want := v.prompt.input(), "b"; got != want {
 		t.Fatalf("prompt buffer after typing over seeded query = %q, want %q", got, want)
 	}
 
 	v.cancelPrompt()
 	v.HandleKey(keyRune("?"))
-	if got, want := string(v.prompt.buffer), "alpha"; got != want {
+	if got, want := v.prompt.input(), "alpha"; got != want {
 		t.Fatalf("prompt buffer after reopening ? = %q, want %q", got, want)
+	}
+}
+
+func TestPromptEditorSupportsInlineCursorEditing(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune(":"))
+	v.HandleKey(keyRune("a"))
+	v.HandleKey(keyRune("c"))
+	v.HandleKey(keyKey(tcell.KeyLeft))
+	v.HandleKey(keyRune("b"))
+
+	if got, want := v.prompt.input(), "abc"; got != want {
+		t.Fatalf("prompt input after inline edit = %q, want %q", got, want)
+	}
+	if got, want := v.prompt.cursor(), 2; got != want {
+		t.Fatalf("prompt cursor after inline edit = %d, want %d", got, want)
+	}
+}
+
+func TestPromptCtrlBAndCtrlFMoveCursor(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune(":"))
+	for _, s := range []string{"a", "b", "c"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyCtrlB))
+	v.HandleKey(keyKey(tcell.KeyCtrlB))
+	if got, want := v.prompt.cursor(), 1; got != want {
+		t.Fatalf("cursor after Ctrl-B = %d, want %d", got, want)
+	}
+	v.HandleKey(keyKey(tcell.KeyCtrlF))
+	if got, want := v.prompt.cursor(), 2; got != want {
+		t.Fatalf("cursor after Ctrl-F = %d, want %d", got, want)
+	}
+}
+
+func TestPromptEditorOverwriteModeReplacesAtCursor(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune(":"))
+	for _, s := range []string{"a", "b", "c"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyLeft))
+	v.HandleKey(keyKey(tcell.KeyLeft))
+	v.HandleKey(keyKey(tcell.KeyInsert))
+	v.HandleKey(keyRune("Z"))
+
+	if got, want := v.prompt.input(), "aZc"; got != want {
+		t.Fatalf("prompt input after overwrite edit = %q, want %q", got, want)
+	}
+	if !v.prompt.editor.Overwrite() {
+		t.Fatal("overwrite mode = false, want true after Insert")
+	}
+}
+
+func TestPromptCtrlKDeletesToEndOfLine(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune(":"))
+	for _, s := range []string{"a", "b", "c", "d", "e"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyLeft))
+	v.HandleKey(keyKey(tcell.KeyLeft))
+	v.HandleKey(keyKey(tcell.KeyCtrlK))
+
+	if got, want := v.prompt.input(), "abc"; got != want {
+		t.Fatalf("prompt input after Ctrl-K = %q, want %q", got, want)
+	}
+	if got, want := v.prompt.cursor(), 3; got != want {
+		t.Fatalf("cursor after Ctrl-K = %d, want %d", got, want)
+	}
+}
+
+func TestPromptCtrlWDeletesPreviousWord(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune(":"))
+	for _, s := range []string{"a", "l", "p", "h", "a", " ", " ", "b", "e", "t", "a"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyCtrlW))
+
+	if got, want := v.prompt.input(), "alpha  "; got != want {
+		t.Fatalf("prompt input after first Ctrl-W = %q, want %q", got, want)
+	}
+	if got, want := v.prompt.cursor(), 7; got != want {
+		t.Fatalf("cursor after first Ctrl-W = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyCtrlW))
+	if got, want := v.prompt.input(), ""; got != want {
+		t.Fatalf("prompt input after second Ctrl-W = %q, want empty", got)
+	}
+	if got, want := v.prompt.cursor(), 0; got != want {
+		t.Fatalf("cursor after second Ctrl-W = %d, want %d", got, want)
+	}
+}
+
+func TestPromptCtrlUDeletesToBeginningOfLine(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune(":"))
+	for _, s := range []string{"a", "b", "c", "d", "e"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyLeft))
+	v.HandleKey(keyKey(tcell.KeyLeft))
+	v.HandleKey(keyKey(tcell.KeyCtrlU))
+
+	if got, want := v.prompt.input(), "de"; got != want {
+		t.Fatalf("prompt input after Ctrl-U = %q, want %q", got, want)
+	}
+	if got, want := v.prompt.cursor(), 0; got != want {
+		t.Fatalf("cursor after Ctrl-U = %d, want %d", got, want)
+	}
+}
+
+func TestPromptHistoryRecallIsPromptKindAware(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nbeta\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune("/"))
+	for _, s := range []string{"a", "l", "p", "h", "a"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	v.HandleKey(keyRune(":"))
+	v.HandleKey(keyRune("1"))
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	v.HandleKey(keyRune("?"))
+	for _, s := range []string{"b", "e", "t", "a"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	v.HandleKey(keyRune("/"))
+	v.HandleKey(keyKey(tcell.KeyUp))
+	if got, want := v.prompt.input(), "beta"; got != want {
+		t.Fatalf("search history newest entry = %q, want %q", got, want)
+	}
+	v.HandleKey(keyKey(tcell.KeyUp))
+	if got, want := v.prompt.input(), "alpha"; got != want {
+		t.Fatalf("search history older entry = %q, want %q", got, want)
+	}
+
+	v.cancelPrompt()
+	v.HandleKey(keyRune(":"))
+	v.HandleKey(keyKey(tcell.KeyUp))
+	if got, want := v.prompt.input(), "1"; got != want {
+		t.Fatalf("command history entry = %q, want %q", got, want)
+	}
+}
+
+func TestPromptHistoryDownRestoresDraft(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune(":"))
+	for _, s := range []string{"1", "2"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	v.HandleKey(keyRune(":"))
+	for _, s := range []string{"n", "e"} {
+		v.HandleKey(keyRune(s))
+	}
+	v.HandleKey(keyKey(tcell.KeyUp))
+	if got, want := v.prompt.input(), "12"; got != want {
+		t.Fatalf("recalled history entry = %q, want %q", got, want)
+	}
+	v.HandleKey(keyKey(tcell.KeyDown))
+	if got, want := v.prompt.input(), "ne"; got != want {
+		t.Fatalf("restored draft after history = %q, want %q", got, want)
 	}
 }
 
@@ -1972,7 +2170,7 @@ func TestPromptLineFormatterOverridesBuiltInPromptText(t *testing.T) {
 	})
 	v.SetSize(20, 2)
 	v.beginPrompt(promptSearchForward)
-	v.prompt.buffer = []rune("a")
+	v.prompt.editor.SetText("a")
 
 	if got, want := v.promptText(), "find>a"; got != want {
 		t.Fatalf("promptText() = %q, want %q", got, want)
@@ -1984,7 +2182,7 @@ func TestDrawPromptShowsTailWhenInputOverflows(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
 	v.SetSize(18, 2)
 	v.beginPrompt(promptSearchForward)
-	v.prompt.buffer = []rune("abcdefghijkl")
+	v.prompt.editor.SetText("abcdefghijkl")
 
 	_, screen := newMockScreen(t, 18, 2)
 	defer screen.Fini()
@@ -1995,11 +2193,54 @@ func TestDrawPromptShowsTailWhenInputOverflows(t *testing.T) {
 	}
 }
 
+func TestDrawPromptKeepsCursorVisibleWhenInputIsClipped(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(6, 2)
+	v.beginPrompt(promptCommand)
+	v.prompt.editor.SetText("abcdef")
+	v.prompt.editor.MoveHome()
+	v.prompt.editor.MoveRight()
+
+	term, screen := newMockScreen(t, 6, 2)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got, want := screenRowString(screen, 1, 6), " :…bcd"; got != want {
+		t.Fatalf("prompt row = %q, want %q", got, want)
+	}
+	if got, want := term.Pos(), (vt.Coord{X: vt.Col(3), Y: vt.Row(1)}); got != want {
+		t.Fatalf("cursor position = %+v, want %+v", got, want)
+	}
+}
+
+func TestDrawPromptUsesCursorStyleForInsertAndOverwrite(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(10, 2)
+	v.beginPrompt(promptCommand)
+	v.prompt.editor.SetText("alpha")
+
+	term, screen := newMockScreen(t, 10, 2)
+	defer screen.Fini()
+
+	v.Draw(screen)
+	if got, want := term.Backend().GetCursor(), vt.SteadyBar; got != want {
+		t.Fatalf("insert cursor style = %v, want %v", got, want)
+	}
+
+	v.prompt.editor.ToggleOverwrite()
+	v.Draw(screen)
+	if got, want := term.Backend().GetCursor(), vt.SteadyBlock; got != want {
+		t.Fatalf("overwrite cursor style = %v, want %v", got, want)
+	}
+}
+
 func TestDisplayPromptTextReturnsEmptyForNonPositiveWidth(t *testing.T) {
 	doc := model.NewDocument(4)
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
 	v.beginPrompt(promptSearchForward)
-	v.prompt.buffer = []rune("alpha")
+	v.prompt.editor.SetText("alpha")
 
 	if got := v.displayPromptText(0); got != "" {
 		t.Fatalf("displayPromptText(0) = %q, want empty", got)
@@ -2011,7 +2252,7 @@ func TestBuiltInSearchPromptPlacesModeHintOnRight(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
 	v.SetSize(20, 2)
 	v.beginPrompt(promptSearchForward)
-	v.prompt.buffer = []rune("alpha")
+	v.prompt.editor.SetText("alpha")
 
 	_, screen := newMockScreen(t, 20, 2)
 	defer screen.Fini()
@@ -2044,7 +2285,7 @@ func TestSearchPromptHintKeysUseHighlightedStyle(t *testing.T) {
 	})
 	v.SetSize(24, 2)
 	v.beginPrompt(promptSearchForward)
-	v.prompt.buffer = []rune("alpha")
+	v.prompt.editor.SetText("alpha")
 
 	_, screen := newMockScreen(t, 24, 2)
 	defer screen.Fini()
@@ -2081,7 +2322,7 @@ func TestPromptLineFormatterDoesNotDuplicatePromptError(t *testing.T) {
 	})
 	v.SetSize(40, 2)
 	v.beginPrompt(promptSearchForward)
-	v.prompt.buffer = []rune("(")
+	v.prompt.editor.SetText("(")
 	v.updatePromptPreview()
 
 	_, screen := newMockScreen(t, 40, 2)
@@ -2130,7 +2371,7 @@ func TestDrawStatusAndPromptUseConfiguredStyles(t *testing.T) {
 	}
 
 	v.beginPrompt(promptSearchForward)
-	v.prompt.buffer = []rune("(")
+	v.prompt.editor.SetText("(")
 	v.updatePromptPreview()
 	screen.Clear()
 	v.drawPrompt(screen, 1)

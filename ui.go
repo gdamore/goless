@@ -39,6 +39,12 @@ type PromptInfo struct {
 	Prefix string
 	// Input is the current editable prompt buffer.
 	Input string
+	// Cursor is the current rune cursor within Input.
+	Cursor int
+	// Overwrite reports whether the prompt editor is in overwrite mode.
+	Overwrite bool
+	// Seeded reports whether the current prompt contents came from the active search seed.
+	Seeded bool
 	// Error is the current prompt-side error indicator, such as an invalid regex.
 	Error string
 	// Search is the current committed or preview search state.

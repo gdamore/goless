@@ -25,6 +25,18 @@
   F2              cycle case mode (smart/case/nocase)
   F3              cycle match mode (substring/word/regex)
 
+[1;4mPrompt Editing[0m
+  ← →             move within the prompt
+  Ctrl-B Ctrl-F   move backward/forward one character
+  Home End        jump to start/end of prompt input
+  Ctrl-A Ctrl-E   jump to start/end of prompt input
+  Backspace Del   delete left/right
+  Ctrl-K          delete to end of prompt input
+  Ctrl-W          delete backward one word
+  Ins             toggle insert/overwrite mode
+  ↑ ↓             recall prompt history
+  Ctrl-U          delete to beginning of prompt input
+
 [1;4mCommands[0m
   :123                    jump to line 123
   :50%                    jump to 50%
