@@ -39,10 +39,11 @@ func run() error {
 	var quitAtEOF bool
 	var quitAtEOFFirst bool
 	var renderName string
+	var squeeze bool
 	var title string
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-e|-E] [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-title text] [+line|+/pattern] [file ...]\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-e|-E] [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [+line|+/pattern] [file ...]\n")
 	}
 	flag.BoolVar(&quitAtEOF, "e", false, "quit on the first forward command at EOF")
 	flag.BoolVar(&quitAtEOFFirst, "E", false, "quit when EOF is already visible on screen")
@@ -53,6 +54,7 @@ func run() error {
 	flag.BoolVar(&quitAtEOF, "quit-at-eof", false, "long form of -e")
 	flag.BoolVar(&quitAtEOFFirst, "QUIT-AT-EOF", false, "long form of -E")
 	flag.StringVar(&renderName, "render", "hybrid", "render mode: hybrid, literal, presentation")
+	flag.BoolVar(&squeeze, "squeeze", false, "collapse repeated blank lines in the current view")
 	flag.StringVar(&title, "title", "", "frame title")
 	flag.Parse()
 
@@ -107,6 +109,7 @@ func run() error {
 			session.chrome(chromeCfg),
 			hidden,
 			liveLinks,
+			squeeze,
 			session.commandHandler(func() error {
 				if reloadCurrent == nil {
 					return fmt.Errorf("file reload unavailable")
@@ -665,18 +668,20 @@ func newDemoPager(
 	chrome goless.Chrome,
 	hidden bool,
 	liveLinks bool,
+	squeeze bool,
 	commandHandler func(goless.Command) goless.CommandResult,
 ) *goless.Pager {
 	return goless.New(goless.Config{
-		TabWidth:         8,
-		WrapMode:         goless.NoWrap,
-		RenderMode:       renderMode,
-		Theme:            preset.Theme,
-		Visualization:    demoVisualization(hidden),
-		HyperlinkHandler: demoHyperlinkHandler(liveLinks),
-		CommandHandler:   commandHandler,
-		Chrome:           chrome,
-		ShowStatus:       true,
+		TabWidth:          8,
+		WrapMode:          goless.NoWrap,
+		RenderMode:        renderMode,
+		SqueezeBlankLines: squeeze,
+		Theme:             preset.Theme,
+		Visualization:     demoVisualization(hidden),
+		HyperlinkHandler:  demoHyperlinkHandler(liveLinks),
+		CommandHandler:    commandHandler,
+		Chrome:            chrome,
+		ShowStatus:        true,
 	})
 }
 

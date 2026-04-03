@@ -569,6 +569,18 @@ func TestPagerLineNumberToggle(t *testing.T) {
 	}
 }
 
+func TestPagerSqueezeBlankLines(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	if pager.SqueezeBlankLines() {
+		t.Fatal("SqueezeBlankLines() = true, want false by default")
+	}
+
+	pager.SetSqueezeBlankLines(true)
+	if !pager.SqueezeBlankLines() {
+		t.Fatal("SqueezeBlankLines() = false, want true after SetSqueezeBlankLines(true)")
+	}
+}
+
 func TestPagerHeaderLines(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	if got, want := pager.HeaderLines(), 0; got != want {
@@ -600,6 +612,27 @@ func TestPagerHeaderColumns(t *testing.T) {
 	pager.SetHeaderColumns(-1)
 	if got, want := pager.HeaderColumns(), 0; got != want {
 		t.Fatalf("HeaderColumns() after SetHeaderColumns(-1) = %d, want %d", got, want)
+	}
+}
+
+func TestPagerJumpToLineUsesSqueezedView(t *testing.T) {
+	pager := New(Config{
+		TabWidth:          4,
+		WrapMode:          NoWrap,
+		ShowStatus:        true,
+		SqueezeBlankLines: true,
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("one\n\n\nthree\nfour\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if !pager.JumpToLine(3) {
+		t.Fatal("JumpToLine(3) = false, want true")
+	}
+	if got, want := pager.Position().Row, 3; got != want {
+		t.Fatalf("Position().Row after squeezed JumpToLine = %d, want %d", got, want)
 	}
 }
 

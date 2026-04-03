@@ -626,6 +626,20 @@ func (v *Viewer) runSetCommand(text string) bool {
 		}
 		v.message = ""
 		return true
+	case "squeeze", "squeezeblanks", "blanklines":
+		switch fields[2] {
+		case "on", "true":
+			v.SetSqueezeBlankLines(true)
+		case "off", "false":
+			v.SetSqueezeBlankLines(false)
+		case "toggle":
+			v.SetSqueezeBlankLines(!v.SqueezeBlankLines())
+		default:
+			v.message = v.text.CommandUnknown(text)
+			return true
+		}
+		v.message = ""
+		return true
 	case "headers", "headerlines":
 		switch fields[2] {
 		case "on", "true":
@@ -706,7 +720,7 @@ func (v *Viewer) goToPercent(percent int) {
 	v.message = strconv.Itoa(percent) + "%"
 }
 
-// JumpToLine moves the viewport to the requested logical line.
+// JumpToLine moves the viewport to the requested visible line number.
 func (v *Viewer) JumpToLine(lineNumber int) bool {
 	v.goToLine(lineNumber)
 	return lineNumber > 0 && lineNumber <= len(v.lines)
