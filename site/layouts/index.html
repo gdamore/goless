@@ -1,0 +1,88 @@
+{{ define "main" }}
+  <main class="content">
+    <section class="hero-panel">
+      <div class="hero-copy">
+        <p class="eyebrow">{{ .Site.Params.tagline }}</p>
+        <h1>{{ .Site.Params.hero }}</h1>
+        <p class="lede">{{ .Site.Params.intro }}</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="{{ .Site.Params.repoURL }}">View Repository</a>
+          <a class="button button-secondary" href="{{ .Site.Params.pkgURL }}">Read API Docs</a>
+        </div>
+      </div>
+      <div class="hero-art">
+        <img class="logo logo-light-mode" src="{{ .Site.Params.lightLogo | relURL }}" alt="goless logo">
+        <img class="logo logo-dark-mode" src="{{ .Site.Params.darkLogo | relURL }}" alt="goless logo">
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Why goless</h2>
+      <div class="value-grid">
+        <article class="value-card">
+          <h3>Embeddable</h3>
+          <p>Built as a pager core for host applications, not as a shell escape hatch bolted onto your UI.</p>
+        </article>
+        <article class="value-card">
+          <h3>Modern</h3>
+          <p>Supports 24-bit color, OSC 8 links, real Unicode grapheme handling, and cleaner chrome than classic terminal pagers.</p>
+        </article>
+        <article class="value-card">
+          <h3>Intuitive</h3>
+          <p>Familiar enough to pick up quickly, but designed to feel clearer and less awkward than inherited 1980s pager behavior.</p>
+        </article>
+        <article class="value-card">
+          <h3>Powerful</h3>
+          <p>Search modes, line numbers, follow mode, scrolling, headers, and presentation controls are available when you need them.</p>
+        </article>
+        <article class="value-card">
+          <h3>Secure</h3>
+          <p>Treats input as data, sanitizes unsupported terminal sequences, and makes hyperlink activation an explicit policy choice.</p>
+        </article>
+        <article class="value-card">
+          <h3>Customizable</h3>
+          <p>Themes, chrome, prompts, key bindings, render modes, and hyperlink decisions stay under embedder control.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Documentation Tracks</h2>
+      <div class="track-grid">
+        {{ range slice "user-manual" "developer-guide" }}
+          {{ with $.Site.GetPage (printf "/%s" .) }}
+            <article class="track-card">
+              <p class="track-eyebrow">{{ .Params.audience }}</p>
+              <h3><a href="{{ .RelPermalink }}">{{ .Title }}</a></h3>
+              <p>{{ .Summary }}</p>
+              <p class="track-focus">{{ .Params.focus }}</p>
+              <ul class="track-list">
+                {{ range first 3 (.Pages.ByWeight) }}
+                  <li><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
+                {{ end }}
+              </ul>
+            </article>
+          {{ end }}
+        {{ end }}
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Media Plan</h2>
+      <div class="media-grid">
+        <article>
+          <h3>Screenshots</h3>
+          <p>Store screenshots in <code>site/static/screenshots/</code> and reference them directly from Markdown pages.</p>
+        </article>
+        <article>
+          <h3>Terminal Recordings</h3>
+          <p>Store <code>.cast</code> recordings in <code>site/static/casts/</code> and embed them with the built-in Asciinema shortcode.</p>
+        </article>
+        <article>
+          <h3>Brand Assets</h3>
+          <p>Use the transparent logo variants from <code>site/static/assets/logos/</code> across the site and project docs.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+{{ end }}

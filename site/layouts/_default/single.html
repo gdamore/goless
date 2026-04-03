@@ -1,0 +1,25 @@
+{{ define "main" }}
+  <main class="content docs-layout">
+    <article class="card doc-main">
+      <p class="eyebrow">{{ .CurrentSection.Title }}</p>
+      <h1>{{ .Title }}</h1>
+      {{ with .Summary }}
+        <p class="lede">{{ . }}</p>
+      {{ end }}
+      <div class="doc-body">
+        {{ .Content }}
+      </div>
+    </article>
+
+    <aside class="card doc-sidebar">
+      <h2>{{ .CurrentSection.Title }}</h2>
+      <ul class="section-nav">
+        {{ range .CurrentSection.Pages.ByWeight }}
+          <li>
+            <a class="{{ if eq .RelPermalink $.RelPermalink }}active{{ end }}" href="{{ .RelPermalink }}">{{ .Title }}</a>
+          </li>
+        {{ end }}
+      </ul>
+    </aside>
+  </main>
+{{ end }}
