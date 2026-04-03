@@ -430,7 +430,7 @@ img {
 
 @media (max-width: 560px) {
   .page-shell {
-    width: min(100% - 20px, 1120px);
+    width: min(calc(100% - 20px), 1120px);
     padding-top: 16px;
   }
 
