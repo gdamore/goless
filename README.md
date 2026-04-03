@@ -237,12 +237,13 @@ The built-in pager UI exposes search mode controls directly:
   These are 1-based logical coordinates rather than wrapped visual row numbers
 - the built-in status bar appends `EOF` when the end of the document is visible
 - the right side of the status bar adds contextual wrap/scroll glyphs such as `↪` and `⇆`
-- `:set searchcase smart|case|nocase` is available as a fallback
-- `:set searchmode sub|word|regex` is available as a fallback
-- `:set squeeze on|off|toggle` is available as a fallback
-- `:set numbers on|off|toggle` is available as a fallback
-- `:set headers on|off|toggle|<n>` is available as a fallback
-- `:set headercols on|off|toggle|<n>` is available as a fallback
+- `:set number|nonumber|invnumber` is available as a fallback
+- `:set wrap|nowrap|invwrap` is available as a fallback
+- `:set list|nolist|invlist` is available as a fallback
+- `:set squeeze|nosqueeze|invsqueeze` is available as a fallback
+- `:set tabstop=<n>`, `:set pinlines=<n>`, and `:set pincols=<n>` are available as fallbacks
+- `:set ignorecase`, `:set noignorecase`, `:set smartcase`, and `:set nosmartcase` control search case
+- `:set searchcase=smart|case|nocase` and `:set searchmode=sub|word|regex` are available as explicit fallbacks
 - invalid regexes stay in the search prompt and are marked visibly until fixed
 
 `SqueezeBlankLines` is a view-time policy: raw input stays unchanged and
@@ -322,6 +323,7 @@ Program flags:
 - `-?` or `--help` to print usage and exit
 - `-e` or `--quit-at-eof` to quit on the first forward command at EOF
 - `-E` or `--QUIT-AT-EOF` to quit when EOF is already visible on screen
+- `-F` to quit immediately when the current input fits on one screen
 - `-N` to enable line numbers
 - `-R` accepted as a less-compatibility no-op
 - `-S` accepted as a less-compatibility no-op because no-wrap is already the default
@@ -359,8 +361,10 @@ The default key group is intentionally less-like. Common bindings include:
 - `:first`, `:last`, `:x`, and `:file` for file-session control
 - `:Q` as an additional quit command
 - `=` or `Ctrl-G` to show current file/session status in the standalone program
-- `:set searchcase smart|case|nocase` to set search mode directly
-- `:set searchmode sub|word|regex` to set search mode directly
+- `:set number`, `:set wrap`, `:set list`, and `:set squeeze` plus `no...` and `inv...` forms
+- `:set tabstop=<n>`, `:set pinlines=<n>`, and `:set pincols=<n>`
+- `:set ignorecase`, `:set noignorecase`, `:set smartcase`, and `:set nosmartcase`
+- `:set searchcase=smart|case|nocase` and `:set searchmode=sub|word|regex`
 - `F` to enable follow mode
 - `h` or `F1` to toggle help
 
