@@ -1875,7 +1875,7 @@ func TestStatusTextPlacesPositionOnRight(t *testing.T) {
 	if got, want := leftText, "F1 Help"; got != want {
 		t.Fatalf("left status text = %q, want %q", got, want)
 	}
-	if !strings.Contains(rightText, "row 1/2") || !strings.Contains(rightText, "col 0/5") || !strings.Contains(rightText, "⇆") {
+	if !strings.Contains(rightText, "row 1/2") || !strings.Contains(rightText, "col 1/5") || !strings.Contains(rightText, "⇆") {
 		t.Fatalf("right status text = %q, want row+col indicator with no-wrap glyph", rightText)
 	}
 }
@@ -2063,7 +2063,7 @@ func TestStatusTextShowsColumnTotalsWhenScrolled(t *testing.T) {
 	v.relayout()
 
 	_, rightText := v.statusText()
-	if !strings.Contains(rightText, "col 3/10") {
+	if !strings.Contains(rightText, "col 4/10") {
 		t.Fatalf("right status text = %q, want column total", rightText)
 	}
 	if !strings.Contains(rightText, "⇆") {
@@ -2126,8 +2126,8 @@ func TestStatusLineFormatterOverridesBuiltInStatusText(t *testing.T) {
 	if got, want := leftText, "L:F1 Help"; got != want {
 		t.Fatalf("left status text = %q, want %q", got, want)
 	}
-	if !strings.HasPrefix(rightText, "R:row 1/2  col 0/5") {
-		t.Fatalf("right status text = %q, want prefix %q", rightText, "R:row 1/2  col 0/5")
+	if !strings.HasPrefix(rightText, "R:row 1/2  col 1/5") {
+		t.Fatalf("right status text = %q, want prefix %q", rightText, "R:row 1/2  col 1/5")
 	}
 }
 

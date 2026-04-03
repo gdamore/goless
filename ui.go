@@ -11,7 +11,8 @@ type StatusInfo struct {
 	Following bool
 	// Message is the current status message appended by pager actions.
 	Message string
-	// Position is the current viewport position.
+	// Position is the current viewport position. Row and Column are 1-based when
+	// content is present, and 0 when no content is visible.
 	Position Position
 	// DefaultLeft is the built-in left status text.
 	DefaultLeft string

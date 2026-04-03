@@ -22,6 +22,7 @@ type Text struct {
 	// StatusSearchInfo formats the left-side status text for an active search.
 	StatusSearchInfo func(query string, current, total int) string
 	// StatusPosition formats the right-side position text in the status bar.
+	// current and column are 1-based visible coordinates.
 	StatusPosition func(current, total, column, columns int) string
 	// StatusHelpHint is shown on the left side of the status bar when no other status text is active.
 	StatusHelpHint string

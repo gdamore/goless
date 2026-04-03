@@ -77,10 +77,16 @@ type CommandResult struct {
 }
 
 // Position summarizes the current visible pager viewport.
+// Row and Column are 1-based visible coordinates when content is present, so
+// (1, 1) is the top-left corner of the current viewport. An empty viewport
+// reports Row=0 and Column=0.
 type Position struct {
-	Row     int
-	Rows    int
-	Column  int
+	Row int
+	// Rows is the total visible row count.
+	Rows int
+	// Column is the 1-based visible column number, or 0 when no content is visible.
+	Column int
+	// Columns is the maximum visible content width in columns.
 	Columns int
 }
 
@@ -439,7 +445,9 @@ func (p *Pager) JumpToLine(lineNumber int) bool {
 	return p.viewer.JumpToLine(lineNumber)
 }
 
-// Position reports the current visible row, total row count, horizontal offset, and maximum column span.
+// Position reports the current visible row, total row count, current visible
+// column number, and maximum column span. Row and Column are 1-based when
+// content is present, so (1, 1) is the top-left visible position.
 func (p *Pager) Position() Position {
 	pos := p.viewer.Position()
 	return Position{

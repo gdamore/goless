@@ -175,6 +175,8 @@ The current exported `Pager` API is controller-oriented.
   `SearchCaseMode`, `SetSearchMode`, `SearchMode`, `CycleSearchCaseMode`,
   `CycleSearchMode`, `SearchState`, `ClearSearch`
 - View state: `Position`
+  `Position.Row` and `Position.Column` are 1-based visible coordinates when
+  content is present, so `(1,1)` is the top-left visible position
 
 The main config knobs are:
 
@@ -224,6 +226,7 @@ The built-in pager UI exposes search mode controls directly:
 - when otherwise idle, the left side of the status bar shows a subtle help hint: `F1 Help`
   Embedders can replace it with `Text.StatusHelpHint` or suppress it with `Text.HideStatusHelpHint`
 - the right side of the status bar shows row and column as `current/total`
+  These are 1-based visible coordinates, so the top-left visible position is `row 1`, `col 1`
 - the right side of the status bar adds contextual wrap/scroll glyphs such as `↪` and `⇆`
 - `:set searchcase smart|case|nocase` is available as a fallback
 - `:set searchmode sub|word|regex` is available as a fallback
