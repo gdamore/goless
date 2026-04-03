@@ -40,26 +40,26 @@ type Config struct {
 
 // Viewer is a minimal document viewer built on the model and layout packages.
 type Viewer struct {
-	doc         *model.Document
-	cfg         Config
-	mode        viewerMode
-	prompt      *promptState
-	history     [promptHistoryKindCount][]string
-	message     string
-	search      searchState
-	text        Text
-	keys        keyMap
-	sourceLines []model.Line
-	lines       []model.Line
-	lineMap     []int
-	layout      layout.Result
-	maxColumns  int
-	width       int
-	height      int
-	rowOffset   int
-	colOffset   int
-	follow      bool
-	helpOffset  int
+	doc           *model.Document
+	cfg           Config
+	mode          viewerMode
+	prompt        *promptState
+	history       [promptHistoryKindCount][]string
+	message       string
+	search        searchState
+	text          Text
+	keys          keyMap
+	sourceLines   []model.Line
+	lines         []model.Line
+	lineMap       []int
+	layout        layout.Result
+	maxColumns    int
+	width         int
+	height        int
+	rowOffset     int
+	colOffset     int
+	follow        bool
+	helpOffset    int
 	helpColOffset int
 }
 
@@ -1630,7 +1630,7 @@ func (v *Viewer) drawPrompt(screen tcell.Screen, y int) {
 			screen.PutStrStyled(0, y, padRightToWidth(prompt, v.width), style)
 		}
 	}
-	if v.prompt != nil && v.prompt.errText != "" && v.width > 0 && !strings.Contains(prompt, v.prompt.errText) {
+	if v.prompt != nil && v.prompt.errText != "" && v.width > 0 && v.text.PromptLine == nil {
 		errText := "  " + v.prompt.errText
 		paddedPrompt := truncateToWidth(prompt, v.width)
 		start := stringWidth(paddedPrompt)
@@ -1935,15 +1935,15 @@ func clipPromptInput(input string, cursor, width int) (string, int) {
 		return "", -1
 	}
 
-	runes := []rune(input)
+	clusters := splitGraphemes(input)
 	if cursor < 0 {
 		cursor = 0
 	}
-	if cursor > len(runes) {
-		cursor = len(runes)
+	if cursor > len(clusters) {
+		cursor = len(clusters)
 	}
 
-	cursorWidth := stringWidth(string(runes[:cursor]))
+	cursorWidth := stringWidth(strings.Join(clusters[:cursor], ""))
 	inputWidth := stringWidth(input)
 	if inputWidth <= width {
 		return input, min(cursorWidth, width-1)

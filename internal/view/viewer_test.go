@@ -926,6 +926,32 @@ func TestPromptEditorOverwriteModeReplacesAtCursor(t *testing.T) {
 	}
 }
 
+func TestPromptEditorTreatsCombiningSequenceAsSingleCharacter(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune(":"))
+	v.HandleKey(keyRune("e\u0301"))
+	v.HandleKey(keyRune("x"))
+	if got, want := v.prompt.cursor(), 2; got != want {
+		t.Fatalf("cursor after grapheme insert = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyCtrlB))
+	if got, want := v.prompt.cursor(), 1; got != want {
+		t.Fatalf("cursor after Ctrl-B over grapheme = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyBackspace))
+	if got, want := v.prompt.input(), "x"; got != want {
+		t.Fatalf("prompt input after grapheme backspace = %q, want %q", got, want)
+	}
+	if got, want := v.prompt.cursor(), 0; got != want {
+		t.Fatalf("cursor after grapheme backspace = %d, want %d", got, want)
+	}
+}
+
 func TestPromptCtrlKDeletesToEndOfLine(t *testing.T) {
 	doc := model.NewDocument(4)
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
@@ -2331,6 +2357,32 @@ func TestPromptLineFormatterDoesNotDuplicatePromptError(t *testing.T) {
 	v.drawPrompt(screen, 1)
 	if got := strings.Count(screenRowString(screen, 1, 40), "regex:error"); got != 1 {
 		t.Fatalf("prompt error count = %d, want 1", got)
+	}
+}
+
+func TestPromptLineFormatterOwnsErrorRendering(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		SearchMode: SearchRegex,
+		Text: Text{
+			PromptLine: func(info PromptInfo) string {
+				return "prompt>" + info.Input
+			},
+		},
+	})
+	v.SetSize(40, 2)
+	v.beginPrompt(promptSearchForward)
+	v.prompt.editor.SetText("(")
+	v.updatePromptPreview()
+
+	_, screen := newMockScreen(t, 40, 2)
+	defer screen.Fini()
+
+	v.drawPrompt(screen, 1)
+	if got := screenRowString(screen, 1, 40); strings.Contains(got, "regex:error") {
+		t.Fatalf("prompt row = %q, want custom prompt renderer to own error text", got)
 	}
 }
 

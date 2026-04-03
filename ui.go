@@ -39,7 +39,7 @@ type PromptInfo struct {
 	Prefix string
 	// Input is the current editable prompt buffer.
 	Input string
-	// Cursor is the current rune cursor within Input.
+	// Cursor is the current grapheme cursor within Input.
 	Cursor int
 	// Overwrite reports whether the prompt editor is in overwrite mode.
 	Overwrite bool
