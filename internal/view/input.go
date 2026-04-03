@@ -44,10 +44,14 @@ const (
 	actionScrollDown
 	actionScrollLeft
 	actionScrollRight
+	actionScrollLeftFine
+	actionScrollRightFine
 	actionHalfPageUp
 	actionHalfPageDown
 	actionPageUp
 	actionPageDown
+	actionGoLineStart
+	actionGoLineEnd
 	actionGoTop
 	actionGoBottom
 	actionToggleWrap

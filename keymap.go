@@ -43,10 +43,14 @@ const (
 	KeyActionScrollUp
 	// KeyActionScrollDown scrolls down by one row.
 	KeyActionScrollDown
-	// KeyActionScrollLeft scrolls left by one cell.
+	// KeyActionScrollLeft scrolls left by a horizontal navigation step.
 	KeyActionScrollLeft
-	// KeyActionScrollRight scrolls right by one cell.
+	// KeyActionScrollRight scrolls right by a horizontal navigation step.
 	KeyActionScrollRight
+	// KeyActionScrollLeftFine scrolls left by one cell.
+	KeyActionScrollLeftFine
+	// KeyActionScrollRightFine scrolls right by one cell.
+	KeyActionScrollRightFine
 	// KeyActionHalfPageUp scrolls up by roughly half a page.
 	KeyActionHalfPageUp
 	// KeyActionHalfPageDown scrolls down by roughly half a page.
@@ -55,6 +59,10 @@ const (
 	KeyActionPageUp
 	// KeyActionPageDown scrolls down by roughly one page.
 	KeyActionPageDown
+	// KeyActionGoLineStart jumps to the beginning of the current horizontal line.
+	KeyActionGoLineStart
+	// KeyActionGoLineEnd jumps to the end of the current horizontal line.
+	KeyActionGoLineEnd
 	// KeyActionGoTop jumps to the top of the document.
 	KeyActionGoTop
 	// KeyActionGoBottom jumps to the bottom of the document.
