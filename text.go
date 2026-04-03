@@ -22,7 +22,7 @@ type Text struct {
 	// StatusSearchInfo formats the left-side status text for an active search.
 	StatusSearchInfo func(query string, current, total int) string
 	// StatusPosition formats the right-side position text in the status bar.
-	StatusPosition func(current, total, column int) string
+	StatusPosition func(current, total, column, columns int) string
 	// FollowMode is appended to the status bar while follow mode is active.
 	FollowMode string
 	// StatusLine can override the full left and right status bar text.
@@ -65,8 +65,8 @@ func DefaultText() Text {
 		StatusSearchInfo: func(query string, current, total int) string {
 			return fmt.Sprintf("/%s %d/%d", query, current, total)
 		},
-		StatusPosition: func(current, total, column int) string {
-			return fmt.Sprintf("row %d/%d  col %d", current, total, column)
+		StatusPosition: func(current, total, column, columns int) string {
+			return fmt.Sprintf("row %d/%d  col %d/%d", current, total, column, columns)
 		},
 		FollowMode:  "follow",
 		SearchEmpty: "empty search",

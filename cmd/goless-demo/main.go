@@ -305,7 +305,7 @@ func isDemoQuitAtEOFAction(action goless.KeyAction) bool {
 }
 
 func demoPositionChanged(before, after goless.Position) bool {
-	return before.Row != after.Row || before.Rows != after.Rows || before.Column != after.Column
+	return before.Row != after.Row || before.Rows != after.Rows || before.Column != after.Column || before.Columns != after.Columns
 }
 
 func handleDemoVisibleEOFAction(

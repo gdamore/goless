@@ -70,9 +70,10 @@ type KeyResult struct {
 
 // Position summarizes the current visible viewport state.
 type Position struct {
-	Row    int
-	Rows   int
-	Column int
+	Row     int
+	Rows    int
+	Column  int
+	Columns int
 }
 
 // New constructs a viewer for the given document.
@@ -599,13 +600,14 @@ func (v *Viewer) EOFVisible() bool {
 	return ok && rowIndex >= len(v.layout.Rows)-1
 }
 
-// Position reports the current visible row, total row count, and horizontal offset.
+// Position reports the current visible row, total row count, horizontal offset, and maximum column span.
 func (v *Viewer) Position() Position {
 	v.ensureLayout()
 	return Position{
-		Row:    v.firstVisibleRow(),
-		Rows:   len(v.layout.Rows),
-		Column: v.colOffset,
+		Row:     v.firstVisibleRow(),
+		Rows:    len(v.layout.Rows),
+		Column:  v.colOffset,
+		Columns: v.maxContentColumns(),
 	}
 }
 
@@ -662,16 +664,7 @@ func (v *Viewer) maxColOffset() int {
 	if v.cfg.WrapMode != layout.NoWrap {
 		return 0
 	}
-
-	frozen := v.headerColumnWidth(v.rawContentWidth())
-	maxCells := 0
-	for i, line := range v.layout.Lines {
-		totalCells := line.TotalCells + v.trailingMarkerCellWidth(i)
-		if totalCells > maxCells {
-			maxCells = totalCells
-		}
-	}
-	return max(maxCells-frozen-max(v.bodyContentWidth(), 1), 0)
+	return max(v.maxContentColumns()-max(v.bodyContentWidth(), 1), 0)
 }
 
 func (v *Viewer) bodyHeight() int {
@@ -1415,18 +1408,17 @@ func (v *Viewer) bottomBarRows() int {
 
 func (v *Viewer) statusText() (left, right string) {
 	search := v.activeSearch()
-	searchInfo := "search:" + v.searchModeLabel()
-	if search.Query != "" {
-		searchInfo = "search:" + searchModeLabel(search.CaseMode, search.Mode)
-	}
-	if search.Query != "" {
-		position := 0
-		if len(search.Matches) > 0 && search.Current >= 0 {
-			position = search.Current + 1
+	if search.Query != "" || normalizeSearchCaseMode(v.cfg.SearchCase) != SearchSmartCase || normalizeSearchMode(v.cfg.SearchMode) != SearchSubstring {
+		left = "search:" + v.searchModeLabel()
+		if search.Query != "" {
+			left = "search:" + searchModeLabel(search.CaseMode, search.Mode)
+			position := 0
+			if len(search.Matches) > 0 && search.Current >= 0 {
+				position = search.Current + 1
+			}
+			left += "  " + v.text.StatusSearchInfo(search.Query, position, len(search.Matches))
 		}
-		searchInfo += "  " + v.text.StatusSearchInfo(search.Query, position, len(search.Matches))
 	}
-	left = searchInfo
 	if v.follow {
 		if left != "" {
 			left = v.text.FollowMode + "  " + left
@@ -1442,16 +1434,24 @@ func (v *Viewer) statusText() (left, right string) {
 	}
 
 	current := v.firstVisibleRow()
-	right = v.text.StatusPosition(current, len(v.layout.Rows), v.colOffset)
+	right = v.text.StatusPosition(current, len(v.layout.Rows), v.colOffset, v.maxContentColumns())
+	if modeHint := v.statusModeHint(); modeHint != "" {
+		if right != "" {
+			right += "  " + modeHint
+		} else {
+			right = modeHint
+		}
+	}
 	if v.text.StatusLine != nil {
 		return v.text.StatusLine(StatusInfo{
 			Search:    v.SearchSnapshot(),
 			Following: v.follow,
 			Message:   v.message,
 			Position: Position{
-				Row:    current,
-				Rows:   len(v.layout.Rows),
-				Column: v.colOffset,
+				Row:     current,
+				Rows:    len(v.layout.Rows),
+				Column:  v.colOffset,
+				Columns: v.maxContentColumns(),
 			},
 			DefaultLeft:  left,
 			DefaultRight: right,
@@ -1460,12 +1460,31 @@ func (v *Viewer) statusText() (left, right string) {
 	return left, right
 }
 
+func (v *Viewer) statusModeHint() string {
+	if v.cfg.WrapMode == layout.SoftWrap {
+		return "↪"
+	}
+	return "⇆"
+}
+
 func (v *Viewer) statusOverflow() (left, right bool) {
 	if v.cfg.WrapMode != layout.NoWrap {
 		return false, false
 	}
 
 	return v.colOffset > 0, v.colOffset < v.maxColOffset()
+}
+
+func (v *Viewer) maxContentColumns() int {
+	frozen := v.headerColumnWidth(v.rawContentWidth())
+	maxCells := 0
+	for i, line := range v.layout.Lines {
+		totalCells := line.TotalCells + v.trailingMarkerCellWidth(i)
+		if totalCells > maxCells {
+			maxCells = totalCells
+		}
+	}
+	return max(maxCells-frozen, 0)
 }
 
 func squeezeBlankLines(lines []model.Line, enabled bool) ([]model.Line, []int) {

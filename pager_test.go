@@ -494,6 +494,9 @@ func TestPagerWrapModeAndPosition(t *testing.T) {
 	if got, want := pos.Column, 3; got != want {
 		t.Fatalf("Position().Column = %d, want %d", got, want)
 	}
+	if got, want := pos.Columns, 10; got != want {
+		t.Fatalf("Position().Columns = %d, want %d", got, want)
+	}
 	if got, want := pager.WrapMode(), NoWrap; got != want {
 		t.Fatalf("WrapMode() = %v, want %v", got, want)
 	}
@@ -504,6 +507,9 @@ func TestPagerWrapModeAndPosition(t *testing.T) {
 	}
 	if got := pager.Position().Column; got != 0 {
 		t.Fatalf("Position().Column after SoftWrap = %d, want 0", got)
+	}
+	if got, want := pager.Position().Columns, 10; got != want {
+		t.Fatalf("Position().Columns after SoftWrap = %d, want %d", got, want)
 	}
 }
 
