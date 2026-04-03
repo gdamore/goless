@@ -1282,8 +1282,49 @@ func TestDrawHelpRespectsFrameInsets(t *testing.T) {
 	if got := cellRune(screen, 0, 1); got != '│' {
 		t.Fatalf("left border rune = %q, want %q", got, '│')
 	}
-	if got := cellRune(screen, 1, 1); got != 'N' {
-		t.Fatalf("help body rune = %q, want %q", got, 'N')
+	if got := cellRune(screen, 1, 1); got != 'G' {
+		t.Fatalf("help body rune = %q, want %q", got, 'G')
+	}
+}
+
+func TestDrawHelpAppliesANSIStyles(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Text: Text{
+			HelpBody: "\x1b[1;4mSection\x1b[0m\nnormal \x1b[3mvalue\x1b[0m",
+		},
+	})
+	v.SetSize(24, 6)
+	v.toggleHelp()
+
+	_, screen := newMockScreen(t, 24, 6)
+	defer screen.Fini()
+
+	v.Draw(screen)
+
+	if got := strings.TrimRight(screenRowString(screen, 1, 24), " "); got != "Section" {
+		t.Fatalf("styled heading row = %q, want %q", got, "Section")
+	}
+	if got := strings.TrimRight(screenRowString(screen, 2, 24), " "); got != "normal value" {
+		t.Fatalf("styled body row = %q, want %q", got, "normal value")
+	}
+
+	_, headingStyle, _ := screen.Get(0, 1)
+	if !headingStyle.HasBold() {
+		t.Fatal("help heading lost bold ANSI styling")
+	}
+	if got, want := headingStyle.GetUnderlineStyle(), tcell.UnderlineStyleSolid; got != want {
+		t.Fatalf("help heading underline = %v, want %v", got, want)
+	}
+	pos := strings.Index(screenRowString(screen, 2, 24), "value")
+	if pos < 0 {
+		t.Fatalf("styled body row = %q, want it to contain %q", screenRowString(screen, 2, 24), "value")
+	}
+	_, style, _ := screen.Get(pos, 2)
+	if !style.HasItalic() {
+		t.Fatal("help body lost italic ANSI styling")
 	}
 }
 
