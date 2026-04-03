@@ -1669,6 +1669,11 @@ func (v *Viewer) helpFrameTitle() string {
 	return title
 }
 
+func (v *Viewer) helpPageStep() int {
+	_, _, _, bodyHeight := v.contentRect()
+	return max(bodyHeight, 1)
+}
+
 func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 	a := v.keys.helpAction(ev)
 	switch a {
@@ -1688,13 +1693,13 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 	case actionScrollDown:
 		v.helpOffset++
 	case actionPageUp:
-		v.helpOffset -= max(v.height-2, 1)
+		v.helpOffset -= v.helpPageStep()
 	case actionPageDown:
-		v.helpOffset += max(v.height-2, 1)
+		v.helpOffset += v.helpPageStep()
 	case actionHalfPageUp:
-		v.helpOffset -= max((v.height-2)/2, 1)
+		v.helpOffset -= max(v.helpPageStep()/2, 1)
 	case actionHalfPageDown:
-		v.helpOffset += max((v.height-2)/2, 1)
+		v.helpOffset += max(v.helpPageStep()/2, 1)
 	case actionGoTop:
 		v.helpOffset = 0
 	case actionGoBottom:
