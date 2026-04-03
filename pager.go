@@ -26,7 +26,10 @@ const (
 	SoftWrap WrapMode = WrapMode(layout.SoftWrap)
 )
 
-// Config configures a Pager.
+// Config is a compatibility construction bundle for Pager.
+//
+// Prefer passing explicit Option values to New. Config remains accepted by New
+// because it implements the sealed Option interface.
 type Config struct {
 	TabWidth          int                         // TabWidth controls tab expansion during layout. Values <= 0 default to 8.
 	WrapMode          WrapMode                    // WrapMode selects horizontal scrolling or soft wrapping.
@@ -97,11 +100,22 @@ type Pager struct {
 	captureKey func(*tcell.EventKey) bool
 }
 
-// New constructs a Pager with the supplied configuration.
+// New constructs a Pager with the supplied options.
 //
-// The zero value of Config is valid. Missing optional configuration such as
-// text bundles, key groups, and tab width are filled with pager defaults.
-func New(cfg Config) *Pager {
+// The zero value behavior matches an empty option list. Missing optional
+// configuration such as text bundles, key groups, and tab width are filled
+// with pager defaults.
+func New(opts ...Option) *Pager {
+	var cfg Config
+	for _, opt := range opts {
+		if opt != nil {
+			opt.apply(&cfg)
+		}
+	}
+	return newPagerFromConfig(cfg)
+}
+
+func newPagerFromConfig(cfg Config) *Pager {
 	doc := model.NewDocumentWithMode(defaultChunkSize, toInternalRenderMode(cfg.RenderMode))
 	return &Pager{
 		doc:        doc,
@@ -126,6 +140,15 @@ func New(cfg Config) *Pager {
 			ShowStatus:        cfg.ShowStatus,
 			Text:              toInternalText(cfg.Text),
 		}),
+	}
+}
+
+// Configure applies runtime-safe options to an existing pager.
+func (p *Pager) Configure(opts ...RuntimeOption) {
+	for _, opt := range opts {
+		if opt != nil {
+			opt.applyRuntime(p)
+		}
 	}
 }
 
@@ -193,12 +216,12 @@ func (p *Pager) Refresh() {
 
 // SetTheme updates how document content colors are rendered.
 func (p *Pager) SetTheme(theme Theme) {
-	p.viewer.SetTheme(toInternalTheme(theme))
+	p.Configure(WithTheme(theme))
 }
 
 // SetLineNumbers updates whether the adaptive line-number gutter is shown.
 func (p *Pager) SetLineNumbers(enabled bool) {
-	p.viewer.SetLineNumbers(enabled)
+	p.Configure(WithLineNumbers(enabled))
 }
 
 // ToggleLineNumbers shows or hides the adaptive line-number gutter.
@@ -213,7 +236,7 @@ func (p *Pager) LineNumbers() bool {
 
 // SetSqueezeBlankLines updates whether repeated blank lines are collapsed in the current view.
 func (p *Pager) SetSqueezeBlankLines(enabled bool) {
-	p.viewer.SetSqueezeBlankLines(enabled)
+	p.Configure(WithSqueezeBlankLines(enabled))
 }
 
 // SqueezeBlankLines reports whether repeated blank lines are collapsed in the current view.
@@ -223,7 +246,7 @@ func (p *Pager) SqueezeBlankLines() bool {
 
 // SetHeaderLines updates how many leading logical lines stay fixed at the top of the viewport.
 func (p *Pager) SetHeaderLines(count int) {
-	p.viewer.SetHeaderLines(count)
+	p.Configure(WithHeaderLines(count))
 }
 
 // HeaderLines reports how many leading logical lines are fixed at the top of the viewport.
@@ -233,7 +256,7 @@ func (p *Pager) HeaderLines() int {
 
 // SetHeaderColumns updates how many leading display columns stay fixed at the left edge of the viewport.
 func (p *Pager) SetHeaderColumns(count int) {
-	p.viewer.SetHeaderColumns(count)
+	p.Configure(WithHeaderColumns(count))
 }
 
 // HeaderColumns reports how many leading display columns are fixed at the left edge of the viewport.
@@ -243,17 +266,17 @@ func (p *Pager) HeaderColumns() int {
 
 // SetVisualization updates how hidden structure markers are drawn.
 func (p *Pager) SetVisualization(visual Visualization) {
-	p.viewer.SetVisualization(toInternalVisualization(visual))
+	p.Configure(WithVisualization(visual))
 }
 
 // SetHyperlinkHandler updates how parsed OSC 8 hyperlinks are rendered.
 func (p *Pager) SetHyperlinkHandler(handler HyperlinkHandler) {
-	p.viewer.SetHyperlinkHandler(toInternalHyperlinkHandler(handler))
+	p.Configure(WithHyperlinkHandler(handler))
 }
 
 // SetChrome updates frame, title, and prompt/status styling.
 func (p *Pager) SetChrome(chrome Chrome) {
-	p.viewer.SetChrome(toInternalChrome(chrome))
+	p.Configure(WithChrome(chrome))
 }
 
 // HandleKey applies a key event and reports whether the caller should exit.
@@ -282,7 +305,7 @@ func (p *Pager) ToggleWrap() {
 
 // SetWrapMode updates the pager wrap mode while preserving the current anchor.
 func (p *Pager) SetWrapMode(mode WrapMode) {
-	p.viewer.SetWrapMode(toInternalWrapMode(mode))
+	p.Configure(WithWrapMode(mode))
 }
 
 // WrapMode reports the current wrap mode.
@@ -372,7 +395,7 @@ func (p *Pager) EOFVisible() bool {
 
 // SetSearchCaseMode updates the default case behavior for new and active searches.
 func (p *Pager) SetSearchCaseMode(mode SearchCaseMode) {
-	p.viewer.SetSearchCaseMode(toInternalSearchCaseMode(mode))
+	p.Configure(WithSearchCaseMode(mode))
 }
 
 // SearchCaseMode reports the default case behavior for searches.
@@ -387,7 +410,7 @@ func (p *Pager) CycleSearchCaseMode() SearchCaseMode {
 
 // SetSearchMode updates whether searches use substring, whole-word, or regex matching.
 func (p *Pager) SetSearchMode(mode SearchMode) {
-	p.viewer.SetSearchMode(toInternalSearchMode(mode))
+	p.Configure(WithSearchMode(mode))
 }
 
 // SearchMode reports whether searches use substring, whole-word, or regex matching.

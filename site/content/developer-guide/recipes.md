@@ -13,29 +13,31 @@ The developer guide should favor recipe-style answers to "how do I..." questions
 ```go
 preset := goless.PrettyPreset
 preset.Chrome.Title = "Logs"
-pager := goless.New(goless.Config{
-    Chrome: preset.Chrome,
-    Theme:  preset.Theme,
-})
+pager := goless.New(
+    goless.WithChrome(preset.Chrome),
+    goless.WithTheme(preset.Theme),
+)
 ```
 
 ### How do I make hyperlinks explicit instead of automatically live?
 
 ```go
-pager := goless.New(goless.Config{
-    HyperlinkHandler: func(info goless.HyperlinkInfo) goless.HyperlinkDecision {
+pager := goless.New(
+    goless.WithHyperlinkHandler(func(info goless.HyperlinkInfo) goless.HyperlinkDecision {
         return goless.HyperlinkDecision{
             Live: false,
         }
-    },
-})
+    }),
+)
 ```
 
 ### How do I switch search behavior?
 
 ```go
-pager.SetSearchCaseMode(goless.SearchSmartCase)
-pager.SetSearchMode(goless.SearchWholeWord)
+pager.Configure(
+    goless.WithSearchCaseMode(goless.SearchSmartCase),
+    goless.WithSearchMode(goless.SearchWholeWord),
+)
 ```
 
 ## Future Recipe Backlog

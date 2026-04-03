@@ -11,12 +11,12 @@ import (
 // Preset bundles a Theme and Chrome configuration that work well together.
 //
 // These presets are ordinary exported variables so embedders can copy and tweak
-// them directly before passing the fields into Config. Copy a preset into a
+// them directly before passing the fields into options. Copy a preset into a
 // local variable before modifying it:
 //
 //	preset := DarkPreset
 //	preset.Chrome.Title = "My App"
-//	pager := New(Config{Theme: preset.Theme, Chrome: preset.Chrome})
+//	pager := New(WithTheme(preset.Theme), WithChrome(preset.Chrome))
 type Preset struct {
 	Theme  Theme
 	Chrome Chrome

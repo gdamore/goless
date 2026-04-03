@@ -121,16 +121,16 @@ import (
 )
 
 func main() {
-	pager := goless.New(goless.Config{
-		WrapMode:   goless.NoWrap,
-		KeyGroup:   goless.LessKeyGroup,
-		RenderMode: goless.RenderHybrid,
-		ShowStatus: true,
-		Chrome: goless.Chrome{
+	pager := goless.New(
+		goless.WithWrapMode(goless.NoWrap),
+		goless.WithKeyGroup(goless.LessKeyGroup),
+		goless.WithRenderMode(goless.RenderHybrid),
+		goless.WithShowStatus(true),
+		goless.WithChrome(goless.Chrome{
 			Title: "Example",
 			Frame: goless.RoundedFrame(),
-		},
-	})
+		}),
+	)
 
 	_, _ = pager.ReadFrom(strings.NewReader("hello\nworld\n"))
 	pager.Flush()
@@ -167,6 +167,8 @@ The normal embedding model is:
 
 The current exported `Pager` API is controller-oriented.
 
+- Construction: `New(opts ...Option)`
+- Runtime reconfiguration: `Configure(opts ...RuntimeOption)`
 - Content loading: `Append`, `AppendString`, `ReadFrom`, `Flush`, `Len`
 - Rendering: `SetSize`, `Draw`, `Refresh`
 - Key-driven integration: `HandleKey`
@@ -181,7 +183,10 @@ The current exported `Pager` API is controller-oriented.
   `Position.Row` and `Position.Column` are 1-based visible coordinates when
   content is present, so `(1,1)` is the top-left visible position
 
-The main config knobs are:
+The main constructor/runtime options are available both as explicit `With...`
+helpers and, for construction compatibility, through `Config` passed to `New`.
+
+Common options are:
 
 - `WrapMode`: `NoWrap` or `SoftWrap`
 - `SearchCase`: `SearchSmartCase`, `SearchCaseSensitive`, or
@@ -204,9 +209,9 @@ The main config knobs are:
 - `Chrome.HeaderStyle`: optional style for fixed header rows and columns
 - `Text`: override help text, status text, prompt text, and UI strings
 
-`Pager.SetTheme`, `Pager.SetVisualization`, `Pager.SetHyperlinkHandler`,
-`Pager.SetChrome`, `Pager.SetHeaderLines`, and `Pager.SetHeaderColumns` can
-update those settings on a running pager instance.
+Runtime-safe `With...` options can be applied either through `Pager.Configure`
+or through the existing convenience setters such as `SetTheme`, `SetChrome`,
+and `SetHeaderLines`.
 
 For OSC 8 specifically:
 

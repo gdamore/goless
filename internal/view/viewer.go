@@ -102,6 +102,26 @@ func (v *Viewer) SetTheme(theme Theme) {
 	v.cfg.Theme = theme
 }
 
+// SetTabWidth updates tab expansion during layout.
+func (v *Viewer) SetTabWidth(width int) {
+	if width <= 0 {
+		width = 8
+	}
+	if v.cfg.TabWidth == width {
+		return
+	}
+	v.ensureLayout()
+	anchor := v.firstVisibleAnchor()
+	v.cfg.TabWidth = width
+	v.relayout()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+		return
+	}
+	v.restoreAnchor(anchor)
+}
+
 // SetLineNumbers updates whether the adaptive line-number gutter is shown.
 func (v *Viewer) SetLineNumbers(enabled bool) {
 	if v.cfg.LineNumbers == enabled {
@@ -215,6 +235,11 @@ func (v *Viewer) SetHyperlinkHandler(handler HyperlinkHandler) {
 	v.cfg.HyperlinkHandler = handler
 }
 
+// SetCommandHandler updates how unknown ':' commands are handled.
+func (v *Viewer) SetCommandHandler(handler CommandHandler) {
+	v.cfg.CommandHandler = handler
+}
+
 // SetChrome updates frame, title, and prompt/status styling.
 func (v *Viewer) SetChrome(chrome Chrome) {
 	v.ensureLayout()
@@ -228,6 +253,32 @@ func (v *Viewer) SetChrome(chrome Chrome) {
 		return
 	}
 	v.restoreAnchor(anchor)
+}
+
+// SetShowStatus updates whether the status bar is shown.
+func (v *Viewer) SetShowStatus(enabled bool) {
+	if v.cfg.ShowStatus == enabled {
+		return
+	}
+	v.ensureLayout()
+	anchor := v.firstVisibleAnchor()
+	v.cfg.ShowStatus = enabled
+	v.relayout()
+	v.clampHelpOffset()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+		return
+	}
+	v.restoreAnchor(anchor)
+}
+
+// SetText updates help text, status text, prompt text, and UI strings.
+func (v *Viewer) SetText(text Text) {
+	text = text.withDefaults()
+	v.cfg.Text = text
+	v.text = text
+	v.clampHelpOffset()
 }
 
 // SetSearchCaseMode updates the default case behavior for new and active searches.
