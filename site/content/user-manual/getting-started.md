@@ -4,16 +4,16 @@ summary = "Install or build goless, open content, and understand the first scree
 weight = 10
 +++
 
-The `goless` program is currently represented by the demo binary in this repository:
+The standalone `goless` program currently lives in this repository under `cmd/goless`:
 
 ```bash
-go run ./cmd/goless-demo -- file.txt
+go run ./cmd/goless -- file.txt
 ```
 
 You can also pipe content directly into it:
 
 ```bash
-printf 'hello\nworld\n' | go run ./cmd/goless-demo
+printf 'hello\nworld\n' | go run ./cmd/goless
 ```
 
 ## What Users Need First

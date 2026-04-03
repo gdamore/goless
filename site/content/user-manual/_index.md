@@ -15,4 +15,4 @@ This material should explain what the tool does from an operator's point of view
 - how to launch it with files or piped input
 - how to move around large documents
 - how to search and interpret status indicators
-- how demo-oriented flags map to eventual user-facing behavior
+- how the current flags map to intended user-facing behavior
