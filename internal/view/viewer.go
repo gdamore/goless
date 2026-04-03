@@ -651,13 +651,13 @@ func (v *Viewer) EOFVisible() bool {
 	return ok && rowIndex >= len(v.layout.Rows)-1
 }
 
-// Position reports the current visible row, total row count, horizontal offset, and maximum column span.
+// Position reports the current visible row, total row count, current visible column number, and maximum column span.
 func (v *Viewer) Position() Position {
 	v.ensureLayout()
 	return Position{
 		Row:     v.firstVisibleRow(),
 		Rows:    len(v.layout.Rows),
-		Column:  v.colOffset,
+		Column:  v.visibleColumn(),
 		Columns: v.maxContentColumns(),
 	}
 }
@@ -1523,7 +1523,8 @@ func (v *Viewer) statusText() (left, right string) {
 	}
 
 	current := v.firstVisibleRow()
-	right = v.text.StatusPosition(current, len(v.layout.Rows), v.colOffset, v.maxContentColumns())
+	column := v.visibleColumn()
+	right = v.text.StatusPosition(current, len(v.layout.Rows), column, v.maxContentColumns())
 	if modeHint := v.statusModeHint(); modeHint != "" {
 		if right != "" {
 			right += "  " + modeHint
@@ -1539,7 +1540,7 @@ func (v *Viewer) statusText() (left, right string) {
 			Position: Position{
 				Row:     current,
 				Rows:    len(v.layout.Rows),
-				Column:  v.colOffset,
+				Column:  column,
 				Columns: v.maxContentColumns(),
 			},
 			DefaultLeft:  left,
@@ -1566,6 +1567,13 @@ func (v *Viewer) statusOverflow() (left, right bool) {
 
 func (v *Viewer) maxContentColumns() int {
 	return v.maxColumns
+}
+
+func (v *Viewer) visibleColumn() int {
+	if columns := v.maxContentColumns(); columns > 0 {
+		return min(v.colOffset+1, columns)
+	}
+	return 0
 }
 
 func (v *Viewer) computeMaxContentColumns() int {
