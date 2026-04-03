@@ -107,6 +107,31 @@ img {
   gap: 20px;
 }
 
+.preview-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.preview-label {
+  margin: 0;
+  color: var(--brand-deep);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.preview-text {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .hero-panel,
 .card {
   border: 1px solid var(--line);
@@ -326,6 +351,26 @@ img {
   background: var(--panel-strong);
 }
 
+.preview-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.preview-inline strong {
+  color: var(--brand-deep);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+}
+
 .doc-sidebar {
   position: sticky;
   top: 20px;
@@ -362,6 +407,11 @@ img {
   .media-grid,
   .value-grid {
     grid-template-columns: 1fr;
+  }
+
+  .preview-banner {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .hero-panel {
