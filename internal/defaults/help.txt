@@ -1,20 +1,22 @@
 [1;4mGeneral[0m
-  H F1            help
-  q Esc           quit
+  h F1            help
+  q Q Esc         quit
 
 [1;4mNavigation[0m
-  ↑ ↓ j k         move one line
-  PgDn f Space    forward one page
-  PgUp b          backward one page
+  Enter e ^E ^J ^N
+  ↑ ↓ j k         move one line forward/backward
+  y ^Y ^K ^P      move one line backward
+  PgDn ^F ^V
+  f Space         forward one page
+  PgUp ^B Alt-V b backward one page
   Ctrl-D d        forward half page
   Ctrl-U u        backward half page
   Home 0          jump to line start
   End $           jump to line end
-  g               jump to top
-  G               jump to bottom
-  ← → h l         scroll horizontally faster
+  g <             jump to top
+  G >             jump to bottom
+  ← → l           scroll horizontally faster
   Shift-← Shift-→ scroll horizontally by 1
-  < >             scroll horizontally by 1
   w               toggle wrap
   F               follow the end of the document
 

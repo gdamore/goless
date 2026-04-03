@@ -336,7 +336,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `q` or `Esc` to quit
 - `j`/`k` or arrow keys to scroll
 - `u`/`d` or `Ctrl-U`/`Ctrl-D` for half-page up/down
-- `space`/`b` for page down/up
+- `space`/`b` for page down/up, plus `Ctrl-B` and `Alt-V` for page up
 - `g`/`G` for top/bottom
 - `w` to toggle wrap
 - `/` and `?` to search forward/backward
@@ -352,7 +352,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `:set searchcase smart|case|nocase` to set search mode directly
 - `:set searchmode sub|word|regex` to set search mode directly
 - `F` to enable follow mode
-- `H` or `F1` to toggle help
+- `h` or `F1` to toggle help
 
 ## Hardening and Performance
 

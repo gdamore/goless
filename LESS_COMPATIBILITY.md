@@ -40,7 +40,7 @@ Useful, but intentionally different:
 
 Notable gaps:
 
-- no `:Q`, `Q`, or `ZZ` quit aliases
+- no `:Q` or `ZZ` quit aliases
 - no `=` or `Ctrl-G` file-info/status command
 - no `:x` alias for the first file
 - no `:e [file]` command to examine a new file
@@ -51,33 +51,32 @@ Notable gaps:
 
 Compatible today:
 
-- `q`, `Esc`
-- `j` / `k` and arrow keys
-- `space`, `f`, `b`
-- `g`, `G`
+- `q`, `Q`, `Esc`
+- `j` / `k`, `y` / `e`, `Enter`, and arrow keys
+- `Ctrl-Y`, `Ctrl-K`, `Ctrl-P`, `Ctrl-E`, `Ctrl-N`
+- `space`, `f`, `b`, `Ctrl-B`, `Ctrl-F`, `Ctrl-V`, `Alt-v`
+- `g`, `G`, `<`, `>`
 - `/`, `?`, `n`, `N`
 - `F` for follow mode
 
 Close, but thinner than `less`:
 
-- page navigation exists, but many familiar aliases are missing
 - horizontal navigation exists, but not under the usual `less` bindings
-- help exists on `H` / `F1`, not on lowercase `h`
 
 Compatibility conflicts in the current bundled keymap:
 
-- `<` and `>` are used for fine horizontal scrolling, but `less` uses them for
-  top and bottom of file
 - `w` toggles wrap, but `less` uses `w` for backward-window behavior
-- `h` scrolls left, but `less` users often expect `h` / `H` to be help
 
 High-value missing aliases:
 
-- forward one line: `Enter`, `e`, `Ctrl-E`, `Ctrl-N`
-- backward one line: `y`, `Ctrl-Y`, `Ctrl-K`, `Ctrl-P`
-- forward one page: `Ctrl-F`, `Ctrl-V`
-- backward one page: `Ctrl-B`, `Esc-v`
-- top / bottom aliases: `<`, `>`
+Current sequence limitation:
+
+- the keymap only supports single `tcell.EventKey` bindings today
+- `Alt-v` is supported as the pragmatic stand-in for `less`'s historical
+  `Esc-v` backward-page behavior
+- true multi-key prefixes such as literal `Esc` then `v` are intentionally not
+  supported; they would require explicit prefix-state handling and `Esc`
+  timeout/cancellation rules
 
 ### CLI Switches and Startup Syntax
 
@@ -109,20 +108,24 @@ project into full GNU `less` emulation.
 
 ### 1. Expand the bundled less-like key aliases
 
-This is the highest-value compatibility work.
+Status: partially complete.
 
-Add the common motion aliases that do not require larger parser changes:
+Implemented:
 
 - `Enter`, `e`, `Ctrl-E`, `Ctrl-N` for forward one line
+- `Ctrl-J` for forward one line
 - `y`, `Ctrl-Y`, `Ctrl-K`, `Ctrl-P` for backward one line
 - `Ctrl-F`, `Ctrl-V` for page down
-- `Ctrl-B`, `Esc-v` for page up
+- `Ctrl-B` for page up
+- `Alt-v` as the pragmatic stand-in for `Esc-v` page up
 - `Q` as an additional quit key
-
-Change the bundled keymap so:
-
 - `<` goes to top of file
 - `>` goes to bottom of file
+- `h` opens and closes help
+
+Still open:
+
+- no additional single-key alias changes selected in this batch
 
 Keep fine horizontal scrolling on the existing shifted-arrow bindings. This is a
 better trade than spending two prominent `less` keys on a niche horizontal
@@ -184,7 +187,7 @@ surface area without materially improving the experience for most users.
 
 ## Suggested Follow-Up Issues
 
-- Add common `less` motion aliases and reclaim `<` / `>` for top and bottom
 - Add standalone program aliases for quit and file-info commands
 - Add common `less` CLI aliases (`-N`, `-S`, `-i`, `-I`, `-x`, `-F`)
 - Design numeric-prefix support for normal-mode commands
+- Decide whether to add sequence support or keep keymaps single-event only
