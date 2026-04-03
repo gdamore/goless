@@ -2,25 +2,34 @@
 {{ $poster := .Get "poster" | default "" }}
 {{ $rows := .Get "rows" | default 26 | int }}
 {{ $cols := .Get "cols" | default 100 | int }}
-{{ $id := printf "asciinema-%s" (md5 $src) }}
 {{ if not $src }}
   <div class="cast-placeholder">
     <strong>Asciinema placeholder</strong>
     <p>Add a <code>src</code> path once a <code>.cast</code> recording exists in <code>site/static/casts/</code>.</p>
   </div>
 {{ else }}
+  {{ $id := printf "asciinema-%s" (md5 $src) }}
   {{ if not (.Page.Scratch.Get "asciinemaAssetsIncluded") }}
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/asciinema-player@3.10.0/dist/bundle/asciinema-player.css">
-    <script src="https://cdn.jsdelivr.net/npm/asciinema-player@3.10.0/dist/bundle/asciinema-player.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/asciinema-player@3.15.1/dist/bundle/asciinema-player.css"
+      integrity="sha384-WljTqqSFGa+XcQgQ12VCbL7IN5nR9cirosOWTxSSNN+zV0BIR5+/NfEarkEb/+5a"
+      crossorigin="anonymous"
+    >
+    <script
+      src="https://cdn.jsdelivr.net/npm/asciinema-player@3.15.1/dist/bundle/asciinema-player.min.js"
+      integrity="sha384-wdj+bHCUz/HDxfUSgsGjyE8XcARMnrTYcDvGLmEOkPuYetBuPn3ylhg4A36Wa+DU"
+      crossorigin="anonymous"
+    ></script>
     {{ .Page.Scratch.Set "asciinemaAssetsIncluded" true }}
   {{ end }}
   <div id="{{ $id }}" class="cast-player"></div>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
-      AsciinemaPlayer.create("{{ $src }}", document.getElementById("{{ $id }}"), {
+      AsciinemaPlayer.create({{ $src | safeJSStr }}, document.getElementById({{ $id | safeJSStr }}), {
         cols: {{ $cols }},
         rows: {{ $rows }},
-        poster: "{{ $poster }}"
+        poster: {{ $poster | safeJSStr }}
       });
     });
   </script>

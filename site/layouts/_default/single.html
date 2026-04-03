@@ -5,7 +5,9 @@
         <strong>{{ .Site.Params.previewLabel }}</strong>
         <span>{{ .Site.Params.previewText }}</span>
       </div>
-      <p class="eyebrow">{{ .CurrentSection.Title }}</p>
+      {{ with .CurrentSection }}
+        <p class="eyebrow">{{ .Title }}</p>
+      {{ end }}
       <h1>{{ .Title }}</h1>
       {{ with .Summary }}
         <p class="lede">{{ . }}</p>
@@ -15,19 +17,21 @@
       </div>
     </article>
 
-    <aside class="card doc-sidebar">
-      <h2>{{ .CurrentSection.Title }}</h2>
-      <ul class="section-nav">
-        {{ range .CurrentSection.Pages.ByWeight }}
-          <li>
-            <a
-              class="{{ if eq .RelPermalink $.RelPermalink }}active{{ end }}"
-              href="{{ .RelPermalink }}"
-              {{ if eq .RelPermalink $.RelPermalink }}aria-current="page"{{ end }}
-            >{{ .Title }}</a>
-          </li>
-        {{ end }}
-      </ul>
-    </aside>
+    {{ with .CurrentSection }}
+      <aside class="card doc-sidebar">
+        <h2>{{ .Title }}</h2>
+        <ul class="section-nav">
+          {{ range .Pages.ByWeight }}
+            <li>
+              <a
+                class="{{ if eq .RelPermalink $.RelPermalink }}active{{ end }}"
+                href="{{ .RelPermalink }}"
+                {{ if eq .RelPermalink $.RelPermalink }}aria-current="page"{{ end }}
+              >{{ .Title }}</a>
+            </li>
+          {{ end }}
+        </ul>
+      </aside>
+    {{ end }}
   </main>
 {{ end }}
