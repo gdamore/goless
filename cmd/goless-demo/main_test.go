@@ -367,6 +367,22 @@ func TestHandleDemoVisibleEOFActionRequiresForwardNavigation(t *testing.T) {
 	}
 }
 
+func TestNewDemoPagerPropagatesSqueezeMode(t *testing.T) {
+	pager := newDemoPager(
+		goless.RenderHybrid,
+		goless.Preset{},
+		goless.Chrome{},
+		false,
+		false,
+		true,
+		nil,
+	)
+
+	if !pager.SqueezeBlankLines() {
+		t.Fatal("newDemoPager(..., squeeze=true, ...) did not enable squeeze mode")
+	}
+}
+
 func TestDemoSessionCommandHandler(t *testing.T) {
 	session := newDemoSession([]string{"one.txt", "two.txt"}, demoStartup{})
 	reloads := 0

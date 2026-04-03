@@ -28,24 +28,25 @@ const (
 
 // Config configures a Pager.
 type Config struct {
-	TabWidth         int                         // TabWidth controls tab expansion during layout. Values <= 0 default to 8.
-	WrapMode         WrapMode                    // WrapMode selects horizontal scrolling or soft wrapping.
-	SearchCase       SearchCaseMode              // SearchCase selects smart-case, case-sensitive, or case-insensitive literal search behavior.
-	SearchMode       SearchMode                  // SearchMode selects substring, whole-word, or regex search behavior.
-	LineNumbers      bool                        // LineNumbers enables an adaptive line-number gutter.
-	HeaderLines      int                         // HeaderLines pins the first N logical lines at the top of the viewport.
-	HeaderColumns    int                         // HeaderColumns pins the first N display columns at the left edge of the viewport.
-	Theme            Theme                       // Theme remaps content default colors and ANSI 0-15 without affecting chrome.
-	Visualization    Visualization               // Visualization overlays optional markers for tabs, line endings, carriage returns, and EOF.
-	HyperlinkHandler HyperlinkHandler            // HyperlinkHandler controls how parsed OSC 8 hyperlink spans are rendered.
-	CommandHandler   func(Command) CommandResult // CommandHandler handles unknown ':' commands after built-in pager commands decline them.
-	KeyGroup         KeyGroup                    // KeyGroup selects a bundled set of key bindings.
-	UnbindKeys       []KeyStroke                 // UnbindKeys removes exact bindings from the selected key group.
-	KeyBindings      []KeyBinding                // KeyBindings prepend custom bindings ahead of bundled defaults.
-	RenderMode       RenderMode                  // RenderMode controls how escapes and control sequences are presented.
-	Chrome           Chrome                      // Chrome configures optional body framing and title display.
-	ShowStatus       bool                        // ShowStatus enables the status bar on the last screen row.
-	CaptureKey       func(*tcell.EventKey) bool  // CaptureKey reserves keys for the embedder before normal pager handling.
+	TabWidth          int                         // TabWidth controls tab expansion during layout. Values <= 0 default to 8.
+	WrapMode          WrapMode                    // WrapMode selects horizontal scrolling or soft wrapping.
+	SearchCase        SearchCaseMode              // SearchCase selects smart-case, case-sensitive, or case-insensitive literal search behavior.
+	SearchMode        SearchMode                  // SearchMode selects substring, whole-word, or regex search behavior.
+	SqueezeBlankLines bool                        // SqueezeBlankLines collapses consecutive empty logical lines into a single visible line at view time.
+	LineNumbers       bool                        // LineNumbers enables an adaptive line-number gutter.
+	HeaderLines       int                         // HeaderLines pins the first N logical lines at the top of the viewport.
+	HeaderColumns     int                         // HeaderColumns pins the first N display columns at the left edge of the viewport.
+	Theme             Theme                       // Theme remaps content default colors and ANSI 0-15 without affecting chrome.
+	Visualization     Visualization               // Visualization overlays optional markers for tabs, line endings, carriage returns, and EOF.
+	HyperlinkHandler  HyperlinkHandler            // HyperlinkHandler controls how parsed OSC 8 hyperlink spans are rendered.
+	CommandHandler    func(Command) CommandResult // CommandHandler handles unknown ':' commands after built-in pager commands decline them.
+	KeyGroup          KeyGroup                    // KeyGroup selects a bundled set of key bindings.
+	UnbindKeys        []KeyStroke                 // UnbindKeys removes exact bindings from the selected key group.
+	KeyBindings       []KeyBinding                // KeyBindings prepend custom bindings ahead of bundled defaults.
+	RenderMode        RenderMode                  // RenderMode controls how escapes and control sequences are presented.
+	Chrome            Chrome                      // Chrome configures optional body framing and title display.
+	ShowStatus        bool                        // ShowStatus enables the status bar on the last screen row.
+	CaptureKey        func(*tcell.EventKey) bool  // CaptureKey reserves keys for the embedder before normal pager handling.
 
 	// Text controls user-facing text, help content, and UI indicators.
 	// Zero values are filled from DefaultText.
@@ -99,23 +100,24 @@ func New(cfg Config) *Pager {
 		doc:        doc,
 		captureKey: cfg.CaptureKey,
 		viewer: iview.New(doc, iview.Config{
-			TabWidth:         cfg.TabWidth,
-			WrapMode:         toInternalWrapMode(cfg.WrapMode),
-			SearchCase:       toInternalSearchCaseMode(cfg.SearchCase),
-			SearchMode:       toInternalSearchMode(cfg.SearchMode),
-			LineNumbers:      cfg.LineNumbers,
-			HeaderLines:      cfg.HeaderLines,
-			HeaderColumns:    cfg.HeaderColumns,
-			Theme:            toInternalTheme(cfg.Theme),
-			Visualization:    toInternalVisualization(cfg.Visualization),
-			HyperlinkHandler: toInternalHyperlinkHandler(cfg.HyperlinkHandler),
-			CommandHandler:   toInternalCommandHandler(cfg.CommandHandler),
-			KeyGroup:         toInternalKeyGroup(cfg.KeyGroup),
-			KeyUnbind:        toInternalKeyStrokes(cfg.UnbindKeys),
-			KeyBind:          toInternalKeyBindings(cfg.KeyBindings),
-			Chrome:           toInternalChrome(cfg.Chrome),
-			ShowStatus:       cfg.ShowStatus,
-			Text:             toInternalText(cfg.Text),
+			TabWidth:          cfg.TabWidth,
+			WrapMode:          toInternalWrapMode(cfg.WrapMode),
+			SearchCase:        toInternalSearchCaseMode(cfg.SearchCase),
+			SearchMode:        toInternalSearchMode(cfg.SearchMode),
+			SqueezeBlankLines: cfg.SqueezeBlankLines,
+			LineNumbers:       cfg.LineNumbers,
+			HeaderLines:       cfg.HeaderLines,
+			HeaderColumns:     cfg.HeaderColumns,
+			Theme:             toInternalTheme(cfg.Theme),
+			Visualization:     toInternalVisualization(cfg.Visualization),
+			HyperlinkHandler:  toInternalHyperlinkHandler(cfg.HyperlinkHandler),
+			CommandHandler:    toInternalCommandHandler(cfg.CommandHandler),
+			KeyGroup:          toInternalKeyGroup(cfg.KeyGroup),
+			KeyUnbind:         toInternalKeyStrokes(cfg.UnbindKeys),
+			KeyBind:           toInternalKeyBindings(cfg.KeyBindings),
+			Chrome:            toInternalChrome(cfg.Chrome),
+			ShowStatus:        cfg.ShowStatus,
+			Text:              toInternalText(cfg.Text),
 		}),
 	}
 }
@@ -200,6 +202,16 @@ func (p *Pager) ToggleLineNumbers() {
 // LineNumbers reports whether the adaptive line-number gutter is enabled.
 func (p *Pager) LineNumbers() bool {
 	return p.viewer.LineNumbers()
+}
+
+// SetSqueezeBlankLines updates whether repeated blank lines are collapsed in the current view.
+func (p *Pager) SetSqueezeBlankLines(enabled bool) {
+	p.viewer.SetSqueezeBlankLines(enabled)
+}
+
+// SqueezeBlankLines reports whether repeated blank lines are collapsed in the current view.
+func (p *Pager) SqueezeBlankLines() bool {
+	return p.viewer.SqueezeBlankLines()
 }
 
 // SetHeaderLines updates how many leading logical lines stay fixed at the top of the viewport.
@@ -411,7 +423,7 @@ func (p *Pager) ClearSearch() {
 	p.viewer.ClearSearch()
 }
 
-// JumpToLine moves the viewport to the requested logical line.
+// JumpToLine moves the viewport to the requested visible line number.
 func (p *Pager) JumpToLine(lineNumber int) bool {
 	return p.viewer.JumpToLine(lineNumber)
 }

@@ -18,43 +18,46 @@ import (
 
 // Config controls viewer behavior.
 type Config struct {
-	TabWidth         int
-	WrapMode         layout.WrapMode
-	SearchCase       SearchCaseMode
-	SearchMode       SearchMode
-	LineNumbers      bool
-	HeaderLines      int
-	HeaderColumns    int
-	Theme            Theme
-	Visualization    Visualization
-	HyperlinkHandler HyperlinkHandler
-	CommandHandler   CommandHandler
-	KeyGroup         KeyGroup
-	KeyUnbind        []KeyStroke
-	KeyBind          []KeyBinding
-	Chrome           Chrome
-	ShowStatus       bool
-	Text             Text
+	TabWidth          int
+	WrapMode          layout.WrapMode
+	SearchCase        SearchCaseMode
+	SearchMode        SearchMode
+	SqueezeBlankLines bool
+	LineNumbers       bool
+	HeaderLines       int
+	HeaderColumns     int
+	Theme             Theme
+	Visualization     Visualization
+	HyperlinkHandler  HyperlinkHandler
+	CommandHandler    CommandHandler
+	KeyGroup          KeyGroup
+	KeyUnbind         []KeyStroke
+	KeyBind           []KeyBinding
+	Chrome            Chrome
+	ShowStatus        bool
+	Text              Text
 }
 
 // Viewer is a minimal document viewer built on the model and layout packages.
 type Viewer struct {
-	doc        *model.Document
-	cfg        Config
-	mode       viewerMode
-	prompt     *promptState
-	message    string
-	search     searchState
-	text       Text
-	keys       keyMap
-	lines      []model.Line
-	layout     layout.Result
-	width      int
-	height     int
-	rowOffset  int
-	colOffset  int
-	follow     bool
-	helpOffset int
+	doc         *model.Document
+	cfg         Config
+	mode        viewerMode
+	prompt      *promptState
+	message     string
+	search      searchState
+	text        Text
+	keys        keyMap
+	sourceLines []model.Line
+	lines       []model.Line
+	lineMap     []int
+	layout      layout.Result
+	width       int
+	height      int
+	rowOffset   int
+	colOffset   int
+	follow      bool
+	helpOffset  int
 }
 
 // KeyResult summarizes how the viewer handled a key event.
@@ -120,6 +123,28 @@ func (v *Viewer) ToggleLineNumbers() {
 // LineNumbers reports whether the adaptive line-number gutter is enabled.
 func (v *Viewer) LineNumbers() bool {
 	return v.cfg.LineNumbers
+}
+
+// SetSqueezeBlankLines updates whether repeated blank lines are collapsed in the current view.
+func (v *Viewer) SetSqueezeBlankLines(enabled bool) {
+	if v.cfg.SqueezeBlankLines == enabled {
+		return
+	}
+	v.ensureLayout()
+	anchor := v.firstVisibleSourceAnchor()
+	v.cfg.SqueezeBlankLines = enabled
+	v.relayout()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+		return
+	}
+	v.restoreSourceAnchor(anchor)
+}
+
+// SqueezeBlankLines reports whether repeated blank lines are collapsed in the current view.
+func (v *Viewer) SqueezeBlankLines() bool {
+	return v.cfg.SqueezeBlankLines
 }
 
 // SetHeaderLines updates how many leading logical lines stay fixed at the top of the viewport.
@@ -591,7 +616,8 @@ func (v *Viewer) ensureLayout() {
 }
 
 func (v *Viewer) relayout() {
-	v.lines = v.doc.Lines()
+	v.sourceLines = v.doc.Lines()
+	v.lines, v.lineMap = squeezeBlankLines(v.sourceLines, v.cfg.SqueezeBlankLines)
 	v.layout = layout.Build(v.lines, layout.Config{
 		Width:            max(v.bodyContentWidth(), 1),
 		TabWidth:         v.cfg.TabWidth,
@@ -736,11 +762,22 @@ func (v *Viewer) firstVisibleAnchor() layout.Anchor {
 	return v.layout.AnchorForRow(rowIndex)
 }
 
+func (v *Viewer) firstVisibleSourceAnchor() layout.Anchor {
+	anchor := v.firstVisibleAnchor()
+	anchor.LineIndex = v.sourceLineIndex(anchor.LineIndex)
+	return anchor
+}
+
 func (v *Viewer) restoreAnchor(anchor layout.Anchor) {
 	if rowIndex := v.layout.RowIndexForAnchor(anchor); rowIndex >= 0 {
 		v.rowOffset = max(rowIndex-v.scrollableRowStartIndex(), 0)
 	}
 	v.clampOffsets()
+}
+
+func (v *Viewer) restoreSourceAnchor(anchor layout.Anchor) {
+	anchor.LineIndex = v.displayLineIndexForSource(anchor.LineIndex)
+	v.restoreAnchor(anchor)
 }
 
 func (v *Viewer) revealAnchor(anchor layout.Anchor) {
@@ -1333,6 +1370,36 @@ func (v *Viewer) bodyContentWidth() int {
 	return v.contentWidth()
 }
 
+func (v *Viewer) sourceLineIndex(displayLine int) int {
+	if displayLine < 0 {
+		return 0
+	}
+	if displayLine < len(v.lineMap) {
+		return v.lineMap[displayLine]
+	}
+	if len(v.sourceLines) == 0 {
+		return 0
+	}
+	return len(v.sourceLines) - 1
+}
+
+func (v *Viewer) displayLineIndexForSource(sourceLine int) int {
+	if sourceLine <= 0 || len(v.lineMap) == 0 {
+		return 0
+	}
+	if sourceLine >= len(v.sourceLines) {
+		return len(v.lineMap) - 1
+	}
+	displayLine := 0
+	for i, mapped := range v.lineMap {
+		if mapped > sourceLine {
+			break
+		}
+		displayLine = i
+	}
+	return displayLine
+}
+
 func (v *Viewer) bottomBarRows() int {
 	if v.mode == modeHelp {
 		return 0
@@ -1399,6 +1466,34 @@ func (v *Viewer) statusOverflow() (left, right bool) {
 	}
 
 	return v.colOffset > 0, v.colOffset < v.maxColOffset()
+}
+
+func squeezeBlankLines(lines []model.Line, enabled bool) ([]model.Line, []int) {
+	if len(lines) == 0 {
+		return nil, nil
+	}
+
+	if !enabled {
+		lineMap := make([]int, len(lines))
+		for i := range lines {
+			lineMap[i] = i
+		}
+		return lines, lineMap
+	}
+
+	squeezed := make([]model.Line, 0, len(lines))
+	lineMap := make([]int, 0, len(lines))
+	prevBlank := false
+	for i, line := range lines {
+		blank := len(line.Graphemes) == 0
+		if blank && prevBlank {
+			continue
+		}
+		squeezed = append(squeezed, line)
+		lineMap = append(lineMap, i)
+		prevBlank = blank
+	}
+	return squeezed, lineMap
 }
 
 func (v *Viewer) drawPrompt(screen tcell.Screen, y int) {

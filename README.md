@@ -160,6 +160,7 @@ The main config knobs are:
 - `SearchCase`: `SearchSmartCase`, `SearchCaseSensitive`, or
   `SearchCaseInsensitive`
 - `SearchMode`: `SearchSubstring`, `SearchWholeWord`, or `SearchRegex`
+- `SqueezeBlankLines`: collapse consecutive empty logical lines into one visible line at view time
 - `LineNumbers`: enable an adaptive line-number gutter
 - `HeaderLines`: pin the first N logical lines at the top of the viewport
 - `HeaderColumns`: pin the first N display columns at the left edge of the viewport
@@ -199,10 +200,15 @@ The built-in pager UI exposes search mode controls directly:
 - the current mode is shown in the status bar and search prompt
 - `:set searchcase smart|case|nocase` is available as a fallback
 - `:set searchmode sub|word|regex` is available as a fallback
+- `:set squeeze on|off|toggle` is available as a fallback
 - `:set numbers on|off|toggle` is available as a fallback
 - `:set headers on|off|toggle|<n>` is available as a fallback
 - `:set headercols on|off|toggle|<n>` is available as a fallback
 - invalid regexes stay in the search prompt and are marked visibly until fixed
+
+`SqueezeBlankLines` is a view-time policy: raw input stays unchanged, while
+search, line numbers, and `JumpToLine` operate on the squeezed view when the
+option is enabled.
 
 Embedders are not locked to the bundled keys. They can:
 
