@@ -705,12 +705,14 @@ func toInternalText(text Text) iview.Text {
 	}
 
 	return iview.Text{
-		HelpTitle:        text.HelpTitle,
-		HelpClose:        text.HelpClose,
-		HelpBody:         text.HelpBody,
-		StatusSearchInfo: text.StatusSearchInfo,
-		StatusPosition:   text.StatusPosition,
-		FollowMode:       text.FollowMode,
+		HelpTitle:          text.HelpTitle,
+		HelpClose:          text.HelpClose,
+		HelpBody:           text.HelpBody,
+		StatusSearchInfo:   text.StatusSearchInfo,
+		StatusPosition:     text.StatusPosition,
+		StatusHelpHint:     text.StatusHelpHint,
+		HideStatusHelpHint: text.HideStatusHelpHint,
+		FollowMode:         text.FollowMode,
 		StatusLine: func(info iview.StatusInfo) (left, right string) {
 			if text.StatusLine == nil {
 				return info.DefaultLeft, info.DefaultRight
@@ -752,15 +754,16 @@ func toInternalText(text Text) iview.Text {
 
 func toInternalChrome(chrome Chrome) iview.Chrome {
 	return iview.Chrome{
-		TitleAlign:       toInternalTitleAlign(chrome.TitleAlign),
-		Title:            chrome.Title,
-		BorderStyle:      chrome.BorderStyle,
-		TitleStyle:       chrome.TitleStyle,
-		StatusStyle:      chrome.StatusStyle,
-		LineNumberStyle:  chrome.LineNumberStyle,
-		HeaderStyle:      chrome.HeaderStyle,
-		PromptStyle:      chrome.PromptStyle,
-		PromptErrorStyle: chrome.PromptErrorStyle,
+		TitleAlign:         toInternalTitleAlign(chrome.TitleAlign),
+		Title:              chrome.Title,
+		BorderStyle:        chrome.BorderStyle,
+		TitleStyle:         chrome.TitleStyle,
+		StatusStyle:        chrome.StatusStyle,
+		StatusHelpKeyStyle: chrome.StatusHelpKeyStyle,
+		LineNumberStyle:    chrome.LineNumberStyle,
+		HeaderStyle:        chrome.HeaderStyle,
+		PromptStyle:        chrome.PromptStyle,
+		PromptErrorStyle:   chrome.PromptErrorStyle,
 		Frame: iview.Frame{
 			Horizontal:  chrome.Frame.Horizontal,
 			Vertical:    chrome.Frame.Vertical,

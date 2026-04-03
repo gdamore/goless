@@ -199,6 +199,8 @@ The built-in pager UI exposes search mode controls directly:
 - `F3` in the bundled less-like key group cycles `sub -> word -> regex`
 - the search prompt always shows the current search mode
 - the status bar shows search mode when a search is active or the search settings are non-default
+- when otherwise idle, the left side of the status bar shows a subtle help hint: `F1 Help`
+  Embedders can replace it with `Text.StatusHelpHint` or suppress it with `Text.HideStatusHelpHint`
 - the right side of the status bar shows row and column as `current/total`
 - the right side of the status bar adds contextual wrap/scroll glyphs such as `↪` and `⇆`
 - `:set searchcase smart|case|nocase` is available as a fallback

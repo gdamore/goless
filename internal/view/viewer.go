@@ -1149,6 +1149,10 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 	leftOverflow, rightOverflow := v.statusOverflow()
 	leftText, rightText := v.statusText()
 
+	leftIndicatorReserve := 0
+	if v.cfg.WrapMode == layout.NoWrap {
+		leftIndicatorReserve = stringWidth(v.text.LeftOverflowIndicator)
+	}
 	leftIndicatorWidth := 0
 	if leftOverflow {
 		leftIndicatorWidth = stringWidth(v.text.LeftOverflowIndicator)
@@ -1167,7 +1171,7 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 		}
 	}
 
-	leftStart := 2 + leftIndicatorWidth
+	leftStart := 2 + leftIndicatorReserve
 	rightLimit := v.width - 1
 	if rightOverflow {
 		rightLimit = rightIndicatorStart - 1
@@ -1185,11 +1189,30 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 
 	leftWidth := max(rightStart-leftStart-1, 0)
 	if leftWidth > 0 {
-		screen.PutStrStyled(leftStart, y, truncateToWidth(leftText, leftWidth), style)
+		leftRendered := truncateToWidth(leftText, leftWidth)
+		screen.PutStrStyled(leftStart, y, leftRendered, style)
+		if keyText, ok := v.statusHelpHintKey(leftText, leftRendered); ok {
+			screen.PutStrStyled(leftStart, y, keyText, v.cfg.Chrome.StatusHelpKeyStyle)
+		}
 	}
 	if rightText != "" && rightStart < rightLimit {
 		screen.PutStrStyled(rightStart, y, rightText, style)
 	}
+}
+
+func (v *Viewer) statusHelpHintKey(fullText, rendered string) (string, bool) {
+	if fullText == "" || fullText != v.text.StatusHelpHint || rendered == "" {
+		return "", false
+	}
+	key, _, ok := strings.Cut(fullText, " ")
+	if !ok {
+		key = fullText
+	}
+	key = truncateToWidth(key, stringWidth(rendered))
+	if key == "" {
+		return "", false
+	}
+	return key, true
 }
 
 func (v *Viewer) drawLineNumberGutter(screen tcell.Screen) {
@@ -1431,6 +1454,9 @@ func (v *Viewer) statusText() (left, right string) {
 			left += "  "
 		}
 		left += v.message
+	}
+	if left == "" {
+		left = v.text.StatusHelpHint
 	}
 
 	current := v.firstVisibleRow()
