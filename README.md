@@ -48,7 +48,7 @@ hugo server --source site
 - Supports forward and reverse literal search with repeat-search
 - Supports line jumps, follow mode, help overlay, and a status bar
 - Exposes a reusable `Pager` API for embedding in other Go programs
-- Includes a small full-screen demo pager in `cmd/goless-demo`
+- Includes a small full-screen standalone pager in `cmd/goless`
 
 ## Security Model
 
@@ -273,28 +273,28 @@ For host chrome integration:
   Supported styling is applied. Unsupported sequences are consumed and hidden.
   Parsed OSC 8 links are available to the embedder hyperlink handler.
 
-## Demo Program
+## Standalone Program
 
-The repository includes a small demo in `cmd/goless-demo`.
+The repository includes a small standalone program in `cmd/goless`.
 
 ```bash
-go run ./cmd/goless-demo -- file.txt
+go run ./cmd/goless -- file.txt
 ```
 
 It also accepts less-style startup directives and multiple files:
 
 ```bash
-go run ./cmd/goless-demo +42 -- a.txt b.txt
-go run ./cmd/goless-demo +/needle -- a.txt b.txt
+go run ./cmd/goless +42 -- a.txt b.txt
+go run ./cmd/goless +/needle -- a.txt b.txt
 ```
 
 It can also read from stdin:
 
 ```bash
-printf 'hello\n\033[31mworld\033[0m\n' | go run ./cmd/goless-demo
+printf 'hello\n\033[31mworld\033[0m\n' | go run ./cmd/goless
 ```
 
-Demo flags:
+Program flags:
 
 - `-e` or `--quit-at-eof` to quit on the first forward command at EOF
 - `-E` or `--QUIT-AT-EOF` to quit when EOF is already visible on screen
@@ -318,12 +318,12 @@ The default key group is intentionally less-like. Common bindings include:
 - `n` and `N` to repeat search
 - `F2` to cycle search case mode in the bundled key group
 - `F3` to cycle substring, whole-word, and regex matching in the bundled key group
-- `F4` to cycle visual presets in the demo program
-- `F5` to toggle hidden-character markers in the demo program
+- `F4` to cycle visual presets in the standalone program
+- `F5` to toggle hidden-character markers in the standalone program
 - `:` then a number to jump to a line
 - `:50%` to jump near the middle of the document
-- `:next` / `:prev` to move through a multi-file demo session
-- `:first`, `:last`, and `:file` for demo file-session control
+- `:next` / `:prev` to move through a multi-file session
+- `:first`, `:last`, and `:file` for file-session control
 - `:set searchcase smart|case|nocase` to set search mode directly
 - `:set searchmode sub|word|regex` to set search mode directly
 - `F` to enable follow mode
@@ -346,8 +346,8 @@ performance work measurable as the library evolves.
 - Regex search is available, but the search feature set is intentionally lightweight
 - The public package exposes a pager core, not a full standalone `less`
   replacement
-- The demo is intentionally small and does not aim to replicate every `less`
-  behavior
+- The standalone program is intentionally small and does not aim to replicate
+  every `less` behavior
 
 ## Development
 

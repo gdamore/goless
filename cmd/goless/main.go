@@ -16,12 +16,12 @@ import (
 	tcolor "github.com/gdamore/tcell/v3/color"
 )
 
-type demoQuitAtEOFPolicy int
+type programQuitAtEOFPolicy int
 
 const (
-	demoQuitAtEOFNever demoQuitAtEOFPolicy = iota
-	demoQuitAtEOFOnForwardEOF
-	demoQuitAtEOFWhenVisible
+	programQuitAtEOFNever programQuitAtEOFPolicy = iota
+	programQuitAtEOFOnForwardEOF
+	programQuitAtEOFWhenVisible
 )
 
 func main() {
@@ -43,14 +43,14 @@ func run() error {
 	var title string
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless-demo [-e|-E] [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [+line|+/pattern] [file ...]\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless [-e|-E] [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [+line|+/pattern] [file ...]\n")
 	}
 	flag.BoolVar(&quitAtEOF, "e", false, "quit on the first forward command at EOF")
 	flag.BoolVar(&quitAtEOFFirst, "E", false, "quit when EOF is already visible on screen")
 	flag.StringVar(&presetName, "preset", "none", "visual preset: none, dark, light, plain, pretty")
 	flag.StringVar(&chromeName, "chrome", "auto", "chrome override: auto, none, single, rounded")
 	flag.BoolVar(&hidden, "hidden", false, "show tabs, line endings, carriage returns, and EOF markers")
-	flag.BoolVar(&liveLinks, "live-links", false, "enable live OSC 8 hyperlinks in the demo")
+	flag.BoolVar(&liveLinks, "live-links", false, "enable live OSC 8 hyperlinks in the program")
 	flag.BoolVar(&quitAtEOF, "quit-at-eof", false, "long form of -e")
 	flag.BoolVar(&quitAtEOFFirst, "QUIT-AT-EOF", false, "long form of -E")
 	flag.StringVar(&renderName, "render", "hybrid", "render mode: hybrid, literal, presentation")
@@ -58,21 +58,21 @@ func run() error {
 	flag.StringVar(&title, "title", "", "frame title")
 	flag.Parse()
 
-	renderMode, err := demoRenderMode(renderName)
+	renderMode, err := programRenderMode(renderName)
 	if err != nil {
 		return err
 	}
-	preset, err := demoPreset(presetName)
+	preset, err := programPreset(presetName)
 	if err != nil {
 		return err
 	}
-	startup, files, err := demoInputs(flag.Args())
+	startup, files, err := programInputs(flag.Args())
 	if err != nil {
 		return err
 	}
-	session := newDemoSession(files, startup)
-	quitAtEOFPolicy := demoQuitAtEOFPolicyFromFlags(quitAtEOF, quitAtEOFFirst)
-	chromeCfg, err := demoChrome(chromeName, title, preset.Chrome)
+	session := newProgramSession(files, startup)
+	quitAtEOFPolicy := programQuitAtEOFPolicyFromFlags(quitAtEOF, quitAtEOFFirst)
+	chromeCfg, err := programChrome(chromeName, title, preset.Chrome)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func run() error {
 		return fmt.Errorf("stdin is a terminal; specify a file or pipe input")
 	}
 
-	screen, err := newDemoScreen(quitAtEOFPolicy)
+	screen, err := newProgramScreen(quitAtEOFPolicy)
 	if err != nil {
 		return err
 	}
@@ -97,13 +97,13 @@ func run() error {
 	}
 
 	var (
-		pager          *goless.Pager
-		readResult     chan error
-		reloadCurrent  func() error
-		buildDemoPager func() *goless.Pager
+		pager             *goless.Pager
+		readResult        chan error
+		reloadCurrent     func() error
+		buildProgramPager func() *goless.Pager
 	)
-	buildDemoPager = func() *goless.Pager {
-		return newDemoPager(
+	buildProgramPager = func() *goless.Pager {
+		return newProgramPager(
 			renderMode,
 			preset,
 			session.chrome(chromeCfg),
@@ -121,9 +121,9 @@ func run() error {
 
 	if session.hasFiles() {
 		reloadCurrent = func() error {
-			nextPager := buildDemoPager()
+			nextPager := buildProgramPager()
 			nextPager.SetSize(width, height)
-			if err := loadDemoFile(nextPager, session.currentFile(), session.startup); err != nil {
+			if err := loadProgramFile(nextPager, session.currentFile(), session.startup); err != nil {
 				return err
 			}
 			pager = nextPager
@@ -133,19 +133,19 @@ func run() error {
 			return err
 		}
 	} else {
-		pager = buildDemoPager()
+		pager = buildProgramPager()
 		pager.SetSize(width, height)
 		readResult = make(chan error, 1)
 		go readIntoPager(pager, os.Stdin, screen.EventQ(), readResult)
 	}
 	pager.Draw(screen)
-	quit, err := handleDemoVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, readResult == nil, reloadCurrent)
+	quit, err := handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, readResult == nil, reloadCurrent)
 	if err != nil {
 		return err
 	}
 	pager.Draw(screen)
 	if quit {
-		return demoExit(screen, quitAtEOFPolicy)
+		return programExit(screen, quitAtEOFPolicy)
 	}
 
 	for {
@@ -157,12 +157,12 @@ func run() error {
 			screen.Sync()
 		case *tcell.EventKey:
 			if event.Key() == tcell.KeyF4 {
-				presetName = nextDemoPresetName(presetName)
-				preset, err = demoPreset(presetName)
+				presetName = nextProgramPresetName(presetName)
+				preset, err = programPreset(presetName)
 				if err != nil {
 					return err
 				}
-				chromeCfg, err = demoChrome(chromeName, title, preset.Chrome)
+				chromeCfg, err = programChrome(chromeName, title, preset.Chrome)
 				if err != nil {
 					return err
 				}
@@ -172,24 +172,24 @@ func run() error {
 			}
 			if event.Key() == tcell.KeyF5 {
 				hidden = !hidden
-				pager.SetVisualization(demoVisualization(hidden))
+				pager.SetVisualization(programVisualization(hidden))
 				break
 			}
 			before := pager.Position()
 			beforeFollowing := pager.Following()
 			result := pager.HandleKeyResult(event)
 			if result.Quit {
-				return demoExit(screen, quitAtEOFPolicy)
+				return programExit(screen, quitAtEOFPolicy)
 			}
-			quit, err := handleDemoVisibleEOFAction(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, result, readResult == nil, reloadCurrent)
+			quit, err := handleProgramVisibleEOFAction(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, result, readResult == nil, reloadCurrent)
 			if err != nil {
 				return err
 			}
 			pager.Draw(screen)
 			if quit {
-				return demoExit(screen, quitAtEOFPolicy)
+				return programExit(screen, quitAtEOFPolicy)
 			}
-			if quit, err := applyDemoQuitAtEOF(
+			if quit, err := applyProgramQuitAtEOF(
 				quitAtEOFPolicy,
 				session,
 				result,
@@ -201,7 +201,7 @@ func run() error {
 			); err != nil {
 				return err
 			} else if quit {
-				return demoExit(screen, quitAtEOFPolicy)
+				return programExit(screen, quitAtEOFPolicy)
 			}
 		case *tcell.EventInterrupt:
 			if readResult != nil {
@@ -212,13 +212,13 @@ func run() error {
 					}
 					applyStartupCommand(pager, startup)
 					readResult = nil
-					quit, err := handleDemoVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, true, reloadCurrent)
+					quit, err := handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, true, reloadCurrent)
 					if err != nil {
 						return err
 					}
 					pager.Draw(screen)
 					if quit {
-						return demoExit(screen, quitAtEOFPolicy)
+						return programExit(screen, quitAtEOFPolicy)
 					}
 				default:
 				}
@@ -228,24 +228,24 @@ func run() error {
 	}
 }
 
-func demoQuitAtEOFPolicyFromFlags(quitAtEOF, quitAtEOFFirst bool) demoQuitAtEOFPolicy {
+func programQuitAtEOFPolicyFromFlags(quitAtEOF, quitAtEOFFirst bool) programQuitAtEOFPolicy {
 	if quitAtEOFFirst {
-		return demoQuitAtEOFWhenVisible
+		return programQuitAtEOFWhenVisible
 	}
 	if quitAtEOF {
-		return demoQuitAtEOFOnForwardEOF
+		return programQuitAtEOFOnForwardEOF
 	}
-	return demoQuitAtEOFNever
+	return programQuitAtEOFNever
 }
 
-func demoExit(screen tcell.Screen, policy demoQuitAtEOFPolicy) error {
-	if policy == demoQuitAtEOFWhenVisible {
-		clearDemoStatusLine(screen)
+func programExit(screen tcell.Screen, policy programQuitAtEOFPolicy) error {
+	if policy == programQuitAtEOFWhenVisible {
+		clearProgramStatusLine(screen)
 	}
 	return nil
 }
 
-func clearDemoStatusLine(screen tcell.Screen) {
+func clearProgramStatusLine(screen tcell.Screen) {
 	if screen == nil {
 		return
 	}
@@ -260,16 +260,16 @@ func clearDemoStatusLine(screen tcell.Screen) {
 	screen.Show()
 }
 
-func newDemoScreen(policy demoQuitAtEOFPolicy) (tcell.Screen, error) {
-	if policy == demoQuitAtEOFWhenVisible {
+func newProgramScreen(policy programQuitAtEOFPolicy) (tcell.Screen, error) {
+	if policy == programQuitAtEOFWhenVisible {
 		return tcell.NewTerminfoScreen(tcell.OptAltScreen(false))
 	}
 	return tcell.NewScreen()
 }
 
-func applyDemoQuitAtEOF(
-	policy demoQuitAtEOFPolicy,
-	session *demoSession,
+func applyProgramQuitAtEOF(
+	policy programQuitAtEOFPolicy,
+	session *programSession,
 	result goless.KeyResult,
 	inputComplete bool,
 	following bool,
@@ -277,7 +277,7 @@ func applyDemoQuitAtEOF(
 	after goless.Position,
 	reload func() error,
 ) (bool, error) {
-	if policy != demoQuitAtEOFOnForwardEOF || !inputComplete {
+	if policy != programQuitAtEOFOnForwardEOF || !inputComplete {
 		return false, nil
 	}
 	if result.Context != goless.NormalKeyContext || !result.Handled {
@@ -286,16 +286,16 @@ func applyDemoQuitAtEOF(
 	if following {
 		return false, nil
 	}
-	if !isDemoQuitAtEOFAction(result.Action) {
+	if !isProgramQuitAtEOFAction(result.Action) {
 		return false, nil
 	}
-	if demoPositionChanged(before, after) {
+	if programPositionChanged(before, after) {
 		return false, nil
 	}
-	return advanceDemoSessionOrQuit(session, reload)
+	return advanceProgramSessionOrQuit(session, reload)
 }
 
-func isDemoQuitAtEOFAction(action goless.KeyAction) bool {
+func isProgramQuitAtEOFAction(action goless.KeyAction) bool {
 	switch action {
 	case goless.KeyActionScrollDown, goless.KeyActionHalfPageDown, goless.KeyActionPageDown, goless.KeyActionGoBottom:
 		return true
@@ -304,40 +304,40 @@ func isDemoQuitAtEOFAction(action goless.KeyAction) bool {
 	}
 }
 
-func demoPositionChanged(before, after goless.Position) bool {
+func programPositionChanged(before, after goless.Position) bool {
 	return before.Row != after.Row || before.Rows != after.Rows || before.Column != after.Column || before.Columns != after.Columns
 }
 
-func handleDemoVisibleEOFAction(
-	policy demoQuitAtEOFPolicy,
-	session *demoSession,
+func handleProgramVisibleEOFAction(
+	policy programQuitAtEOFPolicy,
+	session *programSession,
 	currentPager func() *goless.Pager,
 	result goless.KeyResult,
 	inputComplete bool,
 	reload func() error,
 ) (bool, error) {
-	if policy != demoQuitAtEOFWhenVisible || !inputComplete {
+	if policy != programQuitAtEOFWhenVisible || !inputComplete {
 		return false, nil
 	}
-	if result.Context != goless.NormalKeyContext || !result.Handled || !isDemoQuitAtEOFAction(result.Action) {
+	if result.Context != goless.NormalKeyContext || !result.Handled || !isProgramQuitAtEOFAction(result.Action) {
 		return false, nil
 	}
-	return handleDemoVisibleEOF(policy, session, currentPager, inputComplete, reload)
+	return handleProgramVisibleEOF(policy, session, currentPager, inputComplete, reload)
 }
 
-func handleDemoVisibleEOF(
-	policy demoQuitAtEOFPolicy,
-	session *demoSession,
+func handleProgramVisibleEOF(
+	policy programQuitAtEOFPolicy,
+	session *programSession,
 	currentPager func() *goless.Pager,
 	inputComplete bool,
 	reload func() error,
 ) (bool, error) {
 	pager := currentPager()
-	if policy != demoQuitAtEOFWhenVisible || !inputComplete || pager == nil || pager.Following() {
+	if policy != programQuitAtEOFWhenVisible || !inputComplete || pager == nil || pager.Following() {
 		return false, nil
 	}
 	for pager.EOFVisible() {
-		quit, err := advanceDemoSessionOrQuit(session, reload)
+		quit, err := advanceProgramSessionOrQuit(session, reload)
 		if err != nil || quit {
 			return quit, err
 		}
@@ -349,7 +349,7 @@ func handleDemoVisibleEOF(
 	return false, nil
 }
 
-func advanceDemoSessionOrQuit(session *demoSession, reload func() error) (bool, error) {
+func advanceProgramSessionOrQuit(session *programSession, reload func() error) (bool, error) {
 	if session != nil && session.canNext() {
 		index := session.index
 		session.next()
@@ -392,43 +392,43 @@ func readIntoPager(pager *goless.Pager, r io.Reader, eventQ chan tcell.Event, re
 	eventQ <- tcell.NewEventInterrupt(nil)
 }
 
-type demoStartup struct {
+type programStartup struct {
 	line  int
 	query string
 }
 
-type demoSession struct {
+type programSession struct {
 	files   []string
 	index   int
-	startup demoStartup
+	startup programStartup
 }
 
-func newDemoSession(files []string, startup demoStartup) *demoSession {
-	return &demoSession{
+func newProgramSession(files []string, startup programStartup) *programSession {
+	return &programSession{
 		files:   append([]string(nil), files...),
 		startup: startup,
 	}
 }
 
-func (s *demoSession) hasFiles() bool {
+func (s *programSession) hasFiles() bool {
 	return len(s.files) > 0
 }
 
-func (s *demoSession) currentFile() string {
+func (s *programSession) currentFile() string {
 	if len(s.files) == 0 {
 		return ""
 	}
 	return s.files[s.index]
 }
 
-func (s *demoSession) currentFileLabel() string {
+func (s *programSession) currentFileLabel() string {
 	if !s.hasFiles() {
 		return "stdin"
 	}
 	return fmt.Sprintf("%s (%d/%d)", s.currentFile(), s.index+1, len(s.files))
 }
 
-func (s *demoSession) chrome(base goless.Chrome) goless.Chrome {
+func (s *programSession) chrome(base goless.Chrome) goless.Chrome {
 	chrome := base
 	if s.hasFiles() {
 		if chrome.Title == "" {
@@ -440,15 +440,15 @@ func (s *demoSession) chrome(base goless.Chrome) goless.Chrome {
 	return chrome
 }
 
-func (s *demoSession) canNext() bool {
+func (s *programSession) canNext() bool {
 	return s.index+1 < len(s.files)
 }
 
-func (s *demoSession) canPrev() bool {
+func (s *programSession) canPrev() bool {
 	return s.index > 0
 }
 
-func (s *demoSession) next() bool {
+func (s *programSession) next() bool {
 	if !s.canNext() {
 		return false
 	}
@@ -456,7 +456,7 @@ func (s *demoSession) next() bool {
 	return true
 }
 
-func (s *demoSession) prev() bool {
+func (s *programSession) prev() bool {
 	if !s.canPrev() {
 		return false
 	}
@@ -464,7 +464,7 @@ func (s *demoSession) prev() bool {
 	return true
 }
 
-func (s *demoSession) first() bool {
+func (s *programSession) first() bool {
 	if !s.hasFiles() || s.index == 0 {
 		return false
 	}
@@ -472,7 +472,7 @@ func (s *demoSession) first() bool {
 	return true
 }
 
-func (s *demoSession) last() bool {
+func (s *programSession) last() bool {
 	if !s.hasFiles() || s.index == len(s.files)-1 {
 		return false
 	}
@@ -480,7 +480,7 @@ func (s *demoSession) last() bool {
 	return true
 }
 
-func (s *demoSession) commandHandler(reload func() error) func(goless.Command) goless.CommandResult {
+func (s *programSession) commandHandler(reload func() error) func(goless.Command) goless.CommandResult {
 	return func(cmd goless.Command) goless.CommandResult {
 		switch cmd.Name {
 		case "q", "quit":
@@ -537,8 +537,8 @@ func (s *demoSession) commandHandler(reload func() error) func(goless.Command) g
 	}
 }
 
-func demoInputs(args []string) (demoStartup, []string, error) {
-	var startup demoStartup
+func programInputs(args []string) (programStartup, []string, error) {
+	var startup programStartup
 	positional := args
 	if len(positional) > 0 && positional[0] == "--" {
 		positional = positional[1:]
@@ -546,7 +546,7 @@ func demoInputs(args []string) (demoStartup, []string, error) {
 	if len(positional) > 0 && strings.HasPrefix(positional[0], "+") {
 		parsedStartup, err := parseStartup(positional[0])
 		if err != nil {
-			return demoStartup{}, nil, err
+			return programStartup{}, nil, err
 		}
 		startup = parsedStartup
 		positional = positional[1:]
@@ -557,24 +557,24 @@ func demoInputs(args []string) (demoStartup, []string, error) {
 	return startup, append([]string(nil), positional...), nil
 }
 
-func parseStartup(arg string) (demoStartup, error) {
+func parseStartup(arg string) (programStartup, error) {
 	if arg == "" || !strings.HasPrefix(arg, "+") {
-		return demoStartup{}, fmt.Errorf("invalid startup directive %q", arg)
+		return programStartup{}, fmt.Errorf("invalid startup directive %q", arg)
 	}
 	if query, ok := strings.CutPrefix(arg, "+/"); ok {
 		if query == "" {
-			return demoStartup{}, fmt.Errorf("invalid startup search %q", arg)
+			return programStartup{}, fmt.Errorf("invalid startup search %q", arg)
 		}
-		return demoStartup{query: query}, nil
+		return programStartup{query: query}, nil
 	}
 	line, err := strconv.Atoi(arg[1:])
 	if err != nil || line <= 0 {
-		return demoStartup{}, fmt.Errorf("invalid startup line %q", arg)
+		return programStartup{}, fmt.Errorf("invalid startup line %q", arg)
 	}
-	return demoStartup{line: line}, nil
+	return programStartup{line: line}, nil
 }
 
-func applyStartupCommand(pager *goless.Pager, startup demoStartup) {
+func applyStartupCommand(pager *goless.Pager, startup programStartup) {
 	if startup.line > 0 {
 		pager.JumpToLine(startup.line)
 		return
@@ -584,7 +584,7 @@ func applyStartupCommand(pager *goless.Pager, startup demoStartup) {
 	}
 }
 
-func loadDemoFile(pager *goless.Pager, path string, startup demoStartup) error {
+func loadProgramFile(pager *goless.Pager, path string, startup programStartup) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -606,7 +606,7 @@ func stdinIsTerminal() bool {
 	return info.Mode()&os.ModeCharDevice != 0
 }
 
-func demoPreset(name string) (goless.Preset, error) {
+func programPreset(name string) (goless.Preset, error) {
 	switch name {
 	case "dark":
 		return goless.DarkPreset, nil
@@ -623,7 +623,7 @@ func demoPreset(name string) (goless.Preset, error) {
 	}
 }
 
-func nextDemoPresetName(current string) string {
+func nextProgramPresetName(current string) string {
 	switch current {
 	case "dark":
 		return "light"
@@ -638,7 +638,7 @@ func nextDemoPresetName(current string) string {
 	}
 }
 
-func demoVisualization(enabled bool) goless.Visualization {
+func programVisualization(enabled bool) goless.Visualization {
 	if !enabled {
 		return goless.Visualization{}
 	}
@@ -650,7 +650,7 @@ func demoVisualization(enabled bool) goless.Visualization {
 	}
 }
 
-func demoHyperlinkHandler(live bool) goless.HyperlinkHandler {
+func programHyperlinkHandler(live bool) goless.HyperlinkHandler {
 	return func(info goless.HyperlinkInfo) goless.HyperlinkDecision {
 		return goless.HyperlinkDecision{
 			Style: info.Style.
@@ -662,7 +662,7 @@ func demoHyperlinkHandler(live bool) goless.HyperlinkHandler {
 	}
 }
 
-func newDemoPager(
+func newProgramPager(
 	renderMode goless.RenderMode,
 	preset goless.Preset,
 	chrome goless.Chrome,
@@ -677,15 +677,15 @@ func newDemoPager(
 		RenderMode:        renderMode,
 		SqueezeBlankLines: squeeze,
 		Theme:             preset.Theme,
-		Visualization:     demoVisualization(hidden),
-		HyperlinkHandler:  demoHyperlinkHandler(liveLinks),
+		Visualization:     programVisualization(hidden),
+		HyperlinkHandler:  programHyperlinkHandler(liveLinks),
 		CommandHandler:    commandHandler,
 		Chrome:            chrome,
 		ShowStatus:        true,
 	})
 }
 
-func demoChrome(name, title string, base goless.Chrome) (goless.Chrome, error) {
+func programChrome(name, title string, base goless.Chrome) (goless.Chrome, error) {
 	chrome := goless.Chrome{
 		TitleAlign:       base.TitleAlign,
 		Title:            base.Title,
@@ -735,7 +735,7 @@ func demoChrome(name, title string, base goless.Chrome) (goless.Chrome, error) {
 	return chrome, nil
 }
 
-func demoRenderMode(name string) (goless.RenderMode, error) {
+func programRenderMode(name string) (goless.RenderMode, error) {
 	switch name {
 	case "literal":
 		return goless.RenderLiteral, nil

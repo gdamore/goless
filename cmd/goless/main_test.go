@@ -12,52 +12,52 @@ import (
 )
 
 func TestDemoPreset(t *testing.T) {
-	preset, err := demoPreset("dark")
+	preset, err := programPreset("dark")
 	if err != nil {
-		t.Fatalf("demoPreset(dark) failed: %v", err)
+		t.Fatalf("programPreset(dark) failed: %v", err)
 	}
 	if got, want := preset.Theme.DefaultBG, goless.DarkPreset.Theme.DefaultBG; got != want {
-		t.Fatalf("demoPreset(dark).Theme.DefaultBG = %v, want %v", got, want)
+		t.Fatalf("programPreset(dark).Theme.DefaultBG = %v, want %v", got, want)
 	}
 
-	if _, err := demoPreset("bogus"); err == nil {
-		t.Fatal("demoPreset(bogus) = nil error, want error")
+	if _, err := programPreset("bogus"); err == nil {
+		t.Fatal("programPreset(bogus) = nil error, want error")
 	}
 }
 
 func TestDemoChromeUsesPresetAndOverrides(t *testing.T) {
-	chrome, err := demoChrome("auto", "", goless.PrettyPreset.Chrome)
+	chrome, err := programChrome("auto", "", goless.PrettyPreset.Chrome)
 	if err != nil {
-		t.Fatalf("demoChrome(auto) failed: %v", err)
+		t.Fatalf("programChrome(auto) failed: %v", err)
 	}
 	if got, want := chrome.Frame.TopLeft, "╭"; got != want {
-		t.Fatalf("demoChrome(auto).Frame.TopLeft = %q, want %q", got, want)
+		t.Fatalf("programChrome(auto).Frame.TopLeft = %q, want %q", got, want)
 	}
 
-	chrome, err = demoChrome("single", "Demo", goless.PrettyPreset.Chrome)
+	chrome, err = programChrome("single", "Demo", goless.PrettyPreset.Chrome)
 	if err != nil {
-		t.Fatalf("demoChrome(single) failed: %v", err)
+		t.Fatalf("programChrome(single) failed: %v", err)
 	}
 	if got, want := chrome.Frame.TopLeft, "┌"; got != want {
-		t.Fatalf("demoChrome(single).Frame.TopLeft = %q, want %q", got, want)
+		t.Fatalf("programChrome(single).Frame.TopLeft = %q, want %q", got, want)
 	}
 	if got, want := chrome.Title, "Demo"; got != want {
-		t.Fatalf("demoChrome(single).Title = %q, want %q", got, want)
+		t.Fatalf("programChrome(single).Title = %q, want %q", got, want)
 	}
 
-	chrome, err = demoChrome("none", "", goless.PrettyPreset.Chrome)
+	chrome, err = programChrome("none", "", goless.PrettyPreset.Chrome)
 	if err != nil {
-		t.Fatalf("demoChrome(none) failed: %v", err)
+		t.Fatalf("programChrome(none) failed: %v", err)
 	}
 	if got := chrome.Frame.TopLeft; got != "" {
-		t.Fatalf("demoChrome(none).Frame.TopLeft = %q, want empty", got)
+		t.Fatalf("programChrome(none).Frame.TopLeft = %q, want empty", got)
 	}
 	if got := chrome.Frame.Horizontal; got != "" {
-		t.Fatalf("demoChrome(none).Frame.Horizontal = %q, want empty", got)
+		t.Fatalf("programChrome(none).Frame.Horizontal = %q, want empty", got)
 	}
 
-	if _, err := demoChrome("bogus", "", goless.PrettyPreset.Chrome); err == nil {
-		t.Fatal("demoChrome(bogus) = nil error, want error")
+	if _, err := programChrome("bogus", "", goless.PrettyPreset.Chrome); err == nil {
+		t.Fatal("programChrome(bogus) = nil error, want error")
 	}
 }
 
@@ -72,26 +72,26 @@ func TestNextDemoPresetName(t *testing.T) {
 		"bogus":  "dark",
 	}
 	for current, want := range cases {
-		if got := nextDemoPresetName(current); got != want {
-			t.Fatalf("nextDemoPresetName(%q) = %q, want %q", current, got, want)
+		if got := nextProgramPresetName(current); got != want {
+			t.Fatalf("nextProgramPresetName(%q) = %q, want %q", current, got, want)
 		}
 	}
 }
 
 func TestDemoVisualization(t *testing.T) {
-	disabled := demoVisualization(false)
+	disabled := programVisualization(false)
 	if disabled.ShowTabs || disabled.ShowNewlines || disabled.ShowCarriageReturns || disabled.ShowEOF {
-		t.Fatal("demoVisualization(false) unexpectedly enabled markers")
+		t.Fatal("programVisualization(false) unexpectedly enabled markers")
 	}
 
-	enabled := demoVisualization(true)
+	enabled := programVisualization(true)
 	if !enabled.ShowTabs || !enabled.ShowNewlines || !enabled.ShowCarriageReturns || !enabled.ShowEOF {
-		t.Fatal("demoVisualization(true) did not enable all markers")
+		t.Fatal("programVisualization(true) did not enable all markers")
 	}
 }
 
 func TestDemoHyperlinkHandler(t *testing.T) {
-	handler := demoHyperlinkHandler(false)
+	handler := programHyperlinkHandler(false)
 	decision := handler(goless.HyperlinkInfo{
 		Target: "https://example.com",
 		Text:   "example",
@@ -109,7 +109,7 @@ func TestDemoHyperlinkHandler(t *testing.T) {
 		t.Fatalf("demo hyperlink background = %v, want %v", got, want)
 	}
 
-	live := demoHyperlinkHandler(true)(goless.HyperlinkInfo{
+	live := programHyperlinkHandler(true)(goless.HyperlinkInfo{
 		Target: "http://example.com",
 		Text:   "example",
 	})
@@ -123,28 +123,28 @@ func TestDemoQuitAtEOFPolicyFromFlags(t *testing.T) {
 		name           string
 		quitAtEOF      bool
 		quitAtEOFFirst bool
-		want           demoQuitAtEOFPolicy
+		want           programQuitAtEOFPolicy
 	}{
-		{name: "disabled", want: demoQuitAtEOFNever},
-		{name: "forward eof", quitAtEOF: true, want: demoQuitAtEOFOnForwardEOF},
-		{name: "visible eof", quitAtEOFFirst: true, want: demoQuitAtEOFWhenVisible},
-		{name: "visible eof wins", quitAtEOF: true, quitAtEOFFirst: true, want: demoQuitAtEOFWhenVisible},
+		{name: "disabled", want: programQuitAtEOFNever},
+		{name: "forward eof", quitAtEOF: true, want: programQuitAtEOFOnForwardEOF},
+		{name: "visible eof", quitAtEOFFirst: true, want: programQuitAtEOFWhenVisible},
+		{name: "visible eof wins", quitAtEOF: true, quitAtEOFFirst: true, want: programQuitAtEOFWhenVisible},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := demoQuitAtEOFPolicyFromFlags(tt.quitAtEOF, tt.quitAtEOFFirst)
+			got := programQuitAtEOFPolicyFromFlags(tt.quitAtEOF, tt.quitAtEOFFirst)
 			if got != tt.want {
-				t.Fatalf("demoQuitAtEOFPolicyFromFlags(%v, %v) = %v, want %v", tt.quitAtEOF, tt.quitAtEOFFirst, got, tt.want)
+				t.Fatalf("programQuitAtEOFPolicyFromFlags(%v, %v) = %v, want %v", tt.quitAtEOF, tt.quitAtEOFFirst, got, tt.want)
 			}
 		})
 	}
 }
 
 func TestApplyDemoQuitAtEOFQuitsAtLastFile(t *testing.T) {
-	session := newDemoSession([]string{"one.txt"}, demoStartup{})
-	quit, err := applyDemoQuitAtEOF(
-		demoQuitAtEOFOnForwardEOF,
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
+	quit, err := applyProgramQuitAtEOF(
+		programQuitAtEOFOnForwardEOF,
 		session,
 		goless.KeyResult{Handled: true, Action: goless.KeyActionPageDown, Context: goless.NormalKeyContext},
 		true,
@@ -154,19 +154,19 @@ func TestApplyDemoQuitAtEOFQuitsAtLastFile(t *testing.T) {
 		func() error { return nil },
 	)
 	if err != nil {
-		t.Fatalf("applyDemoQuitAtEOF returned error: %v", err)
+		t.Fatalf("applyProgramQuitAtEOF returned error: %v", err)
 	}
 	if !quit {
-		t.Fatal("applyDemoQuitAtEOF(...) = false, want true")
+		t.Fatal("applyProgramQuitAtEOF(...) = false, want true")
 	}
 }
 
 func TestApplyDemoQuitAtEOFAdvancesToNextFile(t *testing.T) {
-	session := newDemoSession([]string{"one.txt", "two.txt"}, demoStartup{})
+	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
 	reloads := 0
 
-	quit, err := applyDemoQuitAtEOF(
-		demoQuitAtEOFOnForwardEOF,
+	quit, err := applyProgramQuitAtEOF(
+		programQuitAtEOFOnForwardEOF,
 		session,
 		goless.KeyResult{Handled: true, Action: goless.KeyActionPageDown, Context: goless.NormalKeyContext},
 		true,
@@ -179,10 +179,10 @@ func TestApplyDemoQuitAtEOFAdvancesToNextFile(t *testing.T) {
 		},
 	)
 	if err != nil {
-		t.Fatalf("applyDemoQuitAtEOF returned error: %v", err)
+		t.Fatalf("applyProgramQuitAtEOF returned error: %v", err)
 	}
 	if quit {
-		t.Fatal("applyDemoQuitAtEOF(...) = true, want false")
+		t.Fatal("applyProgramQuitAtEOF(...) = true, want false")
 	}
 	if got, want := session.currentFile(), "two.txt"; got != want {
 		t.Fatalf("currentFile() = %q, want %q", got, want)
@@ -193,7 +193,7 @@ func TestApplyDemoQuitAtEOFAdvancesToNextFile(t *testing.T) {
 }
 
 func TestHandleDemoVisibleEOFQuitsAtLastFile(t *testing.T) {
-	session := newDemoSession([]string{"one.txt"}, demoStartup{})
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 5)
 	if err := pager.AppendString("one\ntwo\n"); err != nil {
@@ -201,17 +201,17 @@ func TestHandleDemoVisibleEOFQuitsAtLastFile(t *testing.T) {
 	}
 	pager.Flush()
 
-	quit, err := handleDemoVisibleEOF(demoQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() error { return nil })
+	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() error { return nil })
 	if err != nil {
-		t.Fatalf("handleDemoVisibleEOF returned error: %v", err)
+		t.Fatalf("handleProgramVisibleEOF returned error: %v", err)
 	}
 	if !quit {
-		t.Fatal("handleDemoVisibleEOF(...) = false, want true")
+		t.Fatal("handleProgramVisibleEOF(...) = false, want true")
 	}
 }
 
 func TestHandleDemoVisibleEOFAdvancesPastShortFile(t *testing.T) {
-	session := newDemoSession([]string{"one.txt", "two.txt"}, demoStartup{})
+	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 5)
 	if err := pager.AppendString("one\ntwo\n"); err != nil {
@@ -220,7 +220,7 @@ func TestHandleDemoVisibleEOFAdvancesPastShortFile(t *testing.T) {
 	pager.Flush()
 
 	reloads := 0
-	quit, err := handleDemoVisibleEOF(demoQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() error {
+	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() error {
 		reloads++
 		pager = goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 		pager.SetSize(20, 5)
@@ -231,10 +231,10 @@ func TestHandleDemoVisibleEOFAdvancesPastShortFile(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("handleDemoVisibleEOF returned error: %v", err)
+		t.Fatalf("handleProgramVisibleEOF returned error: %v", err)
 	}
 	if quit {
-		t.Fatal("handleDemoVisibleEOF(...) = true, want false")
+		t.Fatal("handleProgramVisibleEOF(...) = true, want false")
 	}
 	if got, want := reloads, 1; got != want {
 		t.Fatalf("reload count = %d, want %d", got, want)
@@ -245,7 +245,7 @@ func TestHandleDemoVisibleEOFAdvancesPastShortFile(t *testing.T) {
 }
 
 func TestHandleDemoVisibleEOFIgnoredWhenNotVisible(t *testing.T) {
-	session := newDemoSession([]string{"one.txt"}, demoStartup{})
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
 	if err := pager.AppendString("one\ntwo\nthree\nfour\n"); err != nil {
@@ -253,17 +253,17 @@ func TestHandleDemoVisibleEOFIgnoredWhenNotVisible(t *testing.T) {
 	}
 	pager.Flush()
 
-	quit, err := handleDemoVisibleEOF(demoQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() error { return nil })
+	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() error { return nil })
 	if err != nil {
-		t.Fatalf("handleDemoVisibleEOF returned error: %v", err)
+		t.Fatalf("handleProgramVisibleEOF returned error: %v", err)
 	}
 	if quit {
-		t.Fatal("handleDemoVisibleEOF(...) = true, want false")
+		t.Fatal("handleProgramVisibleEOF(...) = true, want false")
 	}
 }
 
 func TestHandleDemoVisibleEOFIgnoredInFollowMode(t *testing.T) {
-	session := newDemoSession([]string{"one.txt"}, demoStartup{})
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 5)
 	if err := pager.AppendString("one\ntwo\n"); err != nil {
@@ -272,12 +272,12 @@ func TestHandleDemoVisibleEOFIgnoredInFollowMode(t *testing.T) {
 	pager.Flush()
 	pager.Follow()
 
-	quit, err := handleDemoVisibleEOF(demoQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() error { return nil })
+	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() error { return nil })
 	if err != nil {
-		t.Fatalf("handleDemoVisibleEOF returned error: %v", err)
+		t.Fatalf("handleProgramVisibleEOF returned error: %v", err)
 	}
 	if quit {
-		t.Fatal("handleDemoVisibleEOF(...) = true, want false")
+		t.Fatal("handleProgramVisibleEOF(...) = true, want false")
 	}
 }
 
@@ -322,9 +322,9 @@ func TestApplyDemoQuitAtEOFIgnoredOutsideNormalCompletedNavigation(t *testing.T)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			quit, err := applyDemoQuitAtEOF(
-				demoQuitAtEOFOnForwardEOF,
-				newDemoSession([]string{"one.txt"}, demoStartup{}),
+			quit, err := applyProgramQuitAtEOF(
+				programQuitAtEOFOnForwardEOF,
+				newProgramSession([]string{"one.txt"}, programStartup{}),
 				tt.result,
 				tt.inputComplete,
 				tt.following,
@@ -333,17 +333,17 @@ func TestApplyDemoQuitAtEOFIgnoredOutsideNormalCompletedNavigation(t *testing.T)
 				func() error { return nil },
 			)
 			if err != nil {
-				t.Fatalf("applyDemoQuitAtEOF returned error: %v", err)
+				t.Fatalf("applyProgramQuitAtEOF returned error: %v", err)
 			}
 			if quit {
-				t.Fatal("applyDemoQuitAtEOF(...) = true, want false")
+				t.Fatal("applyProgramQuitAtEOF(...) = true, want false")
 			}
 		})
 	}
 }
 
 func TestHandleDemoVisibleEOFActionRequiresForwardNavigation(t *testing.T) {
-	session := newDemoSession([]string{"one.txt"}, demoStartup{})
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 5)
 	if err := pager.AppendString("one\ntwo\n"); err != nil {
@@ -351,8 +351,8 @@ func TestHandleDemoVisibleEOFActionRequiresForwardNavigation(t *testing.T) {
 	}
 	pager.Flush()
 
-	quit, err := handleDemoVisibleEOFAction(
-		demoQuitAtEOFWhenVisible,
+	quit, err := handleProgramVisibleEOFAction(
+		programQuitAtEOFWhenVisible,
 		session,
 		func() *goless.Pager { return pager },
 		goless.KeyResult{Handled: true, Action: goless.KeyActionScrollUp, Context: goless.NormalKeyContext},
@@ -360,15 +360,15 @@ func TestHandleDemoVisibleEOFActionRequiresForwardNavigation(t *testing.T) {
 		func() error { return nil },
 	)
 	if err != nil {
-		t.Fatalf("handleDemoVisibleEOFAction returned error: %v", err)
+		t.Fatalf("handleProgramVisibleEOFAction returned error: %v", err)
 	}
 	if quit {
-		t.Fatal("handleDemoVisibleEOFAction(...) = true, want false")
+		t.Fatal("handleProgramVisibleEOFAction(...) = true, want false")
 	}
 }
 
 func TestNewDemoPagerPropagatesSqueezeMode(t *testing.T) {
-	pager := newDemoPager(
+	pager := newProgramPager(
 		goless.RenderHybrid,
 		goless.Preset{},
 		goless.Chrome{},
@@ -379,12 +379,12 @@ func TestNewDemoPagerPropagatesSqueezeMode(t *testing.T) {
 	)
 
 	if !pager.SqueezeBlankLines() {
-		t.Fatal("newDemoPager(..., squeeze=true, ...) did not enable squeeze mode")
+		t.Fatal("newProgramPager(..., squeeze=true, ...) did not enable squeeze mode")
 	}
 }
 
 func TestDemoSessionCommandHandler(t *testing.T) {
-	session := newDemoSession([]string{"one.txt", "two.txt"}, demoStartup{})
+	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
 	reloads := 0
 	handler := session.commandHandler(func() error {
 		reloads++
@@ -441,7 +441,7 @@ func TestDemoSessionCommandHandler(t *testing.T) {
 }
 
 func TestDemoSessionAdditionalCommands(t *testing.T) {
-	session := newDemoSession([]string{"one.txt", "two.txt", "three.txt"}, demoStartup{})
+	session := newProgramSession([]string{"one.txt", "two.txt", "three.txt"}, programStartup{})
 	reloads := 0
 	handler := session.commandHandler(func() error {
 		reloads++
@@ -480,7 +480,7 @@ func TestDemoSessionAdditionalCommands(t *testing.T) {
 }
 
 func TestDemoSessionCommandHandlerReloadFailureRestoresIndex(t *testing.T) {
-	session := newDemoSession([]string{"one.txt", "two.txt"}, demoStartup{})
+	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
 	handler := session.commandHandler(func() error {
 		return fmt.Errorf("reload failed")
 	})
@@ -498,7 +498,7 @@ func TestDemoSessionCommandHandlerReloadFailureRestoresIndex(t *testing.T) {
 }
 
 func TestDemoSessionCommandHandlerReloadFailureRestoresIndexForLast(t *testing.T) {
-	session := newDemoSession([]string{"one.txt", "two.txt", "three.txt"}, demoStartup{})
+	session := newProgramSession([]string{"one.txt", "two.txt", "three.txt"}, programStartup{})
 	handler := session.commandHandler(func() error {
 		return fmt.Errorf("reload failed")
 	})
@@ -537,15 +537,15 @@ func TestDemoInputs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			startup, files, err := demoInputs(tt.args)
+			startup, files, err := programInputs(tt.args)
 			if tt.wantErr {
 				if err == nil {
-					t.Fatal("demoInputs(...) = nil error, want error")
+					t.Fatal("programInputs(...) = nil error, want error")
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("demoInputs(...) failed: %v", err)
+				t.Fatalf("programInputs(...) failed: %v", err)
 			}
 			if got, want := startup.line, tt.wantLine; got != want {
 				t.Fatalf("startup.line = %d, want %d", got, want)
@@ -573,7 +573,7 @@ func TestApplyStartupCommand(t *testing.T) {
 	}
 	pager.Flush()
 
-	applyStartupCommand(pager, demoStartup{line: 3})
+	applyStartupCommand(pager, programStartup{line: 3})
 	if got, want := pager.Position().Row, 3; got != want {
 		t.Fatalf("Position().Row = %d, want %d", got, want)
 	}
@@ -585,7 +585,7 @@ func TestApplyStartupCommand(t *testing.T) {
 	}
 	pager.Flush()
 
-	applyStartupCommand(pager, demoStartup{query: "beta"})
+	applyStartupCommand(pager, programStartup{query: "beta"})
 	state := pager.SearchState()
 	if got, want := state.Query, "beta"; got != want {
 		t.Fatalf("SearchState().Query = %q, want %q", got, want)

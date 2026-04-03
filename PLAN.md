@@ -14,7 +14,7 @@ The library should:
 - Support forward and reverse searching with match highlighting.
 - Sanitize non-display control/escape sequences so input cannot manipulate the host terminal.
 - Support either horizontal scrolling or soft wrapping.
-- Expose a reusable library API and a small demo program.
+- Expose a reusable library API and a small standalone program.
 
 ## Non-Goals
 
@@ -430,7 +430,7 @@ Embeddability goals:
 ## Suggested Package Layout
 
 ```text
-/cmd/goless-demo        demo pager program
+/cmd/goless             standalone pager program
 /internal/ansi          ECMA-48 parsing and style state
 /internal/document      source adapters and logical document model
 /internal/layout        grapheme-aware wrapping and cell measurement

@@ -23,6 +23,6 @@
 // link inert, allow it to go live, rewrite the target, and/or restyle the
 // linked span.
 //
-// The bundled demo in cmd/goless-demo shows the intended integration model for
-// a full-screen tcell application.
+// The bundled program in cmd/goless shows the intended integration model for a
+// full-screen tcell application.
 package goless
