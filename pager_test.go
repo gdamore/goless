@@ -575,6 +575,66 @@ func TestPagerLineNumberToggle(t *testing.T) {
 	}
 }
 
+func TestPagerNewWithOptions(t *testing.T) {
+	pager := New(
+		WithTabWidth(4),
+		WithWrapMode(SoftWrap),
+		WithLineNumbers(true),
+		WithHeaderLines(2),
+		WithHeaderColumns(3),
+		WithShowStatus(true),
+	)
+
+	if got, want := pager.WrapMode(), SoftWrap; got != want {
+		t.Fatalf("WrapMode() = %v, want %v", got, want)
+	}
+	if !pager.LineNumbers() {
+		t.Fatal("LineNumbers() = false, want true")
+	}
+	if got, want := pager.HeaderLines(), 2; got != want {
+		t.Fatalf("HeaderLines() = %d, want %d", got, want)
+	}
+	if got, want := pager.HeaderColumns(), 3; got != want {
+		t.Fatalf("HeaderColumns() = %d, want %d", got, want)
+	}
+}
+
+func TestPagerConfigureAppliesRuntimeOptions(t *testing.T) {
+	pager := New(WithTabWidth(4), WithWrapMode(NoWrap), WithShowStatus(true))
+
+	pager.Configure(
+		WithWrapMode(SoftWrap),
+		WithLineNumbers(true),
+		WithSqueezeBlankLines(true),
+		WithHeaderLines(2),
+		WithHeaderColumns(3),
+		WithSearchCaseMode(SearchCaseSensitive),
+		WithSearchMode(SearchRegex),
+	)
+
+	if got, want := pager.WrapMode(), SoftWrap; got != want {
+		t.Fatalf("WrapMode() after Configure = %v, want %v", got, want)
+	}
+	if !pager.LineNumbers() {
+		t.Fatal("LineNumbers() after Configure = false, want true")
+	}
+	if !pager.SqueezeBlankLines() {
+		t.Fatal("SqueezeBlankLines() after Configure = false, want true")
+	}
+	if got, want := pager.HeaderLines(), 2; got != want {
+		t.Fatalf("HeaderLines() after Configure = %d, want %d", got, want)
+	}
+	if got, want := pager.HeaderColumns(), 3; got != want {
+		t.Fatalf("HeaderColumns() after Configure = %d, want %d", got, want)
+	}
+	if got, want := pager.SearchCaseMode(), SearchCaseSensitive; got != want {
+		t.Fatalf("SearchCaseMode() after Configure = %v, want %v", got, want)
+	}
+	if got, want := pager.SearchMode(), SearchRegex; got != want {
+		t.Fatalf("SearchMode() after Configure = %v, want %v", got, want)
+	}
+}
+
 func TestPagerSqueezeBlankLines(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	if pager.SqueezeBlankLines() {

@@ -865,18 +865,18 @@ func newProgramPager(
 	squeeze bool,
 	commandHandler func(goless.Command) goless.CommandResult,
 ) *goless.Pager {
-	return goless.New(goless.Config{
-		TabWidth:          8,
-		WrapMode:          goless.NoWrap,
-		RenderMode:        renderMode,
-		SqueezeBlankLines: squeeze,
-		Theme:             preset.Theme,
-		Visualization:     programVisualization(hidden),
-		HyperlinkHandler:  programHyperlinkHandler(liveLinks),
-		CommandHandler:    commandHandler,
-		Chrome:            chrome,
-		ShowStatus:        true,
-	})
+	return goless.New(
+		goless.WithTabWidth(8),
+		goless.WithWrapMode(goless.NoWrap),
+		goless.WithRenderMode(renderMode),
+		goless.WithSqueezeBlankLines(squeeze),
+		goless.WithTheme(preset.Theme),
+		goless.WithVisualization(programVisualization(hidden)),
+		goless.WithHyperlinkHandler(programHyperlinkHandler(liveLinks)),
+		goless.WithCommandHandler(commandHandler),
+		goless.WithChrome(chrome),
+		goless.WithShowStatus(true),
+	)
 }
 
 func programChrome(name, title string, base goless.Chrome) (goless.Chrome, error) {

@@ -7,16 +7,16 @@ weight = 10
 This page should answer the first practical integration question: "How do I get a pager on screen?"
 
 ```go
-pager := goless.New(goless.Config{
-    WrapMode:   goless.NoWrap,
-    KeyGroup:   goless.LessKeyGroup,
-    RenderMode: goless.RenderHybrid,
-    ShowStatus: true,
-    Chrome: goless.Chrome{
+pager := goless.New(
+    goless.WithWrapMode(goless.NoWrap),
+    goless.WithKeyGroup(goless.LessKeyGroup),
+    goless.WithRenderMode(goless.RenderHybrid),
+    goless.WithShowStatus(true),
+    goless.WithChrome(goless.Chrome{
         Title: "Example",
         Frame: goless.RoundedFrame(),
-    },
-})
+    }),
+)
 
 if _, err := pager.ReadFrom(strings.NewReader("hello\nworld\n")); err != nil {
     return err

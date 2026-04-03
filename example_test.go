@@ -12,16 +12,16 @@ import (
 )
 
 func ExampleNew() {
-	pager := goless.New(goless.Config{
-		WrapMode:   goless.NoWrap,
-		KeyGroup:   goless.LessKeyGroup,
-		RenderMode: goless.RenderHybrid,
-		ShowStatus: true,
-		Chrome: goless.Chrome{
+	pager := goless.New(
+		goless.WithWrapMode(goless.NoWrap),
+		goless.WithKeyGroup(goless.LessKeyGroup),
+		goless.WithRenderMode(goless.RenderHybrid),
+		goless.WithShowStatus(true),
+		goless.WithChrome(goless.Chrome{
 			Title: "Example",
 			Frame: goless.RoundedFrame(),
-		},
-	})
+		}),
+	)
 
 	_, _ = pager.ReadFrom(strings.NewReader("hello\nworld\n"))
 	pager.Flush()

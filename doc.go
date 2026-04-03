@@ -10,11 +10,12 @@
 //
 // The package exposes a small controller-oriented API:
 //
-//   - construct a Pager with New
+//   - construct a Pager with New and Option values
 //   - append content with Append, AppendString, or ReadFrom
 //   - size it with SetSize
 //   - render it with Draw
 //   - feed input through HandleKey, HandleKeyResult, or direct navigation/search methods
+//   - reconfigure runtime-safe behavior with Configure and RuntimeOption values
 //   - inspect visible search state with SearchState when host chrome needs it
 //
 // OSC 8 hyperlinks are parsed in presentation-oriented render modes, but they
