@@ -373,6 +373,8 @@ performance work measurable as the library evolves.
   replacement
 - The standalone program is intentionally small and does not aim to replicate
   every `less` behavior
+- See [LESS_COMPATIBILITY.md](LESS_COMPATIBILITY.md) for the current `less`
+  compatibility audit and selected follow-up scope
 
 ## Development
 
