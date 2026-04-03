@@ -79,17 +79,17 @@ type CommandResult struct {
 	KeepPrompt bool
 }
 
-// Position summarizes the current visible pager viewport.
-// Row and Column are 1-based visible coordinates when content is present, so
-// (1, 1) is the top-left corner of the current viewport. An empty viewport
-// reports Row=0 and Column=0.
+// Position summarizes the current logical pager viewport.
+// Row and Column are 1-based logical coordinates when content is present, so
+// (1, 1) is the start of the first logical line. An empty viewport reports
+// Row=0 and Column=0.
 type Position struct {
 	Row int
-	// Rows is the total visible row count.
+	// Rows is the total logical line count.
 	Rows int
-	// Column is the 1-based visible column number, or 0 when no content is visible.
+	// Column is the 1-based logical display column number, or 0 when no content is visible.
 	Column int
-	// Columns is the maximum visible content width in columns.
+	// Columns is the maximum logical content width in columns.
 	Columns int
 }
 
@@ -463,14 +463,13 @@ func (p *Pager) ClearSearch() {
 	p.viewer.ClearSearch()
 }
 
-// JumpToLine moves the viewport to the requested visible line number.
+// JumpToLine moves the viewport to the requested logical line number.
 func (p *Pager) JumpToLine(lineNumber int) bool {
 	return p.viewer.JumpToLine(lineNumber)
 }
 
-// Position reports the current visible row, total row count, current visible
-// column number, and maximum column span. Row and Column are 1-based when
-// content is present, so (1, 1) is the top-left visible position.
+// Position reports the current logical line, total logical line count,
+// current logical column number, and maximum logical column span.
 func (p *Pager) Position() Position {
 	pos := p.viewer.Position()
 	return Position{
@@ -722,6 +721,9 @@ func toInternalText(text Text) iview.Text {
 	if text.FollowMode == "" {
 		text.FollowMode = defaults.FollowMode
 	}
+	if text.StatusEOF == "" {
+		text.StatusEOF = defaults.StatusEOF
+	}
 	if text.SearchEmpty == "" {
 		text.SearchEmpty = defaults.SearchEmpty
 	}
@@ -762,6 +764,7 @@ func toInternalText(text Text) iview.Text {
 		StatusHelpHint:         text.StatusHelpHint,
 		HideStatusHelpHint:     text.HideStatusHelpHint,
 		FollowMode:             text.FollowMode,
+		StatusEOF:              text.StatusEOF,
 		SearchEmpty:            text.SearchEmpty,
 		SearchNotFound:         text.SearchNotFound,
 		SearchMatchCount:       text.SearchMatchCount,
@@ -778,6 +781,7 @@ func toInternalText(text Text) iview.Text {
 			return text.StatusLine(StatusInfo{
 				Search:       toPublicSearchState(info.Search),
 				Following:    info.Following,
+				EOFVisible:   info.EOFVisible,
 				Message:      info.Message,
 				Position:     Position{Row: info.Position.Row, Rows: info.Position.Rows, Column: info.Position.Column, Columns: info.Position.Columns},
 				DefaultLeft:  info.DefaultLeft,

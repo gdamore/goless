@@ -7,6 +7,7 @@ package view
 type StatusInfo struct {
 	Search       SearchSnapshot
 	Following    bool
+	EOFVisible   bool
 	Message      string
 	Position     Position
 	DefaultLeft  string

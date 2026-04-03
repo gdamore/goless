@@ -22,6 +22,7 @@ type Text struct {
 	StatusHelpHint     string
 	HideStatusHelpHint bool
 	FollowMode         string
+	StatusEOF          string
 	StatusLine         func(StatusInfo) (left, right string)
 
 	SearchEmpty      string
@@ -70,6 +71,9 @@ func (t Text) withDefaults() Text {
 	if t.FollowMode == "" {
 		t.FollowMode = defaults.FollowMode
 	}
+	if t.StatusEOF == "" {
+		t.StatusEOF = defaults.StatusEOF
+	}
 	if t.SearchEmpty == "" {
 		t.SearchEmpty = defaults.SearchEmpty
 	}
@@ -117,6 +121,7 @@ func defaultText() Text {
 		},
 		StatusHelpHint: "F1 Help",
 		FollowMode:     "follow",
+		StatusEOF:      "EOF",
 		SearchEmpty:    "empty search",
 		SearchNotFound: func(query string) string {
 			return fmt.Sprintf("%s not found", query)

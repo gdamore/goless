@@ -180,8 +180,8 @@ The current exported `Pager` API is controller-oriented.
   `SearchCaseMode`, `SetSearchMode`, `SearchMode`, `CycleSearchCaseMode`,
   `CycleSearchMode`, `SearchState`, `ClearSearch`
 - View state: `Position`
-  `Position.Row` and `Position.Column` are 1-based visible coordinates when
-  content is present, so `(1,1)` is the top-left visible position
+  `Position.Row` and `Position.Column` are 1-based logical coordinates when
+  content is present, so `(1,1)` is the start of the first logical line
 
 The main constructor/runtime options are available both as explicit `With...`
 helpers and, for construction compatibility, through `Config` passed to `New`.
@@ -234,7 +234,8 @@ The built-in pager UI exposes search mode controls directly:
 - when otherwise idle, the left side of the status bar shows a subtle help hint: `F1 Help`
   Embedders can replace it with `Text.StatusHelpHint` or suppress it with `Text.HideStatusHelpHint`
 - the right side of the status bar shows row and column as `current/total`
-  These are 1-based visible coordinates, so the top-left visible position is `row 1`, `col 1`
+  These are 1-based logical coordinates rather than wrapped visual row numbers
+- the built-in status bar appends `EOF` when the end of the document is visible
 - the right side of the status bar adds contextual wrap/scroll glyphs such as `↪` and `⇆`
 - `:set searchcase smart|case|nocase` is available as a fallback
 - `:set searchmode sub|word|regex` is available as a fallback
@@ -244,9 +245,10 @@ The built-in pager UI exposes search mode controls directly:
 - `:set headercols on|off|toggle|<n>` is available as a fallback
 - invalid regexes stay in the search prompt and are marked visibly until fixed
 
-`SqueezeBlankLines` is a view-time policy: raw input stays unchanged, while
-search, line numbers, and `JumpToLine` operate on the squeezed view when the
-option is enabled.
+`SqueezeBlankLines` is a view-time policy: raw input stays unchanged and
+consecutive blank lines may be rendered as a single visible blank line, but
+logical line numbering remains source-based for `Position()`, line numbers, and
+`JumpToLine`.
 
 Embedders are not locked to the bundled keys. They can:
 

@@ -1480,7 +1480,28 @@ func TestPromptCommandJumpsToLine(t *testing.T) {
 	}
 }
 
-func TestPromptCommandJumpsToSqueezedLine(t *testing.T) {
+func TestPromptCommandJumpsToLogicalLineInWrap(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdef\nsecond\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.SoftWrap, ShowStatus: true})
+	v.SetSize(4, 2)
+
+	v.HandleKey(keyRune(":"))
+	v.HandleKey(keyRune("2"))
+	v.HandleKey(keyKey(tcell.KeyEnter))
+
+	if got, want := v.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row after :2 = %d, want %d", got, want)
+	}
+	if got, want := v.firstVisibleAnchor(), (layout.Anchor{LineIndex: 1, GraphemeIndex: 0}); got != want {
+		t.Fatalf("anchor after :2 = %+v, want %+v", got, want)
+	}
+}
+
+func TestPromptCommandJumpsToSourceLineWhenSqueezed(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\n\n\nthree\nfour\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -1495,11 +1516,11 @@ func TestPromptCommandJumpsToSqueezedLine(t *testing.T) {
 	v.SetSize(20, 2)
 
 	v.HandleKey(keyRune(":"))
-	v.HandleKey(keyRune("3"))
+	v.HandleKey(keyRune("4"))
 	v.HandleKey(keyKey(tcell.KeyEnter))
 
 	if got, want := v.firstVisibleAnchor().LineIndex, 2; got != want {
-		t.Fatalf("visible squeezed line after :3 = %d, want %d", got, want)
+		t.Fatalf("visible squeezed line after :4 = %d, want %d", got, want)
 	}
 	if got, want := v.lines[2].Text, "three"; got != want {
 		t.Fatalf("visible squeezed line text = %q, want %q", got, want)
@@ -1977,6 +1998,22 @@ func TestStatusTextPlacesPositionOnRight(t *testing.T) {
 	}
 }
 
+func TestStatusTextUsesLogicalCoordinatesInSoftWrap(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefgh\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.SoftWrap, ShowStatus: true})
+	v.SetSize(4, 2)
+	v.ScrollDown(1)
+
+	_, rightText := v.statusText()
+	if !strings.Contains(rightText, "row 1/1") || !strings.Contains(rightText, "col 5/8") {
+		t.Fatalf("right status text = %q, want logical row+col indicator", rightText)
+	}
+}
+
 func TestStatusTextAndPositionAgreeWithFixedHeaders(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("h1\nh2\nbody1\nbody2\n")); err != nil {
@@ -1994,6 +2031,37 @@ func TestStatusTextAndPositionAgreeWithFixedHeaders(t *testing.T) {
 	_, rightText := v.statusText()
 	if !strings.Contains(rightText, "row 3/4") {
 		t.Fatalf("right status text = %q, want row indicator for first visible body row", rightText)
+	}
+}
+
+func TestStatusTextShowsEOFWhenVisible(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nbeta\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 3)
+	v.relayout()
+
+	_, rightText := v.statusText()
+	if !strings.Contains(rightText, "EOF") {
+		t.Fatalf("right status text = %q, want EOF indicator", rightText)
+	}
+}
+
+func TestEOFVisibleRequiresLineEndToBeVisibleInNoWrap(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyz\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(10, 2)
+	v.relayout()
+
+	if v.EOFVisible() {
+		t.Fatal("EOFVisible() = true, want false when line end is clipped")
 	}
 }
 
@@ -2211,6 +2279,9 @@ func TestStatusLineFormatterOverridesBuiltInStatusText(t *testing.T) {
 			StatusLine: func(info StatusInfo) (left, right string) {
 				if info.DefaultRight == "" {
 					t.Fatalf("StatusLine got empty right default: %+v", info)
+				}
+				if info.EOFVisible {
+					t.Fatalf("StatusLine EOFVisible = true, want false")
 				}
 				return "L:" + info.DefaultLeft, "R:" + info.DefaultRight
 			},
@@ -2883,7 +2954,7 @@ func TestDrawLineNumbersUsesAdaptiveGutterWidth(t *testing.T) {
 	}
 }
 
-func TestDrawLineNumbersUseSqueezedViewNumbering(t *testing.T) {
+func TestDrawLineNumbersUseSourceNumberingWhenSqueezed(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\n\n\nthree\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -2907,8 +2978,8 @@ func TestDrawLineNumbersUseSqueezedViewNumbering(t *testing.T) {
 	if got := cellRune(screen, 0, 1); got != '2' {
 		t.Fatalf("squeezed blank line number rune = %q, want %q", got, '2')
 	}
-	if got := cellRune(screen, 0, 2); got != '3' {
-		t.Fatalf("third line number rune = %q, want %q", got, '3')
+	if got := cellRune(screen, 0, 2); got != '4' {
+		t.Fatalf("third line number rune = %q, want %q", got, '4')
 	}
 }
 

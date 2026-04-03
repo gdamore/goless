@@ -578,7 +578,7 @@ func TestPagerSearchMethods(t *testing.T) {
 
 func TestPagerWrapModeAndPosition(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
-	pager.SetSize(5, 4)
+	pager.SetSize(5, 2)
 	if err := pager.AppendString("abcdefghij\n"); err != nil {
 		t.Fatalf("AppendString failed: %v", err)
 	}
@@ -606,6 +606,13 @@ func TestPagerWrapModeAndPosition(t *testing.T) {
 	if got, want := pager.Position().Columns, 10; got != want {
 		t.Fatalf("Position().Columns after SoftWrap = %d, want %d", got, want)
 	}
+	pager.ScrollDown(1)
+	if got, want := pager.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row on wrapped continuation = %d, want %d", got, want)
+	}
+	if got, want := pager.Position().Column, 6; got != want {
+		t.Fatalf("Position().Column on wrapped continuation = %d, want %d", got, want)
+	}
 }
 
 func TestPagerJumpToLine(t *testing.T) {
@@ -624,6 +631,28 @@ func TestPagerJumpToLine(t *testing.T) {
 	}
 	if pager.JumpToLine(4) {
 		t.Fatal("JumpToLine(4) = true, want false")
+	}
+}
+
+func TestPagerJumpToLineUsesLogicalLinesInWrap(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: SoftWrap, ShowStatus: true})
+	pager.SetSize(4, 2)
+	if err := pager.AppendString("abcdef\nsecond\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if got, want := pager.Position().Rows, 2; got != want {
+		t.Fatalf("Position().Rows = %d, want %d", got, want)
+	}
+	if !pager.JumpToLine(2) {
+		t.Fatal("JumpToLine(2) = false, want true")
+	}
+	if got, want := pager.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row after wrapped JumpToLine = %d, want %d", got, want)
+	}
+	if pager.JumpToLine(3) {
+		t.Fatal("JumpToLine(3) = true, want false")
 	}
 }
 
@@ -776,7 +805,7 @@ func TestPagerHeaderColumns(t *testing.T) {
 	}
 }
 
-func TestPagerJumpToLineUsesSqueezedView(t *testing.T) {
+func TestPagerJumpToLineUsesSourceLinesWhenSqueezed(t *testing.T) {
 	pager := New(Config{
 		TabWidth:          4,
 		WrapMode:          NoWrap,
@@ -789,10 +818,10 @@ func TestPagerJumpToLineUsesSqueezedView(t *testing.T) {
 	}
 	pager.Flush()
 
-	if !pager.JumpToLine(3) {
-		t.Fatal("JumpToLine(3) = false, want true")
+	if !pager.JumpToLine(4) {
+		t.Fatal("JumpToLine(4) = false, want true")
 	}
-	if got, want := pager.Position().Row, 3; got != want {
+	if got, want := pager.Position().Row, 4; got != want {
 		t.Fatalf("Position().Row after squeezed JumpToLine = %d, want %d", got, want)
 	}
 }
