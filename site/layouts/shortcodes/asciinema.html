@@ -1,7 +1,7 @@
 {{ $src := .Get "src" }}
 {{ $poster := .Get "poster" | default "" }}
-{{ $rows := .Get "rows" | default "26" }}
-{{ $cols := .Get "cols" | default "100" }}
+{{ $rows := .Get "rows" | default 26 | int }}
+{{ $cols := .Get "cols" | default 100 | int }}
 {{ $id := printf "asciinema-%s" (md5 $src) }}
 {{ if not $src }}
   <div class="cast-placeholder">
@@ -9,8 +9,11 @@
     <p>Add a <code>src</code> path once a <code>.cast</code> recording exists in <code>site/static/casts/</code>.</p>
   </div>
 {{ else }}
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/asciinema-player@3.10.0/dist/bundle/asciinema-player.css">
-  <script src="https://cdn.jsdelivr.net/npm/asciinema-player@3.10.0/dist/bundle/asciinema-player.min.js"></script>
+  {{ if not (.Page.Scratch.Get "asciinemaAssetsIncluded") }}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/asciinema-player@3.10.0/dist/bundle/asciinema-player.css">
+    <script src="https://cdn.jsdelivr.net/npm/asciinema-player@3.10.0/dist/bundle/asciinema-player.min.js"></script>
+    {{ .Page.Scratch.Set "asciinemaAssetsIncluded" true }}
+  {{ end }}
   <div id="{{ $id }}" class="cast-player"></div>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
