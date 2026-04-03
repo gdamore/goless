@@ -77,20 +77,23 @@ Current sequence limitation:
 
 Compatible today:
 
+- `-?` / `--help`
 - `-e` / `--quit-at-eof`
 - `-E` / `--QUIT-AT-EOF`
+- `-N` to enable line numbers
+- `-R` as a compatibility no-op because the default rendering mode already
+  aligns with the intended less-like behavior
+- `-S` as a compatibility no-op because no-wrap is already the default mode
+- `-i` / `-I` for smart-case and case-insensitive search behavior
+- `-s` / `--squeeze` to collapse repeated blank lines in the current view
+- `-x N` to set tab width
 - `+line`
 - `+/pattern`
 - multiple files plus explicit `-` for stdin
 
 Current CLI is thinner than `less` in several common areas:
 
-- no `-N` line-number alias
-- no `-S` chop-long-lines alias
-- no `-i` / `-I` search-case aliases
-- no `-x N` tab-width alias
 - no `-F` quit-if-one-screen behavior
-- no standard `--help` / `-?` less-style help alias
 
 Custom flags such as `-preset`, `-chrome`, `-hidden`, `-render`, and
 `-live-links` are fine; they do not block familiarity as long as common `less`
@@ -151,17 +154,28 @@ Still open:
 
 ### 3. Add common CLI aliases with low behavioral risk
 
-These flags map cleanly onto existing pager behavior:
+Status: partially complete.
+
+Implemented:
 
 - `-N` to enable line numbers
 - `-i` to keep smart-case behavior explicit
 - `-I` to force case-insensitive search
+- `-s` / `--squeeze` to collapse repeated blank lines in the current view
 - `-x N` to set tab width
-- `-F` to quit if the entire file fits on the first screen
 
-`-S` can also be accepted as an alias for no-wrap mode even though that is
+`-S` is accepted as an alias for no-wrap mode even though that is
 already the default. That keeps scripts and muscle memory working without
 forcing users to know the current default.
+
+`-R` is accepted as a compatibility no-op because the default rendering mode is
+already the intended less-like behavior.
+
+`-?` and `--help` are accepted as standard help entry points.
+
+Still open:
+
+- `-F` to quit if the entire file fits on the first screen
 
 ### 4. Treat numeric prefixes as a separate, deliberate follow-up
 
@@ -185,7 +199,7 @@ changes:
 - editor launch via `v`
 - save-to-file commands
 - `LESSOPEN`, lesskey, and other external-process integration points
-- raw control-character passthrough modes such as `-r` / `-R`
+- raw control-character passthrough mode `-r`
 - exact GNU `less` prompt formatting and option-toggling syntax
 
 Those features either conflict with the security model or add substantial

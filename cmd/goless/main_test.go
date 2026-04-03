@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -413,7 +414,68 @@ func TestHandleDemoVisibleEOFActionRequiresForwardNavigation(t *testing.T) {
 	}
 }
 
-func TestNewDemoPagerPropagatesSqueezeMode(t *testing.T) {
+func TestParseProgramFlagsCompatibilityAliases(t *testing.T) {
+	var out bytes.Buffer
+	opts, args, err := parseProgramFlags([]string{"-S", "-N", "-s", "-x", "4", "-I", "sample.txt"}, &out)
+	if err != nil {
+		t.Fatalf("parseProgramFlags(...) failed: %v", err)
+	}
+	if opts.showHelp {
+		t.Fatal("parseProgramFlags(...) unexpectedly set showHelp")
+	}
+	if !opts.lineNumbers {
+		t.Fatal("parseProgramFlags(...) did not enable line numbers for -N")
+	}
+	if !opts.squeeze {
+		t.Fatal("parseProgramFlags(...) did not enable squeeze for -s")
+	}
+	if got, want := opts.tabWidth, 4; got != want {
+		t.Fatalf("tab width = %d, want %d", got, want)
+	}
+	if got, want := opts.searchCaseMode, goless.SearchCaseInsensitive; got != want {
+		t.Fatalf("search case mode = %v, want %v", got, want)
+	}
+	if got, want := len(args), 1; got != want {
+		t.Fatalf("len(args) = %d, want %d", got, want)
+	}
+	if got, want := args[0], "sample.txt"; got != want {
+		t.Fatalf("args[0] = %q, want %q", got, want)
+	}
+}
+
+func TestParseProgramFlagsHelp(t *testing.T) {
+	var out bytes.Buffer
+	opts, args, err := parseProgramFlags([]string{"--help"}, &out)
+	if err != nil {
+		t.Fatalf("parseProgramFlags(--help) failed: %v", err)
+	}
+	if !opts.showHelp {
+		t.Fatal("parseProgramFlags(--help) did not set showHelp")
+	}
+	if len(args) != 0 {
+		t.Fatalf("len(args) after --help = %d, want 0", len(args))
+	}
+	if got := out.String(); !strings.Contains(got, "usage: goless") {
+		t.Fatalf("help output = %q, want usage text", got)
+	}
+
+	out.Reset()
+	opts, args, err = parseProgramFlags([]string{"-?"}, &out)
+	if err != nil {
+		t.Fatalf("parseProgramFlags(-?) failed: %v", err)
+	}
+	if !opts.showHelp {
+		t.Fatal("parseProgramFlags(-?) did not set showHelp")
+	}
+	if len(args) != 0 {
+		t.Fatalf("len(args) after -? = %d, want 0", len(args))
+	}
+	if got := out.String(); !strings.Contains(got, "usage: goless") {
+		t.Fatalf("help output for -? = %q, want usage text", got)
+	}
+}
+
+func TestNewDemoPagerPropagatesConfig(t *testing.T) {
 	pager := newProgramPager(
 		goless.RenderHybrid,
 		goless.Preset{},
@@ -421,11 +483,20 @@ func TestNewDemoPagerPropagatesSqueezeMode(t *testing.T) {
 		false,
 		false,
 		true,
+		goless.SearchCaseInsensitive,
+		true,
+		4,
 		nil,
 	)
 
 	if !pager.SqueezeBlankLines() {
 		t.Fatal("newProgramPager(..., squeeze=true, ...) did not enable squeeze mode")
+	}
+	if !pager.LineNumbers() {
+		t.Fatal("newProgramPager(..., lineNumbers=true, ...) did not enable line numbers")
+	}
+	if got, want := pager.SearchCaseMode(), goless.SearchCaseInsensitive; got != want {
+		t.Fatalf("SearchCaseMode() = %v, want %v", got, want)
 	}
 }
 

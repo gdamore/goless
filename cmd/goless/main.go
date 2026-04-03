@@ -28,6 +28,24 @@ const (
 
 const programStdinInput = "-"
 
+type programOptions struct {
+	chromeName        string
+	hidden            bool
+	ignoredChopLines  bool
+	ignoredRawControl bool
+	lineNumbers       bool
+	liveLinks         bool
+	presetName        string
+	quitAtEOF         bool
+	quitAtEOFFirst    bool
+	renderName        string
+	searchCaseMode    goless.SearchCaseMode
+	showHelp          bool
+	squeeze           bool
+	tabWidth          int
+	title             string
+}
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -36,48 +54,30 @@ func main() {
 }
 
 func run() error {
-	var chromeName string
-	var hidden bool
-	var liveLinks bool
-	var presetName string
-	var quitAtEOF bool
-	var quitAtEOFFirst bool
-	var renderName string
-	var squeeze bool
-	var title string
-
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: goless [-e|-E] [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [+line|+/pattern] [path ...]\n")
-	}
-	flag.BoolVar(&quitAtEOF, "e", false, "quit on the first forward command at EOF")
-	flag.BoolVar(&quitAtEOFFirst, "E", false, "quit when EOF is already visible on screen")
-	flag.StringVar(&presetName, "preset", "none", "visual preset: none, dark, light, plain, pretty")
-	flag.StringVar(&chromeName, "chrome", "auto", "chrome override: auto, none, single, rounded")
-	flag.BoolVar(&hidden, "hidden", false, "show tabs, line endings, carriage returns, and EOF markers")
-	flag.BoolVar(&liveLinks, "live-links", false, "enable live OSC 8 hyperlinks in the program")
-	flag.BoolVar(&quitAtEOF, "quit-at-eof", false, "long form of -e")
-	flag.BoolVar(&quitAtEOFFirst, "QUIT-AT-EOF", false, "long form of -E")
-	flag.StringVar(&renderName, "render", "hybrid", "render mode: hybrid, literal, presentation")
-	flag.BoolVar(&squeeze, "squeeze", false, "collapse repeated blank lines in the current view")
-	flag.StringVar(&title, "title", "", "frame title")
-	flag.Parse()
-
-	renderMode, err := programRenderMode(renderName)
+	opts, args, err := parseProgramFlags(os.Args[1:], flag.CommandLine.Output())
 	if err != nil {
 		return err
 	}
-	preset, err := programPreset(presetName)
+	if opts.showHelp {
+		return nil
+	}
+
+	renderMode, err := programRenderMode(opts.renderName)
 	if err != nil {
 		return err
 	}
-	startup, files, err := programInputs(flag.Args())
+	preset, err := programPreset(opts.presetName)
+	if err != nil {
+		return err
+	}
+	startup, files, err := programInputs(args)
 	if err != nil {
 		return err
 	}
 	session := newProgramSession(files, startup)
 	inputLoader := newProgramInputLoader(os.Stdin)
-	quitAtEOFPolicy := programQuitAtEOFPolicyFromFlags(quitAtEOF, quitAtEOFFirst)
-	chromeCfg, err := programChrome(chromeName, title, preset.Chrome)
+	quitAtEOFPolicy := programQuitAtEOFPolicyFromFlags(opts.quitAtEOF, opts.quitAtEOFFirst)
+	chromeCfg, err := programChrome(opts.chromeName, opts.title, preset.Chrome)
 	if err != nil {
 		return err
 	}
@@ -115,9 +115,12 @@ func run() error {
 			renderMode,
 			preset,
 			session.chrome(chromeCfg),
-			hidden,
-			liveLinks,
-			squeeze,
+			opts.hidden,
+			opts.liveLinks,
+			opts.lineNumbers,
+			opts.searchCaseMode,
+			opts.squeeze,
+			opts.tabWidth,
 			session.commandHandler(func() error {
 				if reloadCurrent == nil {
 					return fmt.Errorf("file reload unavailable")
@@ -158,12 +161,12 @@ func run() error {
 			screen.Sync()
 		case *tcell.EventKey:
 			if event.Key() == tcell.KeyF4 {
-				presetName = nextProgramPresetName(presetName)
-				preset, err = programPreset(presetName)
+				opts.presetName = nextProgramPresetName(opts.presetName)
+				preset, err = programPreset(opts.presetName)
 				if err != nil {
 					return err
 				}
-				chromeCfg, err = programChrome(chromeName, title, preset.Chrome)
+				chromeCfg, err = programChrome(opts.chromeName, opts.title, preset.Chrome)
 				if err != nil {
 					return err
 				}
@@ -172,8 +175,8 @@ func run() error {
 				break
 			}
 			if event.Key() == tcell.KeyF5 {
-				hidden = !hidden
-				pager.SetVisualization(programVisualization(hidden))
+				opts.hidden = !opts.hidden
+				pager.SetVisualization(programVisualization(opts.hidden))
 				break
 			}
 			before := pager.Position()
@@ -231,6 +234,64 @@ func run() error {
 		}
 		pager.Draw(screen)
 	}
+}
+
+func parseProgramFlags(args []string, output io.Writer) (programOptions, []string, error) {
+	opts := programOptions{
+		presetName:     "none",
+		chromeName:     "auto",
+		renderName:     "hybrid",
+		searchCaseMode: goless.SearchSmartCase,
+		tabWidth:       8,
+	}
+
+	fs := flag.NewFlagSet("goless", flag.ContinueOnError)
+	fs.SetOutput(output)
+	fs.Usage = func() {
+		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-N|-R|-S|-i|-I|-s] [-x n] [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [+line|+/pattern] [path ...]\n")
+	}
+
+	fs.BoolVar(&opts.showHelp, "?", false, "show help")
+	fs.BoolVar(&opts.showHelp, "help", false, "show help")
+	fs.BoolVar(&opts.showHelp, "h", false, "show help")
+	fs.BoolVar(&opts.quitAtEOF, "e", false, "quit on the first forward command at EOF")
+	fs.BoolVar(&opts.quitAtEOFFirst, "E", false, "quit when EOF is already visible on screen")
+	fs.BoolVar(&opts.lineNumbers, "N", false, "show line numbers")
+	fs.BoolVar(&opts.ignoredRawControl, "R", false, "accepted as a less compatibility no-op")
+	fs.BoolVar(&opts.ignoredChopLines, "S", false, "accepted as a less compatibility no-op")
+	fs.BoolVar(&opts.hidden, "hidden", false, "show tabs, line endings, carriage returns, and EOF markers")
+	fs.BoolVar(&opts.liveLinks, "live-links", false, "enable live OSC 8 hyperlinks in the program")
+	fs.BoolVar(&opts.quitAtEOF, "quit-at-eof", false, "long form of -e")
+	fs.BoolVar(&opts.quitAtEOFFirst, "QUIT-AT-EOF", false, "long form of -E")
+	fs.BoolVar(&opts.squeeze, "s", false, "collapse repeated blank lines in the current view")
+	fs.BoolVar(&opts.squeeze, "squeeze", false, "collapse repeated blank lines in the current view")
+	fs.StringVar(&opts.presetName, "preset", "none", "visual preset: none, dark, light, plain, pretty")
+	fs.StringVar(&opts.chromeName, "chrome", "auto", "chrome override: auto, none, single, rounded")
+	fs.StringVar(&opts.renderName, "render", "hybrid", "render mode: hybrid, literal, presentation")
+	fs.StringVar(&opts.title, "title", "", "frame title")
+	fs.IntVar(&opts.tabWidth, "x", 8, "tab width")
+
+	var ignoreSmartCase bool
+	var ignoreCase bool
+	fs.BoolVar(&ignoreSmartCase, "i", false, "smart-case search")
+	fs.BoolVar(&ignoreCase, "I", false, "case-insensitive search")
+
+	if err := fs.Parse(args); err != nil {
+		return programOptions{}, nil, err
+	}
+	if opts.showHelp {
+		fs.Usage()
+		return opts, nil, nil
+	}
+	if ignoreCase {
+		opts.searchCaseMode = goless.SearchCaseInsensitive
+	} else if ignoreSmartCase {
+		opts.searchCaseMode = goless.SearchSmartCase
+	}
+	if opts.tabWidth <= 0 {
+		opts.tabWidth = 8
+	}
+	return opts, fs.Args(), nil
 }
 
 func programQuitAtEOFPolicyFromFlags(quitAtEOF, quitAtEOFFirst bool) programQuitAtEOFPolicy {
@@ -896,13 +957,18 @@ func newProgramPager(
 	chrome goless.Chrome,
 	hidden bool,
 	liveLinks bool,
+	lineNumbers bool,
+	searchCaseMode goless.SearchCaseMode,
 	squeeze bool,
+	tabWidth int,
 	commandHandler func(goless.Command) goless.CommandResult,
 ) *goless.Pager {
 	return goless.New(
-		goless.WithTabWidth(8),
+		goless.WithTabWidth(tabWidth),
 		goless.WithWrapMode(goless.NoWrap),
 		goless.WithRenderMode(renderMode),
+		goless.WithLineNumbers(lineNumbers),
+		goless.WithSearchCaseMode(searchCaseMode),
 		goless.WithSqueezeBlankLines(squeeze),
 		goless.WithTheme(preset.Theme),
 		goless.WithVisualization(programVisualization(hidden)),

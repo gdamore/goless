@@ -319,14 +319,21 @@ selected input to `stdout` unchanged.
 
 Program flags:
 
+- `-?` or `--help` to print usage and exit
 - `-e` or `--quit-at-eof` to quit on the first forward command at EOF
 - `-E` or `--QUIT-AT-EOF` to quit when EOF is already visible on screen
+- `-N` to enable line numbers
+- `-R` accepted as a less-compatibility no-op
+- `-S` accepted as a less-compatibility no-op because no-wrap is already the default
+- `-i` for smart-case search behavior
+- `-I` for case-insensitive search behavior
+- `-x n` to set tab width
 - `-preset none|dark|light|plain|pretty`
 - `-chrome auto|none|single|rounded`
 - `-hidden`
 - `-live-links`
 - `-render hybrid|literal|presentation`
-- `-squeeze` to collapse repeated blank lines in the current view
+- `-s` or `-squeeze` to collapse repeated blank lines in the current view
 - `-title text`
 - optional `+line` or `+/pattern` startup directive before paths
 - `-` as an explicit stdin path
