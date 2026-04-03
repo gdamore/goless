@@ -86,6 +86,11 @@ The library should:
 - Jump-to-top / jump-to-bottom.
 - Page up / page down.
 - Search next / previous result.
+- Future horizontal navigation polish:
+  - keep it separate from status/chrome refinements
+  - prefer a coarse no-wrap jump of `max(8, viewportWidth/4)` rather than half-screen
+  - retain a fine-grained one-column motion command with bindings to be decided
+  - add explicit jump-to-beginning-of-line and jump-to-end-of-line commands; `Ctrl-A` / `Ctrl-E` are candidates
 
 ### Search
 
@@ -101,8 +106,8 @@ The library should:
 - Bottom status bar showing:
   - current position in content
   - total content length if known
-  - current mode (`WRAP` or `SCROLL`)
-  - active search query if any
+  - contextual wrap/scroll affordances
+  - active search state when useful
 - Position reporting should be meaningful even when total size is unknown.
 
 ### Demo Program

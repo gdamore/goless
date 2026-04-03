@@ -197,7 +197,10 @@ The built-in pager UI exposes search mode controls directly:
 
 - `F2` in the bundled less-like key group cycles `smart -> case -> nocase`
 - `F3` in the bundled less-like key group cycles `sub -> word -> regex`
-- the current mode is shown in the status bar and search prompt
+- the search prompt always shows the current search mode
+- the status bar shows search mode when a search is active or the search settings are non-default
+- the right side of the status bar shows row and column as `current/total`
+- the right side of the status bar adds contextual wrap/scroll glyphs such as `↪` and `⇆`
 - `:set searchcase smart|case|nocase` is available as a fallback
 - `:set searchmode sub|word|regex` is available as a fallback
 - `:set squeeze on|off|toggle` is available as a fallback

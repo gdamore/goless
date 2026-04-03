@@ -18,7 +18,7 @@ type Text struct {
 	HelpBody  string
 
 	StatusSearchInfo func(query string, current, total int) string
-	StatusPosition   func(current, total, column int) string
+	StatusPosition   func(current, total, column, columns int) string
 	FollowMode       string
 	StatusLine       func(StatusInfo) (left, right string)
 
@@ -107,8 +107,8 @@ func defaultText() Text {
 		StatusSearchInfo: func(query string, current, total int) string {
 			return fmt.Sprintf("/%s %d/%d", query, current, total)
 		},
-		StatusPosition: func(current, total, column int) string {
-			return fmt.Sprintf("row %d/%d  col %d", current, total, column)
+		StatusPosition: func(current, total, column, columns int) string {
+			return fmt.Sprintf("row %d/%d  col %d/%d", current, total, column, columns)
 		},
 		FollowMode:  "follow",
 		SearchEmpty: "empty search",

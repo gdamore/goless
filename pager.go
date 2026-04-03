@@ -78,9 +78,10 @@ type CommandResult struct {
 
 // Position summarizes the current visible pager viewport.
 type Position struct {
-	Row    int
-	Rows   int
-	Column int
+	Row     int
+	Rows    int
+	Column  int
+	Columns int
 }
 
 // Pager is an embeddable document pager backed by an appendable document model.
@@ -428,13 +429,14 @@ func (p *Pager) JumpToLine(lineNumber int) bool {
 	return p.viewer.JumpToLine(lineNumber)
 }
 
-// Position reports the current visible row, total row count, and horizontal offset.
+// Position reports the current visible row, total row count, horizontal offset, and maximum column span.
 func (p *Pager) Position() Position {
 	pos := p.viewer.Position()
 	return Position{
-		Row:    pos.Row,
-		Rows:   pos.Rows,
-		Column: pos.Column,
+		Row:     pos.Row,
+		Rows:    pos.Rows,
+		Column:  pos.Column,
+		Columns: pos.Columns,
 	}
 }
 
@@ -717,7 +719,7 @@ func toInternalText(text Text) iview.Text {
 				Search:       toPublicSearchState(info.Search),
 				Following:    info.Following,
 				Message:      info.Message,
-				Position:     Position{Row: info.Position.Row, Rows: info.Position.Rows, Column: info.Position.Column},
+				Position:     Position{Row: info.Position.Row, Rows: info.Position.Rows, Column: info.Position.Column, Columns: info.Position.Columns},
 				DefaultLeft:  info.DefaultLeft,
 				DefaultRight: info.DefaultRight,
 			})

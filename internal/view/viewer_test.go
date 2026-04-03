@@ -1304,11 +1304,11 @@ func TestStatusTextPlacesPositionOnRight(t *testing.T) {
 	v.relayout()
 
 	leftText, rightText := v.statusText()
-	if got, want := leftText, "search:smart,sub"; got != want {
+	if got, want := leftText, ""; got != want {
 		t.Fatalf("left status text = %q, want %q", got, want)
 	}
-	if !strings.Contains(rightText, "row 1/2") {
-		t.Fatalf("right status text = %q, want row indicator", rightText)
+	if !strings.Contains(rightText, "row 1/2") || !strings.Contains(rightText, "col 0/5") || !strings.Contains(rightText, "⇆") {
+		t.Fatalf("right status text = %q, want row+col indicator with no-wrap glyph", rightText)
 	}
 }
 
@@ -1368,6 +1368,42 @@ func TestStatusTextDoesNotDuplicateModeMessage(t *testing.T) {
 	}
 }
 
+func TestStatusTextShowsWrapHintInSoftWrapMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.SoftWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.relayout()
+
+	_, rightText := v.statusText()
+	if !strings.Contains(rightText, "↪") {
+		t.Fatalf("right status text = %q, want wrap hint", rightText)
+	}
+}
+
+func TestStatusTextShowsColumnTotalsWhenScrolled(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefghij\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(6, 2)
+	v.colOffset = 3
+	v.relayout()
+
+	_, rightText := v.statusText()
+	if !strings.Contains(rightText, "col 3/10") {
+		t.Fatalf("right status text = %q, want column total", rightText)
+	}
+	if !strings.Contains(rightText, "⇆") {
+		t.Fatalf("right status text = %q, want no-wrap glyph", rightText)
+	}
+}
+
 func TestStatusBarUsesDisplayWidthForRightAlignedText(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alpha\n")); err != nil {
@@ -1379,7 +1415,7 @@ func TestStatusBarUsesDisplayWidthForRightAlignedText(t *testing.T) {
 		WrapMode:   layout.NoWrap,
 		ShowStatus: true,
 		Text: Text{
-			StatusPosition: func(current, total, column int) string {
+			StatusPosition: func(current, total, column, columns int) string {
 				return "界a"
 			},
 		},
@@ -1392,7 +1428,7 @@ func TestStatusBarUsesDisplayWidthForRightAlignedText(t *testing.T) {
 
 	v.drawStatus(screen, 1)
 
-	if got := cellRune(screen, 6, 1); got != '界' {
+	if got := cellRune(screen, 3, 1); got != '界' {
 		t.Fatalf("status rune at expected start = %q, want %q", got, '界')
 	}
 }
@@ -1409,8 +1445,8 @@ func TestStatusLineFormatterOverridesBuiltInStatusText(t *testing.T) {
 		ShowStatus: true,
 		Text: Text{
 			StatusLine: func(info StatusInfo) (left, right string) {
-				if info.DefaultLeft == "" || info.DefaultRight == "" {
-					t.Fatalf("StatusLine got empty defaults: %+v", info)
+				if info.DefaultRight == "" {
+					t.Fatalf("StatusLine got empty right default: %+v", info)
 				}
 				return "L:" + info.DefaultLeft, "R:" + info.DefaultRight
 			},
@@ -1420,11 +1456,11 @@ func TestStatusLineFormatterOverridesBuiltInStatusText(t *testing.T) {
 	v.relayout()
 
 	leftText, rightText := v.statusText()
-	if got, want := leftText, "L:search:smart,sub"; got != want {
+	if got, want := leftText, "L:"; got != want {
 		t.Fatalf("left status text = %q, want %q", got, want)
 	}
-	if !strings.HasPrefix(rightText, "R:row 1/2  col 0") {
-		t.Fatalf("right status text = %q, want prefix %q", rightText, "R:row 1/2  col 0")
+	if !strings.HasPrefix(rightText, "R:row 1/2  col 0/5") {
+		t.Fatalf("right status text = %q, want prefix %q", rightText, "R:row 1/2  col 0/5")
 	}
 }
 
