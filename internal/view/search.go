@@ -829,6 +829,7 @@ func (v *Viewer) graphemeMatched(line model.Line, lineIndex int, grapheme model.
 	if len(search.Matches) == 0 {
 		return false, false
 	}
+	matched := false
 	for i, match := range search.Matches {
 		if match.LineIndex != lineIndex {
 			continue
@@ -836,9 +837,12 @@ func (v *Viewer) graphemeMatched(line model.Line, lineIndex int, grapheme model.
 		if grapheme.RuneStart >= match.EndRune || grapheme.RuneEnd <= match.StartRune {
 			continue
 		}
-		return true, i == search.Current
+		matched = true
+		if i == search.Current {
+			return true, true
+		}
 	}
-	return false, false
+	return matched, false
 }
 
 func (v *Viewer) pickInitialPreviewMatch(search *searchState) int {

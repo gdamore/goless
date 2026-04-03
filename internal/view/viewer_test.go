@@ -1650,6 +1650,39 @@ func TestApplyMatchCellStyleUsesUnderlineAccents(t *testing.T) {
 	}
 }
 
+func TestDrawPrefersActiveStyleForOverlappingSearchMatches(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("ababa\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(8, 2)
+
+	if !v.SearchForward("aba") {
+		t.Fatal("SearchForward returned false, want true")
+	}
+	if !v.SearchNext() {
+		t.Fatal("SearchNext returned false, want true")
+	}
+
+	_, screen := newMockScreen(t, 8, 2)
+	defer screen.Fini()
+
+	v.Draw(screen)
+
+	_, overlapStyle, _ := screen.Get(2, 0)
+	if got, want := overlapStyle.GetBackground(), currentMatchStyle.Bg; got != want {
+		t.Fatalf("overlap background = %v, want %v", got, want)
+	}
+	if !overlapStyle.HasBold() {
+		t.Fatal("overlap style should use active match bold")
+	}
+	if got, want := overlapStyle.GetUnderlineStyle(), currentMatchStyle.UnderlineStyle; got != want {
+		t.Fatalf("overlap underline style = %v, want %v", got, want)
+	}
+}
+
 func TestRefreshPicksUpAppendedDocumentContent(t *testing.T) {
 	doc := model.NewDocument(4)
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
