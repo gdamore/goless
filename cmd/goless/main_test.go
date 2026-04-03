@@ -51,6 +51,16 @@ func TestDemoChromeUsesPresetAndOverrides(t *testing.T) {
 		t.Fatalf("programChrome(single).Title = %q, want %q", got, want)
 	}
 
+	base := goless.PrettyPreset.Chrome
+	base.StatusHelpKeyStyle = tcell.StyleDefault.Foreground(tcolor.Red).Bold(true)
+	chrome, err = programChrome("single", "Demo", base)
+	if err != nil {
+		t.Fatalf("programChrome(single, custom help style) failed: %v", err)
+	}
+	if got, want := chrome.StatusHelpKeyStyle, base.StatusHelpKeyStyle; got != want {
+		t.Fatalf("programChrome(single).StatusHelpKeyStyle = %#v, want %#v", got, want)
+	}
+
 	chrome, err = programChrome("none", "", goless.PrettyPreset.Chrome)
 	if err != nil {
 		t.Fatalf("programChrome(none) failed: %v", err)
