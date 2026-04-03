@@ -62,6 +62,26 @@ func TestLessKeyMapGoBottom(t *testing.T) {
 	}
 }
 
+func TestLessKeyMapDocumentEndAliases(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.HandleKey(keyRune(">"))
+	if got, want := v.firstVisibleAnchor().LineIndex, 3; got != want {
+		t.Fatalf("visible line after > = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("<"))
+	if got, want := v.firstVisibleAnchor().LineIndex, 0; got != want {
+		t.Fatalf("visible line after < = %d, want %d", got, want)
+	}
+}
+
 func TestLessKeyMapHalfPageMoves(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\nsix\n")); err != nil {
@@ -102,6 +122,79 @@ func TestLessKeyMapHalfPageMoves(t *testing.T) {
 	}
 }
 
+func TestLessKeyMapSingleLineAliases(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	events := []struct {
+		name string
+		ev   *tcell.EventKey
+		want int
+	}{
+		{name: "Enter", ev: keyKey(tcell.KeyEnter), want: 3},
+		{name: "e", ev: keyRune("e"), want: 3},
+		{name: "Ctrl-E key", ev: keyKey(tcell.KeyCtrlE), want: 3},
+		{name: "Ctrl-E rune", ev: keyCtrlRune("e"), want: 3},
+		{name: "Ctrl-J key", ev: keyKey(tcell.KeyCtrlJ), want: 3},
+		{name: "Ctrl-J rune", ev: keyCtrlRune("j"), want: 3},
+		{name: "Ctrl-N key", ev: keyKey(tcell.KeyCtrlN), want: 3},
+		{name: "Ctrl-N rune", ev: keyCtrlRune("n"), want: 3},
+		{name: "y", ev: keyRune("y"), want: 1},
+		{name: "Ctrl-Y key", ev: keyKey(tcell.KeyCtrlY), want: 1},
+		{name: "Ctrl-Y rune", ev: keyCtrlRune("y"), want: 1},
+		{name: "Ctrl-K key", ev: keyKey(tcell.KeyCtrlK), want: 1},
+		{name: "Ctrl-K rune", ev: keyCtrlRune("k"), want: 1},
+		{name: "Ctrl-P key", ev: keyKey(tcell.KeyCtrlP), want: 1},
+		{name: "Ctrl-P rune", ev: keyCtrlRune("p"), want: 1},
+	}
+
+	for _, tt := range events {
+		t.Run(tt.name, func(t *testing.T) {
+			v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+			v.SetSize(20, 2)
+			v.HandleKey(keyRune("j"))
+			v.HandleKey(tt.ev)
+			if got := v.Position().Row; got != tt.want {
+				t.Fatalf("Position().Row after %s = %d, want %d", tt.name, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLessKeyMapPageAliases(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	events := []struct {
+		name string
+		ev   *tcell.EventKey
+		want int
+	}{
+		{name: "Ctrl-F", ev: keyKey(tcell.KeyCtrlF), want: 3},
+		{name: "Ctrl-V", ev: keyKey(tcell.KeyCtrlV), want: 3},
+		{name: "Alt-V", ev: keyRuneMod("v", tcell.ModAlt), want: 1},
+		{name: "Ctrl-B", ev: keyKey(tcell.KeyCtrlB), want: 1},
+	}
+
+	for _, tt := range events {
+		t.Run(tt.name, func(t *testing.T) {
+			v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+			v.SetSize(20, 4)
+			if tt.want == 1 {
+				v.HandleKey(keyKey(tcell.KeyCtrlF))
+			}
+			v.HandleKey(tt.ev)
+			if got := v.Position().Row; got != tt.want {
+				t.Fatalf("Position().Row after %s = %d, want %d", tt.name, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLessKeyMapHelpScrollsAndCloses(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("hello\nworld\n")); err != nil {
@@ -117,9 +210,9 @@ func TestLessKeyMapHelpScrollsAndCloses(t *testing.T) {
 		t.Fatalf("help offset after down = %d, want %d", got, want)
 	}
 
-	v.HandleKey(keyRune("H"))
+	v.HandleKey(keyRune("h"))
 	if got, want := v.mode, modeNormal; got != want {
-		t.Fatalf("mode after H = %v, want %v", got, want)
+		t.Fatalf("mode after h = %v, want %v", got, want)
 	}
 }
 
@@ -256,16 +349,6 @@ func TestLessKeyMapHelpUsesHorizontalNavigationKeys(t *testing.T) {
 	v.HandleKey(keyKeyMod(tcell.KeyLeft, tcell.ModShift))
 	if got, want := v.helpColOffset, 4; got != want {
 		t.Fatalf("help col offset after Shift-Left = %d, want %d", got, want)
-	}
-
-	v.HandleKey(keyRune(">"))
-	if got, want := v.helpColOffset, 5; got != want {
-		t.Fatalf("help col offset after > = %d, want %d", got, want)
-	}
-
-	v.HandleKey(keyRune("<"))
-	if got, want := v.helpColOffset, 4; got != want {
-		t.Fatalf("help col offset after < = %d, want %d", got, want)
 	}
 }
 
@@ -611,23 +694,18 @@ func TestAngleBracketsRemainFineHorizontalScroll(t *testing.T) {
 	v.SetSize(20, 4)
 
 	v.HandleKey(keyRune(">"))
-	if got, want := v.colOffset, 1; got != want {
-		t.Fatalf("col offset after > = %d, want %d", got, want)
+	if got, want := v.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row after > = %d, want %d", got, want)
 	}
+	if got, want := v.firstVisibleAnchor().LineIndex, 0; got != want {
+		t.Fatalf("visible line after > = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("G"))
 
 	v.HandleKey(keyRune("<"))
-	if got, want := v.colOffset, 0; got != want {
-		t.Fatalf("col offset after < = %d, want %d", got, want)
-	}
-
-	v.HandleKey(keyRuneMod(">", tcell.ModShift))
-	if got, want := v.colOffset, 1; got != want {
-		t.Fatalf("col offset after shifted > = %d, want %d", got, want)
-	}
-
-	v.HandleKey(keyRuneMod("<", tcell.ModShift))
-	if got, want := v.colOffset, 0; got != want {
-		t.Fatalf("col offset after shifted < = %d, want %d", got, want)
+	if got, want := v.firstVisibleAnchor().LineIndex, 0; got != want {
+		t.Fatalf("visible line after < = %d, want %d", got, want)
 	}
 }
 
@@ -1870,9 +1948,9 @@ func TestToggleHelpMode(t *testing.T) {
 	if got, want := v.mode, modeNormal; got != want {
 		t.Fatalf("initial mode = %v, want %v", got, want)
 	}
-	v.HandleKey(keyRune("H"))
+	v.HandleKey(keyRune("h"))
 	if got, want := v.mode, modeHelp; got != want {
-		t.Fatalf("mode after H = %v, want %v", got, want)
+		t.Fatalf("mode after h = %v, want %v", got, want)
 	}
 	v.HandleKey(keyKey(tcell.KeyEscape))
 	if got, want := v.mode, modeNormal; got != want {
