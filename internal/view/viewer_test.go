@@ -542,23 +542,57 @@ func TestF2UpdatesPromptPrefix(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 2)
 	v.HandleKey(keyRune("/"))
-	if got, want := v.prompt.String(), "/[smart,sub] "; got != want {
+	if got, want := v.prompt.String(), "/"; got != want {
 		t.Fatalf("prompt prefix = %q, want %q", got, want)
 	}
 
 	v.HandleKey(keyKey(tcell.KeyF2))
-	if got, want := v.prompt.String(), "/[case,sub] "; got != want {
+	if got, want := v.prompt.String(), "/"; got != want {
 		t.Fatalf("prompt prefix after F2 = %q, want %q", got, want)
 	}
 
 	v.HandleKey(keyKey(tcell.KeyF3))
-	if got, want := v.prompt.String(), "/[case,word] "; got != want {
+	if got, want := v.prompt.String(), "/"; got != want {
 		t.Fatalf("prompt prefix after F3 = %q, want %q", got, want)
 	}
 
 	v.HandleKey(keyKey(tcell.KeyF3))
-	if got, want := v.prompt.String(), "/[case,regex] "; got != want {
+	if got, want := v.prompt.String(), "/"; got != want {
 		t.Fatalf("prompt prefix after second F3 = %q, want %q", got, want)
+	}
+}
+
+func TestReenterSearchPromptPrefillsActiveQuery(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nbeta\nalpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	if !v.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true")
+	}
+
+	v.HandleKey(keyRune("/"))
+	if got, want := string(v.prompt.buffer), "alpha"; got != want {
+		t.Fatalf("prompt buffer after reopening / = %q, want %q", got, want)
+	}
+	if !v.prompt.seeded {
+		t.Fatal("prompt seeded after reopening / = false, want true")
+	}
+	if v.prompt.preview == nil || v.prompt.preview.Query != "alpha" {
+		t.Fatalf("prompt preview after reopening / = %#v, want query alpha", v.prompt.preview)
+	}
+	v.HandleKey(keyRune("b"))
+	if got, want := string(v.prompt.buffer), "b"; got != want {
+		t.Fatalf("prompt buffer after typing over seeded query = %q, want %q", got, want)
+	}
+
+	v.cancelPrompt()
+	v.HandleKey(keyRune("?"))
+	if got, want := string(v.prompt.buffer), "alpha"; got != want {
+		t.Fatalf("prompt buffer after reopening ? = %q, want %q", got, want)
 	}
 }
 
@@ -1345,9 +1379,12 @@ func TestStatusTextUsesActiveSearchOverride(t *testing.T) {
 		t.Fatal("SearchForwardWithCase(BETA, SearchCaseInsensitive) = false, want true")
 	}
 
-	leftText, _ := v.statusText()
-	if !strings.Contains(leftText, "search:nocase,sub") {
-		t.Fatalf("left status text = %q, want active override label", leftText)
+	leftText, rightText := v.statusText()
+	if !strings.Contains(leftText, "/BETA 1/2") {
+		t.Fatalf("left status text = %q, want active search info", leftText)
+	}
+	if strings.Contains(rightText, "F2:") || strings.Contains(rightText, "F3:") {
+		t.Fatalf("right status text = %q, want no prompt-only search mode hint", rightText)
 	}
 }
 
@@ -1455,9 +1492,12 @@ func TestStatusTextDoesNotDuplicateModeMessage(t *testing.T) {
 	v.relayout()
 	v.CycleSearchMode()
 
-	leftText, _ := v.statusText()
-	if got, want := leftText, "search:smart,word"; got != want {
+	leftText, rightText := v.statusText()
+	if got, want := leftText, "F1 Help"; got != want {
 		t.Fatalf("left status text after F3 = %q, want %q", got, want)
+	}
+	if strings.Contains(rightText, "F2:") || strings.Contains(rightText, "F3:") {
+		t.Fatalf("right status text after F3 = %q, want no prompt-only search mode hint", rightText)
 	}
 }
 
@@ -1610,7 +1650,7 @@ func TestPromptLineFormatterOverridesBuiltInPromptText(t *testing.T) {
 		WrapMode: layout.NoWrap,
 		Text: Text{
 			PromptLine: func(info PromptInfo) string {
-				if got, want := info.DefaultText, "/[smart,sub] a"; got != want {
+				if got, want := info.DefaultText, "/a"; got != want {
 					t.Fatalf("PromptLine default text = %q, want %q", got, want)
 				}
 				if got, want := info.Kind, PromptKindSearchForward; got != want {
@@ -1626,6 +1666,83 @@ func TestPromptLineFormatterOverridesBuiltInPromptText(t *testing.T) {
 
 	if got, want := v.promptText(), "find>a"; got != want {
 		t.Fatalf("promptText() = %q, want %q", got, want)
+	}
+}
+
+func TestDrawPromptShowsTailWhenInputOverflows(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(18, 2)
+	v.beginPrompt(promptSearchForward)
+	v.prompt.buffer = []rune("abcdefghijkl")
+
+	_, screen := newMockScreen(t, 18, 2)
+	defer screen.Fini()
+	v.drawPrompt(screen, 1)
+
+	if got, want := screenRowString(screen, 1, 18), " /…kl F2:A? F3:ab "; got != want {
+		t.Fatalf("prompt row = %q, want %q", got, want)
+	}
+}
+
+func TestBuiltInSearchPromptPlacesModeHintOnRight(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 2)
+	v.beginPrompt(promptSearchForward)
+	v.prompt.buffer = []rune("alpha")
+
+	_, screen := newMockScreen(t, 20, 2)
+	defer screen.Fini()
+	v.drawPrompt(screen, 1)
+
+	row := screenRowString(screen, 1, 20)
+	if !strings.HasPrefix(row, " /alpha") {
+		t.Fatalf("prompt row = %q, want left search input", row)
+	}
+	if !strings.HasSuffix(row, " F2:A? F3:ab ") {
+		t.Fatalf("prompt row = %q, want right search mode hint", row)
+	}
+}
+
+func TestSearchPromptHintKeysUseHighlightedStyle(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	keyStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(10)).Background(tcolor.PaletteColor(4)).Bold(true)
+	promptStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(15)).Background(tcolor.PaletteColor(2))
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Chrome: Chrome{
+			PromptStyle:        promptStyle,
+			StatusHelpKeyStyle: keyStyle,
+		},
+	})
+	v.SetSize(24, 2)
+	v.beginPrompt(promptSearchForward)
+	v.prompt.buffer = []rune("alpha")
+
+	_, screen := newMockScreen(t, 24, 2)
+	defer screen.Fini()
+	v.drawPrompt(screen, 1)
+
+	row := screenRowString(screen, 1, 24)
+	idx := strings.Index(row, "F2:")
+	if idx < 0 {
+		t.Fatalf("prompt row = %q, want F2 hint", row)
+	}
+	_, gotKeyStyle, _ := screen.Get(idx, 1)
+	if got, want := gotKeyStyle.GetForeground(), keyStyle.GetForeground(); got != want {
+		t.Fatalf("prompt hint key fg = %v, want %v", got, want)
+	}
+	if got, want := gotKeyStyle.GetBackground(), keyStyle.GetBackground(); got != want {
+		t.Fatalf("prompt hint key bg = %v, want %v", got, want)
+	}
+	if !gotKeyStyle.HasBold() {
+		t.Fatal("prompt hint key style lost bold attribute")
 	}
 }
 

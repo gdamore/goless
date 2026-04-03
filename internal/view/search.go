@@ -135,31 +135,39 @@ func (v *Viewer) SearchSnapshot() SearchSnapshot {
 func searchCaseLabel(mode SearchCaseMode) string {
 	switch normalizeSearchCaseMode(mode) {
 	case SearchCaseSensitive:
-		return "case"
+		return "AA"
 	case SearchCaseInsensitive:
-		return "nocase"
+		return "Aa"
 	default:
-		return "smart"
+		return "A?"
 	}
 }
 
 func searchBehaviorLabel(mode SearchMode) string {
 	switch normalizeSearchMode(mode) {
 	case SearchWholeWord:
-		return "word"
+		return "a␣"
 	case SearchRegex:
-		return "regex"
+		return ".*"
 	default:
-		return "sub"
+		return "ab"
 	}
 }
 
 func searchModeLabel(caseMode SearchCaseMode, mode SearchMode) string {
-	return searchCaseLabel(caseMode) + "," + searchBehaviorLabel(mode)
+	return searchCaseLabel(caseMode) + " " + searchBehaviorLabel(mode)
+}
+
+func searchModeHintText(caseMode SearchCaseMode, mode SearchMode) string {
+	return "F2:" + searchCaseLabel(caseMode) + " F3:" + searchBehaviorLabel(mode)
 }
 
 func (v *Viewer) searchModeLabel() string {
 	return searchModeLabel(v.cfg.SearchCase, v.cfg.SearchMode)
+}
+
+func (v *Viewer) searchModeHintText() string {
+	return searchModeHintText(v.cfg.SearchCase, v.cfg.SearchMode)
 }
 
 func (v *Viewer) CycleSearchCaseMode() SearchCaseMode {
@@ -247,7 +255,15 @@ func (v *Viewer) rebuildSearchState(state *searchState) {
 func (v *Viewer) beginPrompt(kind promptKind) {
 	v.mode = modePrompt
 	v.prompt = &promptState{kind: kind}
+	switch kind {
+	case promptSearchForward, promptSearchBackward:
+		if v.search.Query != "" {
+			v.prompt.buffer = []rune(v.search.Query)
+			v.prompt.seeded = true
+		}
+	}
 	v.updatePromptPrefix()
+	v.updatePromptPreview()
 }
 
 func (v *Viewer) cancelPrompt() {
@@ -281,7 +297,7 @@ func (v *Viewer) commitPrompt() KeyResult {
 }
 
 func (v *Viewer) commitPromptSearch(text string, forward bool) bool {
-	if text == "" {
+	if text == "" || (v.prompt != nil && v.prompt.seeded) {
 		v.clearSearch()
 		return true
 	}
@@ -322,9 +338,9 @@ func (v *Viewer) updatePromptPrefix() {
 	}
 	switch v.prompt.kind {
 	case promptSearchForward:
-		v.prompt.prefix = "/[" + v.searchModeLabel() + "] "
+		v.prompt.prefix = "/"
 	case promptSearchBackward:
-		v.prompt.prefix = "?[" + v.searchModeLabel() + "] "
+		v.prompt.prefix = "?"
 	case promptCommand:
 		v.prompt.prefix = ":"
 	}
