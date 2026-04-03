@@ -148,6 +148,49 @@ func TestPagerCaptureKeyReservesBinding(t *testing.T) {
 	}
 }
 
+func TestPagerConstructionOptionsSupportKeyCustomizationAndCapture(t *testing.T) {
+	pager := New(
+		WithKeyGroup(LessKeyGroup),
+		WithUnboundKeys(KeyStroke{Context: NormalKeyContext, Key: tcell.KeyRune, Rune: "n"}),
+		WithKeyBindings(
+			KeyBinding{
+				KeyStroke: KeyStroke{Context: NormalKeyContext, Key: tcell.KeyRune, Rune: "x"},
+				Action:    KeyActionSearchNext,
+			},
+		),
+		WithCaptureKey(func(ev *tcell.EventKey) bool {
+			return ev.Key() == tcell.KeyRune && ev.Str() == "n"
+		}),
+		WithTabWidth(4),
+		WithWrapMode(NoWrap),
+		WithShowStatus(true),
+	)
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\nalpha\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	if !pager.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true")
+	}
+
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "n", tcell.ModNone))
+	if result.Handled {
+		t.Fatal("HandleKeyResult(n).Handled = true, want false when captured")
+	}
+	if got, want := pager.SearchState().CurrentMatch, 1; got != want {
+		t.Fatalf("SearchState().CurrentMatch after captured n = %d, want %d", got, want)
+	}
+
+	result = pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "x", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(x).Handled = false, want true for custom binding")
+	}
+	if got, want := pager.SearchState().CurrentMatch, 2; got != want {
+		t.Fatalf("SearchState().CurrentMatch after x = %d, want %d", got, want)
+	}
+}
+
 func TestPagerEmptyKeyGroupDisablesBundledBindings(t *testing.T) {
 	pager := New(Config{
 		KeyGroup:   EmptyKeyGroup,
@@ -353,6 +396,58 @@ func TestPagerCommandHandlerHandlesUnknownCommand(t *testing.T) {
 	pager.Draw(screen)
 	if got := pagerRowString(screen, 1, 30); !strings.Contains(got, "advanced") {
 		t.Fatalf("status line = %q, want message", got)
+	}
+}
+
+func TestPagerOptionsSupportHandlersTextAndRenderMode(t *testing.T) {
+	handled := false
+	pager := New(
+		WithTabWidth(4),
+		WithWrapMode(NoWrap),
+		WithRenderMode(RenderPresentation),
+		WithShowStatus(true),
+		WithText(Text{
+			StatusLine: func(info StatusInfo) (left, right string) {
+				return info.Message, ""
+			},
+		}),
+		WithHyperlinkHandler(func(info HyperlinkInfo) HyperlinkDecision {
+			return HyperlinkDecision{Live: true}
+		}),
+	)
+	pager.Configure(WithCommandHandler(func(cmd Command) CommandResult {
+		handled = true
+		return CommandResult{Handled: true, Message: "configured"}
+	}))
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("x\x1b]8;id=demo;https://example.com\aY\x1b]8;;\aZ"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 20, 2)
+	defer screen.Fini()
+	pager.Draw(screen)
+	if id, url := pagerCellStyle(screen, 1, 0).GetUrl(); id != "demo" || url != "https://example.com" {
+		t.Fatalf("live link = (%q, %q), want (%q, %q)", id, url, "demo", "https://example.com")
+	}
+
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, ":", tcell.ModNone))
+	for _, r := range "noop" {
+		pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, string(r), tcell.ModNone))
+	}
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyEnter, "", tcell.ModNone))
+	if !result.Handled || result.Quit {
+		t.Fatalf("HandleKeyResult(Enter) = %+v, want handled non-quit", result)
+	}
+	if !handled {
+		t.Fatal("configured CommandHandler was not called")
+	}
+
+	screen.Clear()
+	pager.Draw(screen)
+	if got := pagerRowString(screen, 1, 20); !strings.Contains(got, "configured") {
+		t.Fatalf("status line = %q, want configured message", got)
 	}
 }
 

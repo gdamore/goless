@@ -166,6 +166,76 @@ func TestLessKeyMapHelpUsesNormalNavigationKeys(t *testing.T) {
 	}
 }
 
+func TestViewerRuntimeSettersUpdateConfigAndState(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("a\tb\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	v.SetTheme(Theme{DefaultFG: tcolor.Green, DefaultBG: tcolor.Navy})
+	if got, want := v.cfg.Theme.DefaultFG, tcolor.Green; got != want {
+		t.Fatalf("theme fg = %v, want %v", got, want)
+	}
+	if got, want := v.cfg.Theme.DefaultBG, tcolor.Navy; got != want {
+		t.Fatalf("theme bg = %v, want %v", got, want)
+	}
+
+	v.SetTabWidth(-1)
+	if got, want := v.cfg.TabWidth, 8; got != want {
+		t.Fatalf("tab width = %d, want %d", got, want)
+	}
+
+	v.SetVisualization(Visualization{ShowTabs: true, TabGlyph: ">"})
+	if !v.cfg.Visualization.ShowTabs {
+		t.Fatal("visualization ShowTabs = false, want true")
+	}
+
+	handler := func(HyperlinkInfo) HyperlinkDecision { return HyperlinkDecision{Live: true} }
+	v.SetHyperlinkHandler(handler)
+	if v.cfg.HyperlinkHandler == nil {
+		t.Fatal("hyperlink handler = nil, want set")
+	}
+
+	commandHandler := func(Command) CommandResult { return CommandResult{Handled: true} }
+	v.SetCommandHandler(commandHandler)
+	if v.cfg.CommandHandler == nil {
+		t.Fatal("command handler = nil, want set")
+	}
+
+	frame := Frame{
+		Horizontal:  "-",
+		Vertical:    "|",
+		TopLeft:     "+",
+		TopRight:    "+",
+		BottomLeft:  "+",
+		BottomRight: "+",
+	}
+	chrome := Chrome{Frame: frame, Title: "Demo"}
+	v.SetChrome(chrome)
+	if got, want := v.cfg.Chrome.Title, "Demo"; got != want {
+		t.Fatalf("chrome title = %q, want %q", got, want)
+	}
+	if got, want := v.cfg.Chrome.Frame.TopLeft, frame.TopLeft; got != want {
+		t.Fatalf("chrome frame top-left = %q, want %q", got, want)
+	}
+
+	v.SetShowStatus(false)
+	if v.cfg.ShowStatus {
+		t.Fatal("ShowStatus = true, want false")
+	}
+
+	v.SetText(Text{StatusHelpHint: "Custom", FollowMode: "tail"})
+	if got, want := v.text.StatusHelpHint, "Custom"; got != want {
+		t.Fatalf("status help hint = %q, want %q", got, want)
+	}
+	if got, want := v.text.FollowMode, "tail"; got != want {
+		t.Fatalf("follow mode text = %q, want %q", got, want)
+	}
+}
+
 func TestLessKeyMapHelpUsesHorizontalNavigationKeys(t *testing.T) {
 	doc := model.NewDocument(4)
 	v := New(doc, Config{
