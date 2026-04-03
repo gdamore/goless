@@ -157,7 +157,7 @@ func TestApplyDemoQuitAtEOFQuitsAtLastFile(t *testing.T) {
 		false,
 		goless.Position{Row: 10, Rows: 10},
 		goless.Position{Row: 10, Rows: 10},
-		func() error { return nil },
+		func() (bool, error) { return true, nil },
 	)
 	if err != nil {
 		t.Fatalf("applyProgramQuitAtEOF returned error: %v", err)
@@ -179,9 +179,9 @@ func TestApplyDemoQuitAtEOFAdvancesToNextFile(t *testing.T) {
 		false,
 		goless.Position{Row: 10, Rows: 10},
 		goless.Position{Row: 10, Rows: 10},
-		func() error {
+		func() (bool, error) {
 			reloads++
-			return nil
+			return true, nil
 		},
 	)
 	if err != nil {
@@ -207,7 +207,7 @@ func TestHandleDemoVisibleEOFQuitsAtLastFile(t *testing.T) {
 	}
 	pager.Flush()
 
-	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() error { return nil })
+	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() (bool, error) { return true, nil })
 	if err != nil {
 		t.Fatalf("handleProgramVisibleEOF returned error: %v", err)
 	}
@@ -226,15 +226,15 @@ func TestHandleDemoVisibleEOFAdvancesPastShortFile(t *testing.T) {
 	pager.Flush()
 
 	reloads := 0
-	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() error {
+	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() (bool, error) {
 		reloads++
 		pager = goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 		pager.SetSize(20, 5)
 		if err := pager.AppendString("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n"); err != nil {
-			return err
+			return false, err
 		}
 		pager.Flush()
-		return nil
+		return true, nil
 	})
 	if err != nil {
 		t.Fatalf("handleProgramVisibleEOF returned error: %v", err)
@@ -250,6 +250,36 @@ func TestHandleDemoVisibleEOFAdvancesPastShortFile(t *testing.T) {
 	}
 }
 
+func TestHandleDemoVisibleEOFWaitsForExplicitStdin(t *testing.T) {
+	session := newProgramSession([]string{"one.txt", "-"}, programStartup{})
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 5)
+	if err := pager.AppendString("one\ntwo\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	reloads := 0
+	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() (bool, error) {
+		reloads++
+		pager = goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+		pager.SetSize(20, 5)
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("handleProgramVisibleEOF returned error: %v", err)
+	}
+	if quit {
+		t.Fatal("handleProgramVisibleEOF(...) = true, want false")
+	}
+	if got, want := reloads, 1; got != want {
+		t.Fatalf("reload count = %d, want %d", got, want)
+	}
+	if got, want := session.currentFile(), "-"; got != want {
+		t.Fatalf("currentFile() = %q, want %q", got, want)
+	}
+}
+
 func TestHandleDemoVisibleEOFIgnoredWhenNotVisible(t *testing.T) {
 	session := newProgramSession([]string{"one.txt"}, programStartup{})
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
@@ -259,7 +289,7 @@ func TestHandleDemoVisibleEOFIgnoredWhenNotVisible(t *testing.T) {
 	}
 	pager.Flush()
 
-	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() error { return nil })
+	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() (bool, error) { return true, nil })
 	if err != nil {
 		t.Fatalf("handleProgramVisibleEOF returned error: %v", err)
 	}
@@ -278,7 +308,7 @@ func TestHandleDemoVisibleEOFIgnoredInFollowMode(t *testing.T) {
 	pager.Flush()
 	pager.Follow()
 
-	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() error { return nil })
+	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() (bool, error) { return true, nil })
 	if err != nil {
 		t.Fatalf("handleProgramVisibleEOF returned error: %v", err)
 	}
@@ -336,7 +366,7 @@ func TestApplyDemoQuitAtEOFIgnoredOutsideNormalCompletedNavigation(t *testing.T)
 				tt.following,
 				tt.before,
 				tt.after,
-				func() error { return nil },
+				func() (bool, error) { return true, nil },
 			)
 			if err != nil {
 				t.Fatalf("applyProgramQuitAtEOF returned error: %v", err)
@@ -363,7 +393,7 @@ func TestHandleDemoVisibleEOFActionRequiresForwardNavigation(t *testing.T) {
 		func() *goless.Pager { return pager },
 		goless.KeyResult{Handled: true, Action: goless.KeyActionScrollUp, Context: goless.NormalKeyContext},
 		true,
-		func() error { return nil },
+		func() (bool, error) { return true, nil },
 	)
 	if err != nil {
 		t.Fatalf("handleProgramVisibleEOFAction returned error: %v", err)
@@ -944,8 +974,12 @@ func TestReloadProgramInputStreamsExplicitStdin(t *testing.T) {
 		return next
 	}
 
-	if err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, events, &readResult); err != nil {
+	loaded, err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, events, &readResult)
+	if err != nil {
 		t.Fatalf("reloadProgramInput(stream) failed: %v", err)
+	}
+	if loaded {
+		t.Fatal("reloadProgramInput(stream) = loaded, want false")
 	}
 	if pager == nil {
 		t.Fatal("reloadProgramInput(stream) left pager nil")
@@ -973,11 +1007,14 @@ func TestReloadProgramInputBlocksWhileReading(t *testing.T) {
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	readResult := make(chan error, 1)
 
-	err := reloadProgramInput(session, loader, &pager, func() *goless.Pager {
+	loaded, err := reloadProgramInput(session, loader, &pager, func() *goless.Pager {
 		return goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	}, 20, 3, make(chan tcell.Event, 1), &readResult)
 	if err == nil {
 		t.Fatal("reloadProgramInput while readResult active = nil error, want error")
+	}
+	if loaded {
+		t.Fatal("reloadProgramInput while readResult active = loaded, want false")
 	}
 	if got, want := err.Error(), "stdin still reading"; got != want {
 		t.Fatalf("reloadProgramInput error = %q, want %q", got, want)
@@ -1003,8 +1040,12 @@ func TestReloadProgramInputLoadsCachedStdinSynchronously(t *testing.T) {
 		return goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	}
 
-	if err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, make(chan tcell.Event, 1), &readResult); err != nil {
+	loaded, err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, make(chan tcell.Event, 1), &readResult)
+	if err != nil {
 		t.Fatalf("reloadProgramInput(cached) failed: %v", err)
+	}
+	if !loaded {
+		t.Fatal("reloadProgramInput(cached) = not loaded, want true")
 	}
 	if pager == nil {
 		t.Fatal("reloadProgramInput(cached) left pager nil")
