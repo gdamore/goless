@@ -36,12 +36,38 @@ func (v *Viewer) maxHelpOffset() int {
 	return max(len(v.helpLines())-bodyHeight, 0)
 }
 
+func (v *Viewer) maxHelpColOffset() int {
+	_, _, bodyWidth, _ := v.contentRect()
+	if bodyWidth <= 0 {
+		return 0
+	}
+	maxWidth := 0
+	for _, line := range v.helpLines() {
+		width := 0
+		for _, grapheme := range line.Graphemes {
+			if grapheme.CellWidth > 0 {
+				width += grapheme.CellWidth
+			}
+		}
+		if width > maxWidth {
+			maxWidth = width
+		}
+	}
+	return max(maxWidth-bodyWidth, 0)
+}
+
 func (v *Viewer) clampHelpOffset() {
 	if v.helpOffset < 0 {
 		v.helpOffset = 0
 	}
 	if maxOffset := v.maxHelpOffset(); v.helpOffset > maxOffset {
 		v.helpOffset = maxOffset
+	}
+	if v.helpColOffset < 0 {
+		v.helpColOffset = 0
+	}
+	if maxOffset := v.maxHelpColOffset(); v.helpColOffset > maxOffset {
+		v.helpColOffset = maxOffset
 	}
 }
 
@@ -54,15 +80,35 @@ func (v *Viewer) helpLines() []model.Line {
 
 func (v *Viewer) drawHelpDocumentLine(screen tcell.Screen, x, y, width int, line model.Line) {
 	drawnWidth := 0
+	skip := max(v.helpColOffset, 0)
 	for _, grapheme := range line.Graphemes {
 		if grapheme.CellWidth <= 0 {
 			continue
 		}
-		if drawnWidth+grapheme.CellWidth > width {
-			break
+		if skip >= grapheme.CellWidth {
+			skip -= grapheme.CellWidth
+			continue
+		}
+		text := grapheme.Text
+		cellWidth := grapheme.CellWidth
+		if skip > 0 {
+			text = trimLeftToWidth(text, skip)
+			cellWidth -= skip
+			skip = 0
+		}
+		if drawnWidth+cellWidth > width {
+			remaining := width - drawnWidth
+			if remaining <= 0 {
+				break
+			}
+			text = truncateToWidth(text, remaining)
+			cellWidth = min(cellWidth, remaining)
 		}
 		style := v.toTCellStyle(styleForGrapheme(line, grapheme.RuneStart))
-		screen.PutStrStyled(x+drawnWidth, y, grapheme.Text, style)
-		drawnWidth += grapheme.CellWidth
+		screen.PutStrStyled(x+drawnWidth, y, text, style)
+		drawnWidth += cellWidth
+		if drawnWidth >= width {
+			break
+		}
 	}
 }

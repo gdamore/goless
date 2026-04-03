@@ -40,25 +40,26 @@ type Config struct {
 
 // Viewer is a minimal document viewer built on the model and layout packages.
 type Viewer struct {
-	doc         *model.Document
-	cfg         Config
-	mode        viewerMode
-	prompt      *promptState
-	message     string
-	search      searchState
-	text        Text
-	keys        keyMap
-	sourceLines []model.Line
-	lines       []model.Line
-	lineMap     []int
-	layout      layout.Result
-	maxColumns  int
-	width       int
-	height      int
-	rowOffset   int
-	colOffset   int
-	follow      bool
-	helpOffset  int
+	doc           *model.Document
+	cfg           Config
+	mode          viewerMode
+	prompt        *promptState
+	message       string
+	search        searchState
+	text          Text
+	keys          keyMap
+	sourceLines   []model.Line
+	lines         []model.Line
+	lineMap       []int
+	layout        layout.Result
+	maxColumns    int
+	width         int
+	height        int
+	rowOffset     int
+	colOffset     int
+	follow        bool
+	helpOffset    int
+	helpColOffset int
 }
 
 // KeyResult summarizes how the viewer handled a key event.
@@ -428,8 +429,12 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 	case actionScrollDown:
 		v.ScrollDown(1)
 	case actionScrollLeft:
-		v.ScrollLeft(1)
+		v.ScrollLeft(v.horizontalScrollStep())
 	case actionScrollRight:
+		v.ScrollRight(v.horizontalScrollStep())
+	case actionScrollLeftFine:
+		v.ScrollLeft(1)
+	case actionScrollRightFine:
 		v.ScrollRight(1)
 	case actionHalfPageUp:
 		v.HalfPageUp()
@@ -439,6 +444,10 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 		v.PageUp()
 	case actionPageDown:
 		v.PageDown()
+	case actionGoLineStart:
+		v.GoLineStart()
+	case actionGoLineEnd:
+		v.GoLineEnd()
 	case actionGoTop:
 		v.GoTop()
 	case actionGoBottom:
@@ -521,6 +530,43 @@ func (v *Viewer) ScrollLeft(n int) {
 		return
 	}
 	v.colOffset -= max(n, 0)
+	v.relayout()
+}
+
+func (v *Viewer) horizontalScrollStep() int {
+	return max(1, min(8, v.bodyContentWidth()/4))
+}
+
+// GoLineStart moves to the beginning of the current horizontal line in no-wrap mode.
+func (v *Viewer) GoLineStart() {
+	if v.cfg.WrapMode != layout.NoWrap {
+		return
+	}
+	v.colOffset = 0
+	v.relayout()
+}
+
+// GoLineEnd moves to the end of the current horizontal line in no-wrap mode.
+func (v *Viewer) GoLineEnd() {
+	if v.cfg.WrapMode != layout.NoWrap {
+		return
+	}
+	v.ensureLayout()
+	rowIndex := v.scrollableRowStartIndex() + v.rowOffset
+	if rowIndex < 0 || rowIndex >= len(v.layout.Rows) {
+		v.colOffset = v.maxColOffset()
+		v.relayout()
+		return
+	}
+	lineIndex := v.layout.Rows[rowIndex].LineIndex
+	if lineIndex < 0 || lineIndex >= len(v.layout.Lines) {
+		v.colOffset = v.maxColOffset()
+		v.relayout()
+		return
+	}
+	totalCells := v.layout.Lines[lineIndex].TotalCells + v.trailingMarkerCellWidth(lineIndex)
+	frozen := v.headerColumnWidth(v.rawContentWidth())
+	v.colOffset = max(totalCells-frozen-max(v.bodyContentWidth(), 1), 0)
 	v.relayout()
 }
 
@@ -1692,6 +1738,14 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 		v.helpOffset--
 	case actionScrollDown:
 		v.helpOffset++
+	case actionScrollLeft:
+		v.helpColOffset -= v.horizontalScrollStep()
+	case actionScrollRight:
+		v.helpColOffset += v.horizontalScrollStep()
+	case actionScrollLeftFine:
+		v.helpColOffset--
+	case actionScrollRightFine:
+		v.helpColOffset++
 	case actionPageUp:
 		v.helpOffset -= v.helpPageStep()
 	case actionPageDown:
@@ -1700,6 +1754,10 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 		v.helpOffset -= max(v.helpPageStep()/2, 1)
 	case actionHalfPageDown:
 		v.helpOffset += max(v.helpPageStep()/2, 1)
+	case actionGoLineStart:
+		v.helpColOffset = 0
+	case actionGoLineEnd:
+		v.helpColOffset = v.maxHelpColOffset()
 	case actionGoTop:
 		v.helpOffset = 0
 	case actionGoBottom:
@@ -1777,6 +1835,7 @@ func (v *Viewer) toggleHelp() {
 	}
 	v.mode = modeHelp
 	v.helpOffset = 0
+	v.helpColOffset = 0
 }
 
 func (v *Viewer) updateFollowAtBottom() {

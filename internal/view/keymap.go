@@ -42,10 +42,14 @@ const (
 	KeyActionScrollDown           = actionScrollDown
 	KeyActionScrollLeft           = actionScrollLeft
 	KeyActionScrollRight          = actionScrollRight
+	KeyActionScrollLeftFine       = actionScrollLeftFine
+	KeyActionScrollRightFine      = actionScrollRightFine
 	KeyActionHalfPageUp           = actionHalfPageUp
 	KeyActionHalfPageDown         = actionHalfPageDown
 	KeyActionPageUp               = actionPageUp
 	KeyActionPageDown             = actionPageDown
+	KeyActionGoLineStart          = actionGoLineStart
+	KeyActionGoLineEnd            = actionGoLineEnd
 	KeyActionGoTop                = actionGoTop
 	KeyActionGoBottom             = actionGoBottom
 	KeyActionToggleWrap           = actionToggleWrap
@@ -109,10 +113,12 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyDown, action: actionScrollDown},
 			{key: tcell.KeyLeft, action: actionScrollLeft},
 			{key: tcell.KeyRight, action: actionScrollRight},
+			{key: tcell.KeyLeft, mod: tcell.ModShift, action: actionScrollLeftFine},
+			{key: tcell.KeyRight, mod: tcell.ModShift, action: actionScrollRightFine},
 			{key: tcell.KeyPgUp, action: actionPageUp},
 			{key: tcell.KeyPgDn, action: actionPageDown},
-			{key: tcell.KeyHome, action: actionGoTop},
-			{key: tcell.KeyEnd, action: actionGoBottom},
+			{key: tcell.KeyHome, action: actionGoLineStart},
+			{key: tcell.KeyEnd, action: actionGoLineEnd},
 			{key: tcell.KeyF2, action: actionCycleSearchCase},
 			{key: tcell.KeyF3, action: actionCycleSearchMode},
 			{key: tcell.KeyF1, action: actionToggleHelp},
@@ -121,10 +127,14 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyRune, rune: "k", action: actionScrollUp},
 			{key: tcell.KeyRune, rune: "h", action: actionScrollLeft},
 			{key: tcell.KeyRune, rune: "l", action: actionScrollRight},
+			{key: tcell.KeyRune, rune: "<", action: actionScrollLeftFine},
+			{key: tcell.KeyRune, rune: ">", action: actionScrollRightFine},
 			{key: tcell.KeyRune, rune: "u", mod: tcell.ModCtrl, action: actionHalfPageUp},
 			{key: tcell.KeyRune, rune: "d", mod: tcell.ModCtrl, action: actionHalfPageDown},
 			{key: tcell.KeyRune, rune: "u", action: actionHalfPageUp},
 			{key: tcell.KeyRune, rune: "d", action: actionHalfPageDown},
+			{key: tcell.KeyRune, rune: "0", action: actionGoLineStart},
+			{key: tcell.KeyRune, rune: "$", action: actionGoLineEnd},
 			{key: tcell.KeyRune, rune: " ", action: actionPageDown},
 			{key: tcell.KeyRune, rune: "f", action: actionPageDown},
 			{key: tcell.KeyRune, rune: "b", action: actionPageUp},
@@ -144,8 +154,16 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyCtrlC, action: actionQuit},
 			{key: tcell.KeyUp, action: actionScrollUp},
 			{key: tcell.KeyDown, action: actionScrollDown},
+			{key: tcell.KeyLeft, action: actionScrollLeft},
+			{key: tcell.KeyRight, action: actionScrollRight},
+			{key: tcell.KeyLeft, mod: tcell.ModShift, action: actionScrollLeftFine},
+			{key: tcell.KeyRight, mod: tcell.ModShift, action: actionScrollRightFine},
 			{key: tcell.KeyRune, rune: "j", action: actionScrollDown},
 			{key: tcell.KeyRune, rune: "k", action: actionScrollUp},
+			{key: tcell.KeyRune, rune: "h", action: actionScrollLeft},
+			{key: tcell.KeyRune, rune: "l", action: actionScrollRight},
+			{key: tcell.KeyRune, rune: "<", action: actionScrollLeftFine},
+			{key: tcell.KeyRune, rune: ">", action: actionScrollRightFine},
 			{key: tcell.KeyRune, rune: "u", mod: tcell.ModCtrl, action: actionHalfPageUp},
 			{key: tcell.KeyRune, rune: "d", mod: tcell.ModCtrl, action: actionHalfPageDown},
 			{key: tcell.KeyRune, rune: "u", action: actionHalfPageUp},
@@ -155,8 +173,10 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyRune, rune: " ", action: actionPageDown},
 			{key: tcell.KeyRune, rune: "f", action: actionPageDown},
 			{key: tcell.KeyRune, rune: "b", action: actionPageUp},
-			{key: tcell.KeyHome, action: actionGoTop},
-			{key: tcell.KeyEnd, action: actionGoBottom},
+			{key: tcell.KeyHome, action: actionGoLineStart},
+			{key: tcell.KeyEnd, action: actionGoLineEnd},
+			{key: tcell.KeyRune, rune: "0", action: actionGoLineStart},
+			{key: tcell.KeyRune, rune: "$", action: actionGoLineEnd},
 			{key: tcell.KeyRune, rune: "g", action: actionGoTop},
 			{key: tcell.KeyRune, rune: "G", action: actionGoBottom},
 			{key: tcell.KeyF2, action: actionCycleSearchCase},
@@ -264,13 +284,21 @@ func (b keyBinding) matches(ev *tcell.EventKey) bool {
 	if ev.Key() != b.key {
 		return false
 	}
-	if !b.anyMod && ev.Modifiers() != b.mod {
+	if !b.anyMod && modifiersForMatch(ev, b.key) != b.mod {
 		return false
 	}
 	if b.key == tcell.KeyRune && ev.Str() != b.rune {
 		return false
 	}
 	return true
+}
+
+func modifiersForMatch(ev *tcell.EventKey, key tcell.Key) tcell.ModMask {
+	mod := ev.Modifiers()
+	if key == tcell.KeyRune {
+		mod &^= tcell.ModShift
+	}
+	return mod
 }
 
 func ctrlKeyBindingMatches(b keyBinding, ev *tcell.EventKey) bool {

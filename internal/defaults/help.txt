@@ -8,9 +8,13 @@
   PgUp b          backward one page
   Ctrl-D d        forward half page
   Ctrl-U u        backward half page
-  Home g          jump to top
-  End G           jump to bottom
-  ← → h l         scroll horizontally
+  Home 0          jump to line start
+  End $           jump to line end
+  g               jump to top
+  G               jump to bottom
+  ← → h l         scroll horizontally faster
+  Shift-← Shift-→ scroll horizontally by 1
+  < >             scroll horizontally by 1
   w               toggle wrap
   F               follow the end of the document
 

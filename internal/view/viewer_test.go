@@ -166,6 +166,72 @@ func TestLessKeyMapHelpUsesNormalNavigationKeys(t *testing.T) {
 	}
 }
 
+func TestLessKeyMapHelpUsesHorizontalNavigationKeys(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Text: Text{
+			HelpBody: "abcdefghijklmnopqrstuvwxyz\n",
+		},
+	})
+	v.SetSize(20, 4)
+	v.mode = modeHelp
+
+	v.HandleKey(keyKey(tcell.KeyRight))
+	if got, want := v.helpColOffset, 5; got != want {
+		t.Fatalf("help col offset after Right = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKeyMod(tcell.KeyLeft, tcell.ModShift))
+	if got, want := v.helpColOffset, 4; got != want {
+		t.Fatalf("help col offset after Shift-Left = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune(">"))
+	if got, want := v.helpColOffset, 5; got != want {
+		t.Fatalf("help col offset after > = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("<"))
+	if got, want := v.helpColOffset, 4; got != want {
+		t.Fatalf("help col offset after < = %d, want %d", got, want)
+	}
+}
+
+func TestLessKeyMapHelpLineAndDocumentNavigationAreDistinct(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Text: Text{
+			HelpBody: "abcdefghijklmnopqrstuvwxyz\none\ntwo\nthree\nfour\nfive\nsix\n",
+		},
+	})
+	v.SetSize(20, 4)
+	v.mode = modeHelp
+
+	v.HandleKey(keyKey(tcell.KeyEnd))
+	if got, want := v.helpColOffset, 6; got != want {
+		t.Fatalf("help col offset after End = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("0"))
+	if got, want := v.helpColOffset, 0; got != want {
+		t.Fatalf("help col offset after 0 = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("G"))
+	if got, want := v.helpOffset, v.maxHelpOffset(); got != want {
+		t.Fatalf("help offset after G = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("g"))
+	if got, want := v.helpOffset, 0; got != want {
+		t.Fatalf("help offset after g = %d, want %d", got, want)
+	}
+}
+
 func TestCommandPercentJump(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n")); err != nil {
@@ -318,6 +384,19 @@ func TestKeyBindingMatchesRequireExactNoModifierByDefault(t *testing.T) {
 	}
 }
 
+func TestKeyBindingMatchesShiftedRuneWithoutExplicitShiftModifier(t *testing.T) {
+	binding := keyBinding{
+		key:    tcell.KeyRune,
+		rune:   "$",
+		mod:    tcell.ModNone,
+		action: actionGoLineEnd,
+	}
+
+	if !binding.matches(tcell.NewEventKey(tcell.KeyRune, "$", tcell.ModShift)) {
+		t.Fatalf("shifted $ should match rune binding without explicit shift modifier")
+	}
+}
+
 func TestKeyBindingAnyModifierWildcard(t *testing.T) {
 	binding := keyBinding{
 		key:    tcell.KeyF1,
@@ -392,6 +471,116 @@ func TestScrollRightClampsToContent(t *testing.T) {
 
 	if got, want := v.colOffset, 3; got != want {
 		t.Fatalf("col offset = %d, want %d", got, want)
+	}
+}
+
+func TestHorizontalScrollStepUsesQuarterWidthCappedAtEight(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyz\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 4)
+
+	v.HandleKey(keyKey(tcell.KeyRight))
+	if got, want := v.colOffset, 5; got != want {
+		t.Fatalf("col offset after Right = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyLeft))
+	if got, want := v.colOffset, 0; got != want {
+		t.Fatalf("col offset after Left = %d, want %d", got, want)
+	}
+}
+
+func TestAngleBracketsRemainFineHorizontalScroll(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyz\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 4)
+
+	v.HandleKey(keyRune(">"))
+	if got, want := v.colOffset, 1; got != want {
+		t.Fatalf("col offset after > = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("<"))
+	if got, want := v.colOffset, 0; got != want {
+		t.Fatalf("col offset after < = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRuneMod(">", tcell.ModShift))
+	if got, want := v.colOffset, 1; got != want {
+		t.Fatalf("col offset after shifted > = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRuneMod("<", tcell.ModShift))
+	if got, want := v.colOffset, 0; got != want {
+		t.Fatalf("col offset after shifted < = %d, want %d", got, want)
+	}
+}
+
+func TestShiftArrowKeysRemainFineHorizontalScroll(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyz\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(20, 4)
+
+	v.HandleKey(keyKeyMod(tcell.KeyRight, tcell.ModShift))
+	if got, want := v.colOffset, 1; got != want {
+		t.Fatalf("col offset after Shift-Right = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKeyMod(tcell.KeyLeft, tcell.ModShift))
+	if got, want := v.colOffset, 0; got != want {
+		t.Fatalf("col offset after Shift-Left = %d, want %d", got, want)
+	}
+}
+
+func TestGoLineStartAndEnd(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefghij\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(5, 4)
+
+	v.GoLineEnd()
+	if got, want := v.colOffset, 5; got != want {
+		t.Fatalf("col offset after GoLineEnd = %d, want %d", got, want)
+	}
+
+	v.GoLineStart()
+	if got, want := v.colOffset, 0; got != want {
+		t.Fatalf("col offset after GoLineStart = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyEnd))
+	if got, want := v.colOffset, 5; got != want {
+		t.Fatalf("col offset after End = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyHome))
+	if got, want := v.colOffset, 0; got != want {
+		t.Fatalf("col offset after Home = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("$"))
+	if got, want := v.colOffset, 5; got != want {
+		t.Fatalf("col offset after $ = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("0"))
+	if got, want := v.colOffset, 0; got != want {
+		t.Fatalf("col offset after 0 = %d, want %d", got, want)
 	}
 }
 
@@ -2586,12 +2775,20 @@ func keyRune(s string) *tcell.EventKey {
 	return tcell.NewEventKey(tcell.KeyRune, s, tcell.ModNone)
 }
 
+func keyRuneMod(s string, mod tcell.ModMask) *tcell.EventKey {
+	return tcell.NewEventKey(tcell.KeyRune, s, mod)
+}
+
 func keyCtrlRune(s string) *tcell.EventKey {
 	return tcell.NewEventKey(tcell.KeyRune, s, tcell.ModCtrl)
 }
 
 func keyKey(k tcell.Key) *tcell.EventKey {
 	return tcell.NewEventKey(k, "", tcell.ModNone)
+}
+
+func keyKeyMod(k tcell.Key, mod tcell.ModMask) *tcell.EventKey {
+	return tcell.NewEventKey(k, "", mod)
 }
 
 func cellRune(screen tcell.Screen, x, y int) rune {

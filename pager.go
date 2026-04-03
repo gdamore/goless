@@ -304,6 +304,16 @@ func (p *Pager) ScrollRight(n int) {
 	p.viewer.ScrollRight(n)
 }
 
+// GoLineStart moves to the beginning of the current horizontal line in no-wrap mode.
+func (p *Pager) GoLineStart() {
+	p.viewer.GoLineStart()
+}
+
+// GoLineEnd moves to the end of the current horizontal line in no-wrap mode.
+func (p *Pager) GoLineEnd() {
+	p.viewer.GoLineEnd()
+}
+
 // HalfPageDown moves the viewport down by roughly half a page.
 func (p *Pager) HalfPageDown() {
 	p.viewer.HalfPageDown()
@@ -522,6 +532,10 @@ func toInternalKeyAction(a KeyAction) iview.KeyAction {
 		return iview.KeyActionScrollLeft
 	case KeyActionScrollRight:
 		return iview.KeyActionScrollRight
+	case KeyActionScrollLeftFine:
+		return iview.KeyActionScrollLeftFine
+	case KeyActionScrollRightFine:
+		return iview.KeyActionScrollRightFine
 	case KeyActionHalfPageUp:
 		return iview.KeyActionHalfPageUp
 	case KeyActionHalfPageDown:
@@ -530,6 +544,10 @@ func toInternalKeyAction(a KeyAction) iview.KeyAction {
 		return iview.KeyActionPageUp
 	case KeyActionPageDown:
 		return iview.KeyActionPageDown
+	case KeyActionGoLineStart:
+		return iview.KeyActionGoLineStart
+	case KeyActionGoLineEnd:
+		return iview.KeyActionGoLineEnd
 	case KeyActionGoTop:
 		return iview.KeyActionGoTop
 	case KeyActionGoBottom:
