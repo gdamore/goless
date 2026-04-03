@@ -4,7 +4,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gdamore/goless"
@@ -595,5 +598,43 @@ func TestApplyStartupCommand(t *testing.T) {
 	}
 	if got, want := pager.Position().Row, 2; got != want {
 		t.Fatalf("Position().Row after startup search = %d, want %d", got, want)
+	}
+}
+
+func TestPassThroughProgramInputsFromStdin(t *testing.T) {
+	var out bytes.Buffer
+	if err := passThroughProgramInputs(&out, bytes.NewBufferString("alpha\nbeta\n"), nil); err != nil {
+		t.Fatalf("passThroughProgramInputs(stdin) failed: %v", err)
+	}
+	if got, want := out.String(), "alpha\nbeta\n"; got != want {
+		t.Fatalf("output = %q, want %q", got, want)
+	}
+}
+
+func TestPassThroughProgramInputsFromFiles(t *testing.T) {
+	dir := t.TempDir()
+	first := filepath.Join(dir, "first.txt")
+	second := filepath.Join(dir, "second.txt")
+	if err := os.WriteFile(first, []byte("first\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(first) failed: %v", err)
+	}
+	if err := os.WriteFile(second, []byte("second\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(second) failed: %v", err)
+	}
+
+	var out bytes.Buffer
+	if err := passThroughProgramInputs(&out, bytes.NewBufferString("ignored\n"), []string{first, second}); err != nil {
+		t.Fatalf("passThroughProgramInputs(files) failed: %v", err)
+	}
+	if got, want := out.String(), "first\nsecond\n"; got != want {
+		t.Fatalf("output = %q, want %q", got, want)
+	}
+}
+
+func TestPassThroughProgramInputsReportsOpenError(t *testing.T) {
+	var out bytes.Buffer
+	err := passThroughProgramInputs(&out, bytes.NewBufferString("ignored\n"), []string{filepath.Join(t.TempDir(), "missing.txt")})
+	if err == nil {
+		t.Fatal("passThroughProgramInputs(...) = nil error, want error")
 	}
 }

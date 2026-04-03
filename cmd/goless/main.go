@@ -76,6 +76,9 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	if !stdoutIsTerminal() {
+		return passThroughProgramInputs(os.Stdout, os.Stdin, files)
+	}
 
 	if !session.hasFiles() && stdinIsTerminal() {
 		return fmt.Errorf("stdin is a terminal; specify a file or pipe input")
@@ -392,6 +395,31 @@ func readIntoPager(pager *goless.Pager, r io.Reader, eventQ chan tcell.Event, re
 	eventQ <- tcell.NewEventInterrupt(nil)
 }
 
+func passThroughProgramInputs(dst io.Writer, stdin io.Reader, files []string) error {
+	if len(files) == 0 {
+		return copyProgramInput(dst, stdin)
+	}
+	for _, path := range files {
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		if err := copyProgramInput(dst, file); err != nil {
+			file.Close()
+			return err
+		}
+		if err := file.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func copyProgramInput(dst io.Writer, src io.Reader) error {
+	_, err := io.Copy(dst, src)
+	return err
+}
+
 type programStartup struct {
 	line  int
 	query string
@@ -600,6 +628,14 @@ func loadProgramFile(pager *goless.Pager, path string, startup programStartup) e
 
 func stdinIsTerminal() bool {
 	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
+}
+
+func stdoutIsTerminal() bool {
+	info, err := os.Stdout.Stat()
 	if err != nil {
 		return false
 	}
