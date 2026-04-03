@@ -1757,7 +1757,7 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 	case actionGoLineStart:
 		v.helpColOffset = 0
 	case actionGoLineEnd:
-		v.helpColOffset = v.maxHelpColOffset()
+		v.helpColOffset = v.helpLineMaxColOffset(v.helpOffset)
 	case actionGoTop:
 		v.helpOffset = 0
 	case actionGoBottom:

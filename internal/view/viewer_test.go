@@ -232,6 +232,30 @@ func TestLessKeyMapHelpLineAndDocumentNavigationAreDistinct(t *testing.T) {
 	}
 }
 
+func TestHelpGoLineEndUsesCurrentLineWidth(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Text: Text{
+			HelpBody: "abcdefghijklmnopqrstuv\nabcdefghijklmnopqrstuvwxyz0123456789\n",
+		},
+	})
+	v.SetSize(20, 4)
+	v.mode = modeHelp
+
+	v.HandleKey(keyKey(tcell.KeyEnd))
+	if got, want := v.helpColOffset, 2; got != want {
+		t.Fatalf("help col offset after End on first line = %d, want %d", got, want)
+	}
+
+	v.helpOffset = 1
+	v.HandleKey(keyKey(tcell.KeyEnd))
+	if got, want := v.helpColOffset, 16; got != want {
+		t.Fatalf("help col offset after End on second line = %d, want %d", got, want)
+	}
+}
+
 func TestCommandPercentJump(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n")); err != nil {
@@ -394,6 +418,19 @@ func TestKeyBindingMatchesShiftedRuneWithoutExplicitShiftModifier(t *testing.T) 
 
 	if !binding.matches(tcell.NewEventKey(tcell.KeyRune, "$", tcell.ModShift)) {
 		t.Fatalf("shifted $ should match rune binding without explicit shift modifier")
+	}
+}
+
+func TestKeyBindingMatchesExplicitShiftedRuneBinding(t *testing.T) {
+	binding := keyBinding{
+		key:    tcell.KeyRune,
+		rune:   "$",
+		mod:    tcell.ModShift,
+		action: actionGoLineEnd,
+	}
+
+	if !binding.matches(tcell.NewEventKey(tcell.KeyRune, "$", tcell.ModShift)) {
+		t.Fatalf("shifted $ should match rune binding that explicitly requires shift")
 	}
 }
 
