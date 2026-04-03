@@ -71,7 +71,7 @@ type KeyResult struct {
 	Context KeyContext
 }
 
-// Position summarizes the current visible viewport state.
+// Position summarizes the current logical viewport state.
 type Position struct {
 	Row     int
 	Rows    int
@@ -703,16 +703,25 @@ func (v *Viewer) EOFVisible() bool {
 		return true
 	}
 	rowIndex, ok := v.lastVisibleLayoutRow()
-	return ok && rowIndex >= len(v.layout.Rows)-1
+	if !ok || rowIndex != len(v.layout.Rows)-1 {
+		return false
+	}
+	row := v.layout.Rows[rowIndex]
+	if row.LineIndex < 0 || row.LineIndex >= len(v.layout.Lines) {
+		return false
+	}
+	return row.SourceCellEnd >= v.layout.Lines[row.LineIndex].TotalCells
 }
 
-// Position reports the current visible row, total row count, current visible column number, and maximum column span.
+// Position reports the current logical line, total logical line count, current
+// logical display column, and maximum logical content span.
 func (v *Viewer) Position() Position {
 	v.ensureLayout()
+	rowIndex, ok := v.positionRowIndex()
 	return Position{
-		Row:     v.firstVisibleRow(),
-		Rows:    len(v.layout.Rows),
-		Column:  v.visibleColumn(),
+		Row:     v.logicalRowNumber(rowIndex, ok),
+		Rows:    len(v.sourceLines),
+		Column:  v.logicalColumnNumber(rowIndex, ok),
 		Columns: v.maxContentColumns(),
 	}
 }
@@ -771,30 +780,12 @@ func (v *Viewer) maxColOffset() int {
 	if v.cfg.WrapMode != layout.NoWrap {
 		return 0
 	}
-	return max(v.maxContentColumns()-max(v.bodyContentWidth(), 1), 0)
+	return max(v.maxScrollableColumns()-max(v.bodyContentWidth(), 1), 0)
 }
 
 func (v *Viewer) bodyHeight() int {
 	_, _, _, h := v.contentRect()
 	return h
-}
-
-func (v *Viewer) firstVisibleRow() int {
-	v.ensureLayout()
-	if len(v.layout.Rows) == 0 {
-		return 0
-	}
-	if v.visibleHeaderRowCount() > 0 {
-		rowIndex := v.scrollableRowStartIndex() + v.rowOffset
-		if rowIndex >= 0 && rowIndex < len(v.layout.Rows) {
-			return rowIndex + 1
-		}
-	}
-	rowIndex, _, ok := v.visibleLayoutRowAt(0)
-	if !ok || rowIndex < 0 {
-		return 0
-	}
-	return min(rowIndex+1, len(v.layout.Rows))
 }
 
 func (v *Viewer) headerLineCount() int {
@@ -1359,7 +1350,7 @@ func (v *Viewer) drawLineNumberGutter(screen tcell.Screen) {
 		if !v.shouldShowLineNumber(rowIndex) {
 			continue
 		}
-		label := padRightToWidth(fmt.Sprintf("%*d", gutterWidth-1, row.LineIndex+1), gutterWidth)
+		label := padRightToWidth(fmt.Sprintf("%*d", gutterWidth-1, v.sourceLineIndex(row.LineIndex)+1), gutterWidth)
 		screen.PutStrStyled(gutterX, gutterY+y, label, rowTextStyle)
 	}
 }
@@ -1415,7 +1406,7 @@ func (v *Viewer) lineNumberGutterWidth(available int) int {
 	if !v.cfg.LineNumbers || v.mode == modeHelp || available <= 1 {
 		return 0
 	}
-	digits := len(strconv.Itoa(max(len(v.lines), 1)))
+	digits := len(strconv.Itoa(max(len(v.sourceLines), 1)))
 	width := digits + 1
 	return min(width, available-1)
 }
@@ -1577,9 +1568,17 @@ func (v *Viewer) statusText() (left, right string) {
 		left = v.text.StatusHelpHint
 	}
 
-	current := v.firstVisibleRow()
-	column := v.visibleColumn()
-	right = v.text.StatusPosition(current, len(v.layout.Rows), column, v.maxContentColumns())
+	rowIndex, ok := v.positionRowIndex()
+	current := v.logicalRowNumber(rowIndex, ok)
+	column := v.logicalColumnNumber(rowIndex, ok)
+	right = v.text.StatusPosition(current, len(v.sourceLines), column, v.maxContentColumns())
+	if v.EOFVisible() {
+		if right != "" {
+			right += "  " + v.text.StatusEOF
+		} else {
+			right = v.text.StatusEOF
+		}
+	}
 	if modeHint := v.statusModeHint(); modeHint != "" {
 		if right != "" {
 			right += "  " + modeHint
@@ -1589,12 +1588,13 @@ func (v *Viewer) statusText() (left, right string) {
 	}
 	if v.text.StatusLine != nil {
 		return v.text.StatusLine(StatusInfo{
-			Search:    v.SearchSnapshot(),
-			Following: v.follow,
-			Message:   v.message,
+			Search:     v.SearchSnapshot(),
+			Following:  v.follow,
+			EOFVisible: v.EOFVisible(),
+			Message:    v.message,
 			Position: Position{
 				Row:     current,
-				Rows:    len(v.layout.Rows),
+				Rows:    len(v.sourceLines),
 				Column:  column,
 				Columns: v.maxContentColumns(),
 			},
@@ -1624,15 +1624,11 @@ func (v *Viewer) maxContentColumns() int {
 	return v.maxColumns
 }
 
-func (v *Viewer) visibleColumn() int {
-	if columns := v.maxContentColumns(); columns > 0 {
-		return min(v.colOffset+1, columns)
-	}
-	return 0
+func (v *Viewer) maxScrollableColumns() int {
+	return max(v.maxContentColumns()-v.headerColumnWidth(v.rawContentWidth()), 0)
 }
 
 func (v *Viewer) computeMaxContentColumns() int {
-	frozen := v.headerColumnWidth(v.rawContentWidth())
 	maxCells := 0
 	for i, line := range v.layout.Lines {
 		totalCells := line.TotalCells + v.trailingMarkerCellWidth(i)
@@ -1640,7 +1636,41 @@ func (v *Viewer) computeMaxContentColumns() int {
 			maxCells = totalCells
 		}
 	}
-	return max(maxCells-frozen, 0)
+	return maxCells
+}
+
+func (v *Viewer) positionRowIndex() (int, bool) {
+	v.ensureLayout()
+	if len(v.layout.Rows) == 0 {
+		return 0, false
+	}
+	rowIndex := v.scrollableRowStartIndex() + v.rowOffset
+	if rowIndex >= 0 && rowIndex < len(v.layout.Rows) {
+		return rowIndex, true
+	}
+	rowIndex, _, ok := v.visibleLayoutRowAt(0)
+	if !ok || rowIndex < 0 {
+		return 0, false
+	}
+	return rowIndex, true
+}
+
+func (v *Viewer) logicalRowNumber(rowIndex int, ok bool) int {
+	if !ok || rowIndex < 0 || rowIndex >= len(v.layout.Rows) {
+		return 0
+	}
+	return v.sourceLineIndex(v.layout.Rows[rowIndex].LineIndex) + 1
+}
+
+func (v *Viewer) logicalColumnNumber(rowIndex int, ok bool) int {
+	if !ok || rowIndex < 0 || rowIndex >= len(v.layout.Rows) {
+		return 0
+	}
+	columns := v.maxContentColumns()
+	if columns <= 0 {
+		return 0
+	}
+	return min(v.layout.Rows[rowIndex].SourceCellStart+1, columns)
 }
 
 func squeezeBlankLines(lines []model.Line, enabled bool) ([]model.Line, []int) {

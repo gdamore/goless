@@ -22,7 +22,7 @@ type Text struct {
 	// StatusSearchInfo formats the left-side status text for an active search.
 	StatusSearchInfo func(query string, current, total int) string
 	// StatusPosition formats the right-side position text in the status bar.
-	// current and column are 1-based visible coordinates.
+	// current and column are 1-based logical coordinates.
 	StatusPosition func(current, total, column, columns int) string
 	// StatusHelpHint is shown on the left side of the status bar when no other status text is active.
 	StatusHelpHint string
@@ -30,6 +30,8 @@ type Text struct {
 	HideStatusHelpHint bool
 	// FollowMode is appended to the status bar while follow mode is active.
 	FollowMode string
+	// StatusEOF is appended to the built-in status bar when EOF is visible.
+	StatusEOF string
 	// StatusLine can override the full left and right status bar text.
 	// When nil, the pager assembles the built-in status line from the fields above.
 	StatusLine func(StatusInfo) (left, right string)
@@ -75,6 +77,7 @@ func DefaultText() Text {
 		},
 		StatusHelpHint: "F1 Help",
 		FollowMode:     "follow",
+		StatusEOF:      "EOF",
 		SearchEmpty:    "empty search",
 		SearchNotFound: func(query string) string {
 			return fmt.Sprintf("%s not found", query)

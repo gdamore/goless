@@ -795,7 +795,7 @@ func (v *Viewer) goToLine(lineNumber int) {
 	v.follow = false
 	v.ensureLayout()
 	lineIndex := lineNumber - 1
-	if lineIndex >= len(v.lines) {
+	if lineIndex >= len(v.sourceLines) {
 		v.message = v.text.CommandOutOfRange(lineNumber)
 		return
 	}
@@ -803,7 +803,7 @@ func (v *Viewer) goToLine(lineNumber int) {
 		v.colOffset = 0
 		v.relayout()
 	}
-	v.restoreAnchor(layout.Anchor{LineIndex: lineIndex, GraphemeIndex: 0})
+	v.restoreSourceAnchor(layout.Anchor{LineIndex: lineIndex, GraphemeIndex: 0})
 	v.message = v.text.CommandLine(lineNumber)
 }
 
@@ -818,10 +818,10 @@ func (v *Viewer) goToPercent(percent int) {
 	v.message = strconv.Itoa(percent) + "%"
 }
 
-// JumpToLine moves the viewport to the requested visible line number.
+// JumpToLine moves the viewport to the requested logical line number.
 func (v *Viewer) JumpToLine(lineNumber int) bool {
 	v.goToLine(lineNumber)
-	return lineNumber > 0 && lineNumber <= len(v.lines)
+	return lineNumber > 0 && lineNumber <= len(v.sourceLines)
 }
 
 func (v *Viewer) graphemeMatched(line model.Line, lineIndex int, grapheme model.Grapheme) (bool, bool) {
