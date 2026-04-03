@@ -1625,30 +1625,7 @@ func (v *Viewer) builtInSearchPromptDisplay(width int) (left, right string, ok b
 }
 
 func (v *Viewer) builtInSearchPromptLeft(width int, prefix string) string {
-	input := string(v.prompt.buffer)
-	full := prefix + input
-	if width <= 0 || stringWidth(full) <= width {
-		return full
-	}
-	if stringWidth(prefix) >= width {
-		return truncateToWidth(prefix, width)
-	}
-
-	availableInputWidth := width - stringWidth(prefix)
-	if availableInputWidth <= 0 {
-		return truncateToWidth(prefix, width)
-	}
-	if stringWidth(input) <= availableInputWidth {
-		return full
-	}
-
-	clip := "…"
-	clipWidth := stringWidth(clip)
-	if availableInputWidth <= clipWidth {
-		return prefix + trimLeftToWidth(input, max(stringWidth(input)-availableInputWidth, 0))
-	}
-	tailWidth := availableInputWidth - clipWidth
-	return prefix + clip + trimLeftToWidth(input, max(stringWidth(input)-tailWidth, 0))
+	return truncateTailWithEllipsis(prefix, string(v.prompt.buffer), width)
 }
 
 func (v *Viewer) displayPromptText(width int) string {
@@ -1660,30 +1637,7 @@ func (v *Viewer) displayPromptText(width int) string {
 	}
 
 	prefix := " " + v.prompt.prefix
-	input := string(v.prompt.buffer)
-	full := prefix + input
-	if width <= 0 || stringWidth(full) <= width {
-		return full
-	}
-	if stringWidth(prefix) >= width {
-		return truncateToWidth(prefix, width)
-	}
-
-	availableInputWidth := width - stringWidth(prefix)
-	if availableInputWidth <= 0 {
-		return truncateToWidth(prefix, width)
-	}
-	if stringWidth(input) <= availableInputWidth {
-		return full
-	}
-
-	clip := "…"
-	clipWidth := stringWidth(clip)
-	if availableInputWidth <= clipWidth {
-		return prefix + trimLeftToWidth(input, max(stringWidth(input)-availableInputWidth, 0))
-	}
-	tailWidth := availableInputWidth - clipWidth
-	return prefix + clip + trimLeftToWidth(input, max(stringWidth(input)-tailWidth, 0))
+	return truncateTailWithEllipsis(prefix, string(v.prompt.buffer), width)
 }
 
 func toPromptKind(kind promptKind) PromptKind {
@@ -1945,6 +1899,32 @@ func truncateToWidth(s string, width int) string {
 		total += clusterWidth
 	}
 	return builder.String()
+}
+
+func truncateTailWithEllipsis(prefix, input string, width int) string {
+	full := prefix + input
+	if width <= 0 || stringWidth(full) <= width {
+		return full
+	}
+	if stringWidth(prefix) >= width {
+		return truncateToWidth(prefix, width)
+	}
+
+	availableInputWidth := width - stringWidth(prefix)
+	if availableInputWidth <= 0 {
+		return truncateToWidth(prefix, width)
+	}
+	if stringWidth(input) <= availableInputWidth {
+		return full
+	}
+
+	clip := "…"
+	clipWidth := stringWidth(clip)
+	if availableInputWidth <= clipWidth {
+		return prefix + trimLeftToWidth(input, max(stringWidth(input)-availableInputWidth, 0))
+	}
+	tailWidth := availableInputWidth - clipWidth
+	return prefix + clip + trimLeftToWidth(input, max(stringWidth(input)-tailWidth, 0))
 }
 
 func trimLeftToWidth(s string, skip int) string {
