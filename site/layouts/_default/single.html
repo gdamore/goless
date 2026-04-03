@@ -1,6 +1,10 @@
 {{ define "main" }}
   <main class="content docs-layout">
     <article class="card doc-main">
+      <div class="preview-inline">
+        <strong>{{ .Site.Params.previewLabel }}</strong>
+        <span>{{ .Site.Params.previewText }}</span>
+      </div>
       <p class="eyebrow">{{ .CurrentSection.Title }}</p>
       <h1>{{ .Title }}</h1>
       {{ with .Summary }}
