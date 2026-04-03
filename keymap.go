@@ -79,6 +79,8 @@ const (
 	KeyActionSearchNext
 	// KeyActionSearchPrev advances to the previous search match.
 	KeyActionSearchPrev
+	// KeyActionRefresh repaints the current screen without changing pager state.
+	KeyActionRefresh
 	// KeyActionToggleHelp shows or hides the built-in help.
 	KeyActionToggleHelp
 	// KeyActionFollow enables follow mode.

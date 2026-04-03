@@ -58,6 +58,7 @@ const (
 	KeyActionPromptCommand        = actionPromptCommand
 	KeyActionSearchNext           = actionSearchNext
 	KeyActionSearchPrev           = actionSearchPrev
+	KeyActionRefresh              = actionRefresh
 	KeyActionToggleHelp           = actionToggleHelp
 	KeyActionFollow               = actionFollow
 	KeyActionCycleSearchCase      = actionCycleSearchCase
@@ -109,6 +110,7 @@ func lessKeyMap() keyMap {
 		normal: []keyBinding{
 			{key: tcell.KeyEscape, action: actionQuit},
 			{key: tcell.KeyCtrlC, action: actionQuit},
+			{key: tcell.KeyCtrlL, action: actionRefresh},
 			{key: tcell.KeyEnter, action: actionScrollDown},
 			{key: tcell.KeyUp, action: actionScrollUp},
 			{key: tcell.KeyDown, action: actionScrollDown},
@@ -150,21 +152,24 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyRune, rune: " ", action: actionPageDown},
 			{key: tcell.KeyRune, rune: "f", action: actionPageDown},
 			{key: tcell.KeyRune, rune: "b", action: actionPageUp},
+			{key: tcell.KeyRune, rune: "w", action: actionPageUp},
 			{key: tcell.KeyRune, rune: "<", action: actionGoTop},
 			{key: tcell.KeyRune, rune: ">", action: actionGoBottom},
 			{key: tcell.KeyRune, rune: "g", action: actionGoTop},
 			{key: tcell.KeyRune, rune: "G", action: actionGoBottom},
-			{key: tcell.KeyRune, rune: "w", action: actionToggleWrap},
+			{key: tcell.KeyRune, rune: "W", action: actionToggleWrap},
 			{key: tcell.KeyRune, rune: "/", action: actionPromptSearchForward},
 			{key: tcell.KeyRune, rune: "?", action: actionPromptSearchBackward},
 			{key: tcell.KeyRune, rune: ":", action: actionPromptCommand},
 			{key: tcell.KeyRune, rune: "n", action: actionSearchNext},
 			{key: tcell.KeyRune, rune: "N", action: actionSearchPrev},
+			{key: tcell.KeyRune, rune: "r", action: actionRefresh},
 			{key: tcell.KeyRune, rune: "F", action: actionFollow},
 		},
 		help: []keyBinding{
 			{key: tcell.KeyEscape, action: actionToggleHelp},
 			{key: tcell.KeyCtrlC, action: actionQuit},
+			{key: tcell.KeyCtrlL, action: actionRefresh},
 			{key: tcell.KeyEnter, action: actionScrollDown},
 			{key: tcell.KeyUp, action: actionScrollUp},
 			{key: tcell.KeyDown, action: actionScrollDown},
@@ -197,6 +202,7 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyRune, rune: " ", action: actionPageDown},
 			{key: tcell.KeyRune, rune: "f", action: actionPageDown},
 			{key: tcell.KeyRune, rune: "b", action: actionPageUp},
+			{key: tcell.KeyRune, rune: "w", action: actionPageUp},
 			{key: tcell.KeyHome, action: actionGoLineStart},
 			{key: tcell.KeyEnd, action: actionGoLineEnd},
 			{key: tcell.KeyRune, rune: "0", action: actionGoLineStart},
@@ -210,6 +216,7 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyF1, action: actionToggleHelp},
 			{key: tcell.KeyRune, rune: "q", action: actionToggleHelp},
 			{key: tcell.KeyRune, rune: "Q", action: actionQuit},
+			{key: tcell.KeyRune, rune: "r", action: actionRefresh},
 		},
 		prompt: []keyBinding{
 			{key: tcell.KeyCtrlC, action: actionQuit},

@@ -10,8 +10,9 @@ The built-in less-like key group already gives the future user manual a strong o
 
 - `j` and `k` or the arrow keys to move line by line
 - `space` and `b` to page down and up
+- `w` also pages up in the built-in less-like key group
 - `g` and `G` to jump to the top or bottom
-- `w` to toggle wrap mode
+- `W` to toggle wrap mode
 - `F` to enable follow mode
 
 ## Search

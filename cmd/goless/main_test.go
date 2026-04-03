@@ -443,6 +443,9 @@ func TestDemoSessionCommandHandler(t *testing.T) {
 	if result := handler(goless.Command{Name: "q"}); !result.Handled || !result.Quit {
 		t.Fatalf("q command result = %+v, want handled quit", result)
 	}
+	if result := handler(goless.Command{Name: "Q"}); !result.Handled || !result.Quit {
+		t.Fatalf("Q command result = %+v, want handled quit", result)
+	}
 
 	result := handler(goless.Command{Name: "next"})
 	if !result.Handled || result.Quit {
@@ -522,6 +525,63 @@ func TestDemoSessionAdditionalCommands(t *testing.T) {
 	}
 	if got, want := reloads, 2; got != want {
 		t.Fatalf("reload count after rewind = %d, want %d", got, want)
+	}
+
+	result = handler(goless.Command{Name: "x"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("x command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "already at first file"; got != want {
+		t.Fatalf("x command message = %q, want %q", got, want)
+	}
+	if got, want := reloads, 2; got != want {
+		t.Fatalf("reload count after x = %d, want %d", got, want)
+	}
+}
+
+func TestHandleProgramStatusKey(t *testing.T) {
+	var seen []string
+	pager := goless.New(goless.Config{
+		TabWidth:   4,
+		WrapMode:   goless.NoWrap,
+		ShowStatus: true,
+		CommandHandler: func(cmd goless.Command) goless.CommandResult {
+			seen = append(seen, cmd.Name)
+			if cmd.Name == "file" || cmd.Name == "f" {
+				return goless.CommandResult{Handled: true, Message: "demo.txt (1/1)"}
+			}
+			return goless.CommandResult{}
+		},
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("one\ntwo\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	for _, tt := range []struct {
+		name string
+		ev   *tcell.EventKey
+	}{
+		{name: "equals", ev: tcell.NewEventKey(tcell.KeyRune, "=", tcell.ModNone)},
+		{name: "ctrl-g", ev: tcell.NewEventKey(tcell.KeyCtrlG, "", tcell.ModNone)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			seen = nil
+			if !handleProgramStatusKey(pager, tt.ev) {
+				t.Fatalf("handleProgramStatusKey(%s) = false, want true", tt.name)
+			}
+			if got, want := len(seen), 1; got != want {
+				t.Fatalf("command count after %s = %d, want %d", tt.name, got, want)
+			}
+			if got, want := seen[0], "file"; got != want {
+				t.Fatalf("command after %s = %q, want %q", tt.name, got, want)
+			}
+		})
+	}
+
+	if handleProgramStatusKey(pager, tcell.NewEventKey(tcell.KeyRune, "=", tcell.ModAlt)) {
+		t.Fatal("handleProgramStatusKey(Alt-=) = true, want false")
 	}
 }
 

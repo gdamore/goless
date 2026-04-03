@@ -27,23 +27,23 @@ Already compatible or close enough:
 - `/pattern`, `?pattern`, `n`, and `N`
 - `:123` for line jump
 - `:50%` for percentage jump
-- `:q` and `:quit`
+- `:q`, `:Q`, and `:quit`
 - `:n` and `:p` through the standalone program's command handler
+- `:x` through the standalone program's command handler
 - `:f` through the standalone program's `file` / `f` command alias
+- `=` and `Ctrl-G` for current file/session status in the standalone program
 - `+42` and `+/pattern` startup directives
 
 Useful, but intentionally different:
 
 - `:set ...` commands are custom pager commands, not `less` option toggles
 - search mode and case mode are exposed directly with `F2`, `F3`, and `:set`
-- follow mode is exposed directly with `F`
 
 Notable gaps:
 
-- no `:Q` or `ZZ` quit aliases
-- no `=` or `Ctrl-G` file-info/status command
-- no `:x` alias for the first file
+- no `ZZ` quit alias
 - no `:e [file]` command to examine a new file
+- no `R` hard reload behavior
 - no support for marks, bracket matching, or tag navigation
 - no file-spanning search commands such as `ESC-n` / `ESC-N`
 
@@ -57,17 +57,12 @@ Compatible today:
 - `space`, `f`, `b`, `Ctrl-B`, `Ctrl-F`, `Ctrl-V`, `Alt-v`
 - `g`, `G`, `<`, `>`
 - `/`, `?`, `n`, `N`
+- `r`, `Ctrl-L` for repaint
 - `F` for follow mode
 
 Close, but thinner than `less`:
 
 - horizontal navigation exists, but not under the usual `less` bindings
-
-Compatibility conflicts in the current bundled keymap:
-
-- `w` toggles wrap, but `less` uses `w` for backward-window behavior
-
-High-value missing aliases:
 
 Current sequence limitation:
 
@@ -118,14 +113,18 @@ Implemented:
 - `Ctrl-F`, `Ctrl-V` for page down
 - `Ctrl-B` for page up
 - `Alt-v` as the pragmatic stand-in for `Esc-v` page up
+- `w` for backward-page behavior
+- `r` and `Ctrl-L` for repaint
 - `Q` as an additional quit key
 - `<` goes to top of file
 - `>` goes to bottom of file
 - `h` opens and closes help
+- `W` toggles wrap so `w` can stay less-compatible
 
 Still open:
 
 - no additional single-key alias changes selected in this batch
+- `R` hard reload behavior is still missing entirely
 
 Keep fine horizontal scrolling on the existing shifted-arrow bindings. This is a
 better trade than spending two prominent `less` keys on a niche horizontal
@@ -133,15 +132,22 @@ motion variant.
 
 ### 2. Add the most common standalone program command aliases
 
-The command prompt should accept more of the muscle-memory forms users expect:
+Status: partially complete.
+
+Implemented:
 
 - `:Q`
 - `:x`
 - `=`
 - `Ctrl-G`
 
-`=` and `Ctrl-G` should report the same current-file/status information already
-available through `:file`.
+`=` and `Ctrl-G` report the same current-file/session status already available
+through `:file`.
+
+Still open:
+
+- `:e <file>`
+- `R` / `:reload`
 
 ### 3. Add common CLI aliases with low behavioral risk
 
