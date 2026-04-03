@@ -23,6 +23,7 @@ type promptState struct {
 	kind    promptKind
 	prefix  string
 	buffer  []rune
+	seeded  bool
 	preview *searchState
 	errText string
 }

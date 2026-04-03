@@ -704,28 +704,15 @@ func toInternalText(text Text) iview.Text {
 		text.RightOverflowIndicator = defaults.RightOverflowIndicator
 	}
 
-	return iview.Text{
-		HelpTitle:          text.HelpTitle,
-		HelpClose:          text.HelpClose,
-		HelpBody:           text.HelpBody,
-		StatusSearchInfo:   text.StatusSearchInfo,
-		StatusPosition:     text.StatusPosition,
-		StatusHelpHint:     text.StatusHelpHint,
-		HideStatusHelpHint: text.HideStatusHelpHint,
-		FollowMode:         text.FollowMode,
-		StatusLine: func(info iview.StatusInfo) (left, right string) {
-			if text.StatusLine == nil {
-				return info.DefaultLeft, info.DefaultRight
-			}
-			return text.StatusLine(StatusInfo{
-				Search:       toPublicSearchState(info.Search),
-				Following:    info.Following,
-				Message:      info.Message,
-				Position:     Position{Row: info.Position.Row, Rows: info.Position.Rows, Column: info.Position.Column, Columns: info.Position.Columns},
-				DefaultLeft:  info.DefaultLeft,
-				DefaultRight: info.DefaultRight,
-			})
-		},
+	itext := iview.Text{
+		HelpTitle:              text.HelpTitle,
+		HelpClose:              text.HelpClose,
+		HelpBody:               text.HelpBody,
+		StatusSearchInfo:       text.StatusSearchInfo,
+		StatusPosition:         text.StatusPosition,
+		StatusHelpHint:         text.StatusHelpHint,
+		HideStatusHelpHint:     text.HideStatusHelpHint,
+		FollowMode:             text.FollowMode,
 		SearchEmpty:            text.SearchEmpty,
 		SearchNotFound:         text.SearchNotFound,
 		SearchMatchCount:       text.SearchMatchCount,
@@ -736,10 +723,21 @@ func toInternalText(text Text) iview.Text {
 		CommandLine:            text.CommandLine,
 		LeftOverflowIndicator:  text.LeftOverflowIndicator,
 		RightOverflowIndicator: text.RightOverflowIndicator,
-		PromptLine: func(info iview.PromptInfo) string {
-			if text.PromptLine == nil {
-				return info.DefaultText
-			}
+	}
+	if text.StatusLine != nil {
+		itext.StatusLine = func(info iview.StatusInfo) (left, right string) {
+			return text.StatusLine(StatusInfo{
+				Search:       toPublicSearchState(info.Search),
+				Following:    info.Following,
+				Message:      info.Message,
+				Position:     Position{Row: info.Position.Row, Rows: info.Position.Rows, Column: info.Position.Column, Columns: info.Position.Columns},
+				DefaultLeft:  info.DefaultLeft,
+				DefaultRight: info.DefaultRight,
+			})
+		}
+	}
+	if text.PromptLine != nil {
+		itext.PromptLine = func(info iview.PromptInfo) string {
 			return text.PromptLine(PromptInfo{
 				Kind:        toPublicPromptKind(info.Kind),
 				Prefix:      info.Prefix,
@@ -748,8 +746,9 @@ func toInternalText(text Text) iview.Text {
 				Search:      toPublicSearchState(info.Search),
 				DefaultText: info.DefaultText,
 			})
-		},
+		}
 	}
+	return itext
 }
 
 func toInternalChrome(chrome Chrome) iview.Chrome {

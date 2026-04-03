@@ -1197,6 +1197,7 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 	}
 	if rightText != "" && rightStart < rightLimit {
 		screen.PutStrStyled(rightStart, y, rightText, style)
+		v.drawHintKeys(screen, rightStart, y, rightText, v.cfg.Chrome.StatusHelpKeyStyle, "F2:", "F3:")
 	}
 }
 
@@ -1213,6 +1214,20 @@ func (v *Viewer) statusHelpHintKey(fullText, rendered string) (string, bool) {
 		return "", false
 	}
 	return key, true
+}
+
+func (v *Viewer) drawHintKeys(screen tcell.Screen, x, y int, text string, style tcell.Style, keys ...string) {
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		idx := strings.Index(text, key)
+		if idx < 0 {
+			continue
+		}
+		keyX := x + stringWidth(text[:idx])
+		screen.PutStrStyled(keyX, y, key, style)
+	}
 }
 
 func (v *Viewer) drawLineNumberGutter(screen tcell.Screen) {
@@ -1431,16 +1446,12 @@ func (v *Viewer) bottomBarRows() int {
 
 func (v *Viewer) statusText() (left, right string) {
 	search := v.activeSearch()
-	if search.Query != "" || normalizeSearchCaseMode(v.cfg.SearchCase) != SearchSmartCase || normalizeSearchMode(v.cfg.SearchMode) != SearchSubstring {
-		left = "search:" + v.searchModeLabel()
-		if search.Query != "" {
-			left = "search:" + searchModeLabel(search.CaseMode, search.Mode)
-			position := 0
-			if len(search.Matches) > 0 && search.Current >= 0 {
-				position = search.Current + 1
-			}
-			left += "  " + v.text.StatusSearchInfo(search.Query, position, len(search.Matches))
+	if search.Query != "" {
+		position := 0
+		if len(search.Matches) > 0 && search.Current >= 0 {
+			position = search.Current + 1
 		}
+		left = v.text.StatusSearchInfo(search.Query, position, len(search.Matches))
 	}
 	if v.follow {
 		if left != "" {
@@ -1543,11 +1554,24 @@ func squeezeBlankLines(lines []model.Line, enabled bool) ([]model.Line, []int) {
 
 func (v *Viewer) drawPrompt(screen tcell.Screen, y int) {
 	style := v.cfg.Chrome.PromptStyle
+	screen.PutStrStyled(0, y, padRightToWidth("", v.width), style)
+
 	prompt := ""
 	if v.prompt != nil {
-		prompt = " " + v.promptText()
+		if left, right, ok := v.builtInSearchPromptDisplay(v.width); ok {
+			prompt = left
+			screen.PutStrStyled(0, y, truncateToWidth(left, v.width), style)
+			if right != "" {
+				right = truncateToWidth(right, v.width)
+				start := max(v.width-stringWidth(right), 0)
+				screen.PutStrStyled(start, y, right, style)
+				v.drawHintKeys(screen, start, y, right, v.cfg.Chrome.StatusHelpKeyStyle, "F2:", "F3:")
+			}
+		} else {
+			prompt = v.displayPromptText(v.width)
+			screen.PutStrStyled(0, y, padRightToWidth(prompt, v.width), style)
+		}
 	}
-	screen.PutStrStyled(0, y, padRightToWidth(prompt, v.width), style)
 	if v.prompt != nil && v.prompt.errText != "" && v.width > 0 && !strings.Contains(prompt, v.prompt.errText) {
 		errText := "  " + v.prompt.errText
 		paddedPrompt := truncateToWidth(prompt, v.width)
@@ -1574,6 +1598,92 @@ func (v *Viewer) promptText() string {
 		Search:      v.SearchSnapshot(),
 		DefaultText: defaultText,
 	})
+}
+
+func (v *Viewer) builtInSearchPromptDisplay(width int) (left, right string, ok bool) {
+	if v.prompt == nil || v.text.PromptLine != nil {
+		return "", "", false
+	}
+	switch v.prompt.kind {
+	case promptSearchForward:
+		left = v.builtInSearchPromptLeft(width, " /")
+	case promptSearchBackward:
+		left = v.builtInSearchPromptLeft(width, " ?")
+	default:
+		return "", "", false
+	}
+	if v.prompt.errText == "" {
+		right = " " + v.searchModeHintText() + " "
+		rightWidth := stringWidth(right)
+		if rightWidth >= width {
+			right = ""
+		} else if stringWidth(left) > width-rightWidth {
+			left = v.builtInSearchPromptLeft(width-rightWidth, left[:2])
+		}
+	}
+	return left, right, true
+}
+
+func (v *Viewer) builtInSearchPromptLeft(width int, prefix string) string {
+	input := string(v.prompt.buffer)
+	full := prefix + input
+	if width <= 0 || stringWidth(full) <= width {
+		return full
+	}
+	if stringWidth(prefix) >= width {
+		return truncateToWidth(prefix, width)
+	}
+
+	availableInputWidth := width - stringWidth(prefix)
+	if availableInputWidth <= 0 {
+		return truncateToWidth(prefix, width)
+	}
+	if stringWidth(input) <= availableInputWidth {
+		return full
+	}
+
+	clip := "…"
+	clipWidth := stringWidth(clip)
+	if availableInputWidth <= clipWidth {
+		return prefix + trimLeftToWidth(input, max(stringWidth(input)-availableInputWidth, 0))
+	}
+	tailWidth := availableInputWidth - clipWidth
+	return prefix + clip + trimLeftToWidth(input, max(stringWidth(input)-tailWidth, 0))
+}
+
+func (v *Viewer) displayPromptText(width int) string {
+	if v.prompt == nil {
+		return ""
+	}
+	if v.text.PromptLine != nil {
+		return " " + v.promptText()
+	}
+
+	prefix := " " + v.prompt.prefix
+	input := string(v.prompt.buffer)
+	full := prefix + input
+	if width <= 0 || stringWidth(full) <= width {
+		return full
+	}
+	if stringWidth(prefix) >= width {
+		return truncateToWidth(prefix, width)
+	}
+
+	availableInputWidth := width - stringWidth(prefix)
+	if availableInputWidth <= 0 {
+		return truncateToWidth(prefix, width)
+	}
+	if stringWidth(input) <= availableInputWidth {
+		return full
+	}
+
+	clip := "…"
+	clipWidth := stringWidth(clip)
+	if availableInputWidth <= clipWidth {
+		return prefix + trimLeftToWidth(input, max(stringWidth(input)-availableInputWidth, 0))
+	}
+	tailWidth := availableInputWidth - clipWidth
+	return prefix + clip + trimLeftToWidth(input, max(stringWidth(input)-tailWidth, 0))
 }
 
 func toPromptKind(kind promptKind) PromptKind {
@@ -1647,20 +1757,31 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 	case tcell.KeyEnter:
 		return v.commitPrompt()
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
-		if v.prompt != nil && len(v.prompt.buffer) > 0 {
-			v.prompt.buffer = v.prompt.buffer[:len(v.prompt.buffer)-1]
+		if v.prompt != nil {
+			if v.prompt.seeded {
+				v.prompt.buffer = v.prompt.buffer[:0]
+				v.prompt.seeded = false
+			} else if len(v.prompt.buffer) > 0 {
+				v.prompt.buffer = v.prompt.buffer[:len(v.prompt.buffer)-1]
+			}
 		}
 		v.updatePromptPreview()
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyCtrlU:
 		if v.prompt != nil {
 			v.prompt.buffer = v.prompt.buffer[:0]
+			v.prompt.seeded = false
 		}
 		v.updatePromptPreview()
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyRune:
 		if v.prompt != nil {
-			v.prompt.buffer = append(v.prompt.buffer, []rune(ev.Str())...)
+			if v.prompt.seeded {
+				v.prompt.buffer = append(v.prompt.buffer[:0], []rune(ev.Str())...)
+				v.prompt.seeded = false
+			} else {
+				v.prompt.buffer = append(v.prompt.buffer, []rune(ev.Str())...)
+			}
 		}
 		v.updatePromptPreview()
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
