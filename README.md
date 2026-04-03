@@ -1,5 +1,8 @@
 # goless
 
+[![Go](https://github.com/gdamore/goless/actions/workflows/go.yaml/badge.svg?branch=main&event=push)](https://github.com/gdamore/goless/actions/workflows/go.yaml)
+[![codecov](https://codecov.io/gh/gdamore/goless/branch/main/graph/badge.svg)](https://codecov.io/gh/gdamore/goless)
+
 <p align="center">
   <img src="site/static/assets/logos/goless-light-transparent.png" alt="goless logo" width="240">
 </p>
