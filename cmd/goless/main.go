@@ -107,7 +107,7 @@ func run() error {
 	var (
 		pager             *goless.Pager
 		readResult        chan error
-		reloadCurrent     func() error
+		reloadCurrent     func() (bool, error)
 		buildProgramPager func() *goless.Pager
 	)
 	buildProgramPager = func() *goless.Pager {
@@ -122,15 +122,16 @@ func run() error {
 				if reloadCurrent == nil {
 					return fmt.Errorf("file reload unavailable")
 				}
-				return reloadCurrent()
+				_, err := reloadCurrent()
+				return err
 			}),
 		)
 	}
 	if session.hasFiles() {
-		reloadCurrent = func() error {
+		reloadCurrent = func() (bool, error) {
 			return reloadProgramInput(session, inputLoader, &pager, buildProgramPager, width, height, screen.EventQ(), &readResult)
 		}
-		if err := reloadCurrent(); err != nil {
+		if _, err := reloadCurrent(); err != nil {
 			return err
 		}
 	} else {
@@ -275,7 +276,7 @@ func applyProgramQuitAtEOF(
 	following bool,
 	before goless.Position,
 	after goless.Position,
-	reload func() error,
+	reload func() (bool, error),
 ) (bool, error) {
 	if policy != programQuitAtEOFOnForwardEOF || !inputComplete {
 		return false, nil
@@ -292,7 +293,8 @@ func applyProgramQuitAtEOF(
 	if programPositionChanged(before, after) {
 		return false, nil
 	}
-	return advanceProgramSessionOrQuit(session, reload)
+	quit, _, err := advanceProgramSessionOrQuit(session, reload)
+	return quit, err
 }
 
 func isProgramQuitAtEOFAction(action goless.KeyAction) bool {
@@ -314,7 +316,7 @@ func handleProgramVisibleEOFAction(
 	currentPager func() *goless.Pager,
 	result goless.KeyResult,
 	inputComplete bool,
-	reload func() error,
+	reload func() (bool, error),
 ) (bool, error) {
 	if policy != programQuitAtEOFWhenVisible || !inputComplete {
 		return false, nil
@@ -330,16 +332,19 @@ func handleProgramVisibleEOF(
 	session *programSession,
 	currentPager func() *goless.Pager,
 	inputComplete bool,
-	reload func() error,
+	reload func() (bool, error),
 ) (bool, error) {
 	pager := currentPager()
 	if policy != programQuitAtEOFWhenVisible || !inputComplete || pager == nil || pager.Following() {
 		return false, nil
 	}
 	for pager.EOFVisible() {
-		quit, err := advanceProgramSessionOrQuit(session, reload)
+		quit, loaded, err := advanceProgramSessionOrQuit(session, reload)
 		if err != nil || quit {
 			return quit, err
+		}
+		if !loaded {
+			return false, nil
 		}
 		pager = currentPager()
 		if pager == nil || pager.Following() {
@@ -349,17 +354,18 @@ func handleProgramVisibleEOF(
 	return false, nil
 }
 
-func advanceProgramSessionOrQuit(session *programSession, reload func() error) (bool, error) {
+func advanceProgramSessionOrQuit(session *programSession, reload func() (bool, error)) (bool, bool, error) {
 	if session != nil && session.canNext() {
 		index := session.index
 		session.next()
-		if err := reload(); err != nil {
+		loaded, err := reload()
+		if err != nil {
 			session.index = index
-			return false, err
+			return false, false, err
 		}
-		return false, nil
+		return false, loaded, nil
 	}
-	return true, nil
+	return true, true, nil
 }
 
 func appendFromReader(pager *goless.Pager, r io.Reader, onChunk func()) error {
@@ -507,9 +513,9 @@ func reloadProgramInput(
 	width, height int,
 	eventQ chan tcell.Event,
 	readResult *chan error,
-) error {
+) (bool, error) {
 	if readResult != nil && *readResult != nil {
-		return fmt.Errorf("stdin still reading")
+		return false, fmt.Errorf("stdin still reading")
 	}
 	nextPager := buildPager()
 	nextPager.SetSize(width, height)
@@ -517,7 +523,7 @@ func reloadProgramInput(
 	if loader != nil && loader.canStream(currentPath) {
 		reader, finish, err := loader.startStdinStream()
 		if err != nil {
-			return err
+			return false, err
 		}
 		var cache bytes.Buffer
 		*pager = nextPager
@@ -526,16 +532,16 @@ func reloadProgramInput(
 				finish(err, cache.Bytes())
 			})
 		}
-		return nil
+		return false, nil
 	}
 	if err := loadProgramInput(nextPager, loader, currentPath, session.startup); err != nil {
-		return err
+		return false, err
 	}
 	*pager = nextPager
 	if readResult != nil {
 		*readResult = nil
 	}
-	return nil
+	return true, nil
 }
 
 type programStartup struct {
