@@ -52,6 +52,7 @@ type Viewer struct {
 	lines       []model.Line
 	lineMap     []int
 	layout      layout.Result
+	maxColumns  int
 	width       int
 	height      int
 	rowOffset   int
@@ -202,6 +203,7 @@ func (v *Viewer) HeaderColumns() int {
 func (v *Viewer) SetVisualization(visual Visualization) {
 	v.cfg.Visualization = visual.withDefaults()
 	v.ensureLayout()
+	v.maxColumns = v.computeMaxContentColumns()
 	v.clampOffsets()
 	v.relayout()
 }
@@ -627,6 +629,7 @@ func (v *Viewer) relayout() {
 		HorizontalOffset: v.horizontalOffset(),
 		LeadingColumns:   v.headerColumnWidth(v.rawContentWidth()),
 	})
+	v.maxColumns = v.computeMaxContentColumns()
 	v.rebuildSearch()
 	v.clampOffsets()
 }
@@ -1513,6 +1516,10 @@ func (v *Viewer) statusOverflow() (left, right bool) {
 }
 
 func (v *Viewer) maxContentColumns() int {
+	return v.maxColumns
+}
+
+func (v *Viewer) computeMaxContentColumns() int {
 	frozen := v.headerColumnWidth(v.rawContentWidth())
 	maxCells := 0
 	for i, line := range v.layout.Lines {
@@ -1903,7 +1910,10 @@ func truncateToWidth(s string, width int) string {
 
 func truncateTailWithEllipsis(prefix, input string, width int) string {
 	full := prefix + input
-	if width <= 0 || stringWidth(full) <= width {
+	if width <= 0 {
+		return ""
+	}
+	if stringWidth(full) <= width {
 		return full
 	}
 	if stringWidth(prefix) >= width {

@@ -1685,6 +1685,17 @@ func TestDrawPromptShowsTailWhenInputOverflows(t *testing.T) {
 	}
 }
 
+func TestDisplayPromptTextReturnsEmptyForNonPositiveWidth(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.beginPrompt(promptSearchForward)
+	v.prompt.buffer = []rune("alpha")
+
+	if got := v.displayPromptText(0); got != "" {
+		t.Fatalf("displayPromptText(0) = %q, want empty", got)
+	}
+}
+
 func TestBuiltInSearchPromptPlacesModeHintOnRight(t *testing.T) {
 	doc := model.NewDocument(4)
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
