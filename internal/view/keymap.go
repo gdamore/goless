@@ -284,7 +284,7 @@ func (b keyBinding) matches(ev *tcell.EventKey) bool {
 	if ev.Key() != b.key {
 		return false
 	}
-	if !b.anyMod && modifiersForMatch(ev, b.key) != b.mod {
+	if !b.anyMod && !modifiersMatch(ev, b) {
 		return false
 	}
 	if b.key == tcell.KeyRune && ev.Str() != b.rune {
@@ -293,9 +293,24 @@ func (b keyBinding) matches(ev *tcell.EventKey) bool {
 	return true
 }
 
-func modifiersForMatch(ev *tcell.EventKey, key tcell.Key) tcell.ModMask {
+func modifiersMatch(ev *tcell.EventKey, b keyBinding) bool {
+	got := modifiersForMatch(ev, b)
+	if got == b.mod {
+		return true
+	}
+	// tcell commonly normalizes shifted printable runes to ModNone even when the
+	// original keystroke required Shift to produce the rune. Accept that form for
+	// explicit shifted rune bindings without weakening non-rune or non-shifted
+	// matches.
+	if b.key == tcell.KeyRune && b.mod&tcell.ModShift != 0 && got == (b.mod&^tcell.ModShift) {
+		return true
+	}
+	return false
+}
+
+func modifiersForMatch(ev *tcell.EventKey, b keyBinding) tcell.ModMask {
 	mod := ev.Modifiers()
-	if key == tcell.KeyRune {
+	if b.key == tcell.KeyRune && b.mod&tcell.ModShift == 0 {
 		mod &^= tcell.ModShift
 	}
 	return mod

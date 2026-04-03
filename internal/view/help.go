@@ -43,17 +43,24 @@ func (v *Viewer) maxHelpColOffset() int {
 	}
 	maxWidth := 0
 	for _, line := range v.helpLines() {
-		width := 0
-		for _, grapheme := range line.Graphemes {
-			if grapheme.CellWidth > 0 {
-				width += grapheme.CellWidth
-			}
-		}
+		width := helpLineCellWidth(line)
 		if width > maxWidth {
 			maxWidth = width
 		}
 	}
 	return max(maxWidth-bodyWidth, 0)
+}
+
+func (v *Viewer) helpLineMaxColOffset(lineIndex int) int {
+	lines := v.helpLines()
+	if lineIndex < 0 || lineIndex >= len(lines) {
+		return 0
+	}
+	_, _, bodyWidth, _ := v.contentRect()
+	if bodyWidth <= 0 {
+		return 0
+	}
+	return max(helpLineCellWidth(lines[lineIndex])-bodyWidth, 0)
 }
 
 func (v *Viewer) clampHelpOffset() {
@@ -111,4 +118,14 @@ func (v *Viewer) drawHelpDocumentLine(screen tcell.Screen, x, y, width int, line
 			break
 		}
 	}
+}
+
+func helpLineCellWidth(line model.Line) int {
+	width := 0
+	for _, grapheme := range line.Graphemes {
+		if grapheme.CellWidth > 0 {
+			width += grapheme.CellWidth
+		}
+	}
+	return width
 }
