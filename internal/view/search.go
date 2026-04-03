@@ -671,120 +671,153 @@ func parsePercentCommand(text string) (int, bool) {
 	return percent, true
 }
 
+func parseSetAssignment(text string) (name, value string, ok bool) {
+	index := strings.Index(text, "=")
+	if index < 0 {
+		return "", "", false
+	}
+	name = strings.TrimSpace(text[:index])
+	value = strings.TrimSpace(text[index+1:])
+	if name == "" || value == "" || strings.ContainsAny(name, " \t\r\n") || strings.ContainsAny(value, " \t\r\n") {
+		return "", "", false
+	}
+	return name, value, true
+}
+
+func visualizationEnabled(visual Visualization) bool {
+	return visual.ShowTabs || visual.ShowNewlines || visual.ShowCarriageReturns || visual.ShowEOF
+}
+
+func setVisualizationEnabled(visual Visualization, enabled bool) Visualization {
+	visual.ShowTabs = enabled
+	visual.ShowNewlines = enabled
+	visual.ShowCarriageReturns = enabled
+	visual.ShowEOF = enabled
+	return visual
+}
+
 func (v *Viewer) runSetCommand(text string) bool {
 	fields := strings.Fields(text)
-	if len(fields) != 3 || fields[0] != "set" {
+	if len(fields) == 0 || fields[0] != "set" {
 		return false
 	}
 
-	switch fields[1] {
-	case "searchcase":
-		var mode SearchCaseMode
-		switch fields[2] {
-		case "smart":
-			mode = SearchSmartCase
-		case "case", "sensitive":
-			mode = SearchCaseSensitive
-		case "nocase", "insensitive":
-			mode = SearchCaseInsensitive
-		default:
-			v.message = v.text.CommandUnknown(text)
-			return true
-		}
+	setText := strings.TrimSpace(strings.TrimPrefix(text, "set"))
+	if setText == "" {
+		return false
+	}
 
-		v.SetSearchCaseMode(mode)
-		return true
-	case "searchmode":
-		var mode SearchMode
-		switch fields[2] {
-		case "sub", "substring":
-			mode = SearchSubstring
-		case "word", "wholeword":
-			mode = SearchWholeWord
-		case "regex":
-			mode = SearchRegex
-		default:
-			v.message = v.text.CommandUnknown(text)
-			return true
-		}
-
-		v.SetSearchMode(mode)
-		return true
-	case "numbers", "number", "linenumbers":
-		switch fields[2] {
-		case "on", "true":
-			v.SetLineNumbers(true)
-		case "off", "false":
-			v.SetLineNumbers(false)
-		case "toggle":
-			v.ToggleLineNumbers()
-		default:
-			v.message = v.text.CommandUnknown(text)
-			return true
-		}
-		v.message = ""
-		return true
-	case "squeeze", "squeezeblanks", "blanklines":
-		switch fields[2] {
-		case "on", "true":
-			v.SetSqueezeBlankLines(true)
-		case "off", "false":
-			v.SetSqueezeBlankLines(false)
-		case "toggle":
-			v.SetSqueezeBlankLines(!v.SqueezeBlankLines())
-		default:
-			v.message = v.text.CommandUnknown(text)
-			return true
-		}
-		v.message = ""
-		return true
-	case "headers", "headerlines":
-		switch fields[2] {
-		case "on", "true":
-			v.SetHeaderLines(1)
-		case "off", "false":
-			v.SetHeaderLines(0)
-		case "toggle":
-			if v.HeaderLines() > 0 {
-				v.SetHeaderLines(0)
-			} else {
-				v.SetHeaderLines(1)
+	if name, value, ok := parseSetAssignment(setText); ok {
+		switch name {
+		case "searchcase":
+			var mode SearchCaseMode
+			switch value {
+			case "smart":
+				mode = SearchSmartCase
+			case "case", "sensitive":
+				mode = SearchCaseSensitive
+			case "nocase", "insensitive":
+				mode = SearchCaseInsensitive
+			default:
+				v.message = v.text.CommandUnknown(text)
+				return true
 			}
-		default:
-			count, err := strconv.Atoi(fields[2])
+			v.SetSearchCaseMode(mode)
+			v.message = ""
+			return true
+		case "searchmode":
+			var mode SearchMode
+			switch value {
+			case "sub", "substring":
+				mode = SearchSubstring
+			case "word", "wholeword":
+				mode = SearchWholeWord
+			case "regex":
+				mode = SearchRegex
+			default:
+				v.message = v.text.CommandUnknown(text)
+				return true
+			}
+			v.SetSearchMode(mode)
+			v.message = ""
+			return true
+		case "tabstop":
+			width, err := strconv.Atoi(value)
+			if err != nil || width <= 0 {
+				v.message = v.text.CommandUnknown(text)
+				return true
+			}
+			v.SetTabWidth(width)
+			v.message = ""
+			return true
+		case "pinlines":
+			count, err := strconv.Atoi(value)
 			if err != nil || count < 0 {
 				v.message = v.text.CommandUnknown(text)
 				return true
 			}
 			v.SetHeaderLines(count)
-		}
-		v.message = ""
-		return true
-	case "headercols", "headercolumns":
-		switch fields[2] {
-		case "on", "true":
-			v.SetHeaderColumns(1)
-		case "off", "false":
-			v.SetHeaderColumns(0)
-		case "toggle":
-			if v.HeaderColumns() > 0 {
-				v.SetHeaderColumns(0)
-			} else {
-				v.SetHeaderColumns(1)
-			}
-		default:
-			count, err := strconv.Atoi(fields[2])
+			v.message = ""
+			return true
+		case "pincols":
+			count, err := strconv.Atoi(value)
 			if err != nil || count < 0 {
 				v.message = v.text.CommandUnknown(text)
 				return true
 			}
 			v.SetHeaderColumns(count)
+			v.message = ""
+			return true
+		default:
+			v.message = v.text.CommandUnknown(text)
+			return true
 		}
-		v.message = ""
+	}
+
+	if len(fields) != 2 {
+		v.message = v.text.CommandUnknown(text)
 		return true
+	}
+
+	switch fields[1] {
+	case "number":
+		v.SetLineNumbers(true)
+	case "nonumber":
+		v.SetLineNumbers(false)
+	case "invnumber":
+		v.ToggleLineNumbers()
+	case "wrap":
+		v.SetWrapMode(layout.SoftWrap)
+	case "nowrap":
+		v.SetWrapMode(layout.NoWrap)
+	case "invwrap":
+		v.ToggleWrap()
+	case "list":
+		v.SetVisualization(setVisualizationEnabled(v.cfg.Visualization, true))
+	case "nolist":
+		v.SetVisualization(setVisualizationEnabled(v.cfg.Visualization, false))
+	case "invlist":
+		v.SetVisualization(setVisualizationEnabled(v.cfg.Visualization, !visualizationEnabled(v.cfg.Visualization)))
+	case "squeeze":
+		v.SetSqueezeBlankLines(true)
+	case "nosqueeze":
+		v.SetSqueezeBlankLines(false)
+	case "invsqueeze":
+		v.SetSqueezeBlankLines(!v.SqueezeBlankLines())
+	case "ignorecase":
+		v.SetSearchCaseMode(SearchCaseInsensitive)
+	case "noignorecase":
+		v.SetSearchCaseMode(SearchCaseSensitive)
+	case "smartcase":
+		v.SetSearchCaseMode(SearchSmartCase)
+	case "nosmartcase":
+		v.SetSearchCaseMode(SearchCaseInsensitive)
 	default:
 		return false
 	}
+
+	v.message = ""
+	return true
 }
 
 func (v *Viewer) goToLine(lineNumber int) {

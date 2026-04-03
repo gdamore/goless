@@ -80,6 +80,7 @@ Compatible today:
 - `-?` / `--help`
 - `-e` / `--quit-at-eof`
 - `-E` / `--QUIT-AT-EOF`
+- `-F` to quit immediately when the current input fits on one screen
 - `-N` to enable line numbers
 - `-R` as a compatibility no-op because the default rendering mode already
   aligns with the intended less-like behavior
@@ -90,10 +91,6 @@ Compatible today:
 - `+line`
 - `+/pattern`
 - multiple files plus explicit `-` for stdin
-
-Current CLI is thinner than `less` in several common areas:
-
-- no `-F` quit-if-one-screen behavior
 
 Custom flags such as `-preset`, `-chrome`, `-hidden`, `-render`, and
 `-live-links` are fine; they do not block familiarity as long as common `less`
@@ -163,6 +160,7 @@ Implemented:
 - `-I` to force case-insensitive search
 - `-s` / `--squeeze` to collapse repeated blank lines in the current view
 - `-x N` to set tab width
+- `-F` to quit if the current input already fits on one screen
 
 `-S` is accepted as an alias for no-wrap mode even though that is
 already the default. That keeps scripts and muscle memory working without
@@ -172,10 +170,6 @@ forcing users to know the current default.
 already the intended less-like behavior.
 
 `-?` and `--help` are accepted as standard help entry points.
-
-Still open:
-
-- `-F` to quit if the entire file fits on the first screen
 
 ### 4. Treat numeric prefixes as a separate, deliberate follow-up
 
@@ -207,7 +201,6 @@ surface area without materially improving the experience for most users.
 
 ## Suggested Follow-Up Issues
 
-- Add standalone program aliases for quit and file-info commands
-- Add common `less` CLI aliases (`-N`, `-S`, `-i`, `-I`, `-x`, `-F`)
+- Add standalone program `:e <file>`, `R` / `:reload`, and any secure shell-command opt-ins
 - Design numeric-prefix support for normal-mode commands
 - Decide whether to add sequence support or keep keymaps single-event only

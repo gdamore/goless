@@ -43,9 +43,13 @@
 [1;4mCommands[0m
   :123                    jump to line 123
   :50%                    jump to 50%
-  :set numbers [3mvalue[0m      show line numbers
-  :set headers [3mvalue[0m      pin top header lines (on|off|toggle|[3mnum[0m)
-  :set headercols [3mvalue[0m   pin left header columns (on|off|toggle|[3mnum[0m)
-  :set squeeze [3mvalue[0m      collapse adjacent blank lines (on|off|toggle)
-  :set searchcase [3mmode[0m    set case mode (smart|case|nocase)
-  :set searchmode [3mmode[0m    set match mode (sub|word|regex)
+  :set number             show line numbers
+  :set wrap               soft-wrap long lines
+  :set list               show hidden-character markers
+  :set squeeze            collapse adjacent blank lines
+  :set tabstop=[3mnum[0m        set tab width
+  :set pinlines=[3mnum[0m       pin top lines
+  :set pincols=[3mnum[0m        pin left columns
+  :set ignorecase         search without case sensitivity
+  :set smartcase          search smart-case
+  :set searchmode=[3mmode[0m    set match mode (sub|word|regex)

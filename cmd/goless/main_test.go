@@ -158,6 +158,79 @@ func TestDemoQuitAtEOFPolicyFromFlags(t *testing.T) {
 	}
 }
 
+func TestHandleProgramQuitIfOneScreenQuitsAtLastFile(t *testing.T) {
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 5)
+	if err := pager.AppendString("one\ntwo\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	quit, err := handleProgramQuitIfOneScreen(true, session, func() *goless.Pager { return pager }, true, func() (bool, error) { return true, nil })
+	if err != nil {
+		t.Fatalf("handleProgramQuitIfOneScreen returned error: %v", err)
+	}
+	if !quit {
+		t.Fatal("handleProgramQuitIfOneScreen(...) = false, want true")
+	}
+}
+
+func TestHandleProgramQuitIfOneScreenAdvancesPastShortFile(t *testing.T) {
+	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
+	short := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	short.SetSize(20, 5)
+	if err := short.AppendString("one\ntwo\n"); err != nil {
+		t.Fatalf("AppendString(short) failed: %v", err)
+	}
+	short.Flush()
+
+	tall := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	tall.SetSize(20, 3)
+	if err := tall.AppendString("one\ntwo\nthree\nfour\nfive\n"); err != nil {
+		t.Fatalf("AppendString(tall) failed: %v", err)
+	}
+	tall.Flush()
+
+	current := short
+	reloads := 0
+	quit, err := handleProgramQuitIfOneScreen(true, session, func() *goless.Pager { return current }, true, func() (bool, error) {
+		reloads++
+		current = tall
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("handleProgramQuitIfOneScreen returned error: %v", err)
+	}
+	if quit {
+		t.Fatal("handleProgramQuitIfOneScreen(...) = true, want false")
+	}
+	if got, want := session.currentFile(), "two.txt"; got != want {
+		t.Fatalf("currentFile() = %q, want %q", got, want)
+	}
+	if got, want := reloads, 1; got != want {
+		t.Fatalf("reload count = %d, want %d", got, want)
+	}
+}
+
+func TestHandleProgramQuitIfOneScreenDisabledWhenInputIncomplete(t *testing.T) {
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 5)
+	if err := pager.AppendString("one\ntwo\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	quit, err := handleProgramQuitIfOneScreen(true, session, func() *goless.Pager { return pager }, false, func() (bool, error) { return true, nil })
+	if err != nil {
+		t.Fatalf("handleProgramQuitIfOneScreen returned error: %v", err)
+	}
+	if quit {
+		t.Fatal("handleProgramQuitIfOneScreen(...) = true, want false")
+	}
+}
+
 func TestApplyDemoQuitAtEOFQuitsAtLastFile(t *testing.T) {
 	session := newProgramSession([]string{"one.txt"}, programStartup{})
 	quit, err := applyProgramQuitAtEOF(
@@ -416,7 +489,7 @@ func TestHandleDemoVisibleEOFActionRequiresForwardNavigation(t *testing.T) {
 
 func TestParseProgramFlagsCompatibilityAliases(t *testing.T) {
 	var out bytes.Buffer
-	opts, args, err := parseProgramFlags([]string{"-S", "-N", "-s", "-x", "4", "-I", "sample.txt"}, &out)
+	opts, args, err := parseProgramFlags([]string{"-F", "-S", "-N", "-s", "-x", "4", "-I", "sample.txt"}, &out)
 	if err != nil {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
@@ -425,6 +498,9 @@ func TestParseProgramFlagsCompatibilityAliases(t *testing.T) {
 	}
 	if !opts.lineNumbers {
 		t.Fatal("parseProgramFlags(...) did not enable line numbers for -N")
+	}
+	if !opts.quitIfOneScreen {
+		t.Fatal("parseProgramFlags(...) did not enable quitIfOneScreen for -F")
 	}
 	if !opts.squeeze {
 		t.Fatal("parseProgramFlags(...) did not enable squeeze for -s")

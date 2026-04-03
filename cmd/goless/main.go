@@ -38,6 +38,7 @@ type programOptions struct {
 	presetName        string
 	quitAtEOF         bool
 	quitAtEOFFirst    bool
+	quitIfOneScreen   bool
 	renderName        string
 	searchCaseMode    goless.SearchCaseMode
 	showHelp          bool
@@ -143,7 +144,15 @@ func run() error {
 		readResult = startProgramRead(pager, os.Stdin, screen.EventQ(), nil)
 	}
 	pager.Draw(screen)
-	quit, err := handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, readResult == nil, reloadCurrent)
+	quit, err := handleProgramQuitIfOneScreen(opts.quitIfOneScreen, session, func() *goless.Pager { return pager }, readResult == nil, reloadCurrent)
+	if err != nil {
+		return err
+	}
+	pager.Draw(screen)
+	if quit {
+		return programExit(screen, quitAtEOFPolicy)
+	}
+	quit, err = handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, readResult == nil, reloadCurrent)
 	if err != nil {
 		return err
 	}
@@ -220,7 +229,15 @@ func run() error {
 					}
 					applyStartupCommand(pager, startup)
 					readResult = nil
-					quit, err := handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, true, reloadCurrent)
+					quit, err := handleProgramQuitIfOneScreen(opts.quitIfOneScreen, session, func() *goless.Pager { return pager }, true, reloadCurrent)
+					if err != nil {
+						return err
+					}
+					pager.Draw(screen)
+					if quit {
+						return programExit(screen, quitAtEOFPolicy)
+					}
+					quit, err = handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, true, reloadCurrent)
 					if err != nil {
 						return err
 					}
@@ -248,7 +265,7 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	fs := flag.NewFlagSet("goless", flag.ContinueOnError)
 	fs.SetOutput(output)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-N|-R|-S|-i|-I|-s] [-x n] [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [+line|+/pattern] [path ...]\n")
+		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-F|-N|-R|-S|-i|-I|-s] [-x n] [-preset none|dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [+line|+/pattern] [path ...]\n")
 	}
 
 	fs.BoolVar(&opts.showHelp, "?", false, "show help")
@@ -256,6 +273,7 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	fs.BoolVar(&opts.showHelp, "h", false, "show help")
 	fs.BoolVar(&opts.quitAtEOF, "e", false, "quit on the first forward command at EOF")
 	fs.BoolVar(&opts.quitAtEOFFirst, "E", false, "quit when EOF is already visible on screen")
+	fs.BoolVar(&opts.quitIfOneScreen, "F", false, "quit if the entire input fits on one screen")
 	fs.BoolVar(&opts.lineNumbers, "N", false, "show line numbers")
 	fs.BoolVar(&opts.ignoredRawControl, "R", false, "accepted as a less compatibility no-op")
 	fs.BoolVar(&opts.ignoredChopLines, "S", false, "accepted as a less compatibility no-op")
@@ -401,6 +419,36 @@ func handleProgramVisibleEOF(
 ) (bool, error) {
 	pager := currentPager()
 	if policy != programQuitAtEOFWhenVisible || !inputComplete || pager == nil || pager.Following() {
+		return false, nil
+	}
+	for pager.EOFVisible() {
+		quit, loaded, err := advanceProgramSessionOrQuit(session, reload)
+		if err != nil || quit {
+			return quit, err
+		}
+		if !loaded {
+			return false, nil
+		}
+		pager = currentPager()
+		if pager == nil || pager.Following() {
+			return false, nil
+		}
+	}
+	return false, nil
+}
+
+func handleProgramQuitIfOneScreen(
+	enabled bool,
+	session *programSession,
+	currentPager func() *goless.Pager,
+	inputComplete bool,
+	reload func() (bool, error),
+) (bool, error) {
+	if !enabled || !inputComplete {
+		return false, nil
+	}
+	pager := currentPager()
+	if pager == nil || pager.Following() {
 		return false, nil
 	}
 	for pager.EOFVisible() {
