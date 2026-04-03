@@ -95,16 +95,31 @@ func (s *StringSource) Size() (int64, bool) {
 
 // FileSource adapts an os.File into a Source.
 type FileSource struct {
-	file *os.File
+	file        *os.File
+	startOffset int64
+	hasOffset   bool
 }
 
 // NewFileSource constructs a Source for an os.File.
+// It snapshots the file's current offset so Fill and Size describe the same
+// readable region for the lifetime of the source.
 func NewFileSource(file *os.File) Source {
-	return &FileSource{file: file}
+	source := &FileSource{file: file}
+	if offset, err := file.Seek(0, io.SeekCurrent); err == nil {
+		source.startOffset = offset
+		source.hasOffset = true
+	}
+	return source
 }
 
-// Fill appends all bytes read from the file's current position to the store.
+// Fill appends all bytes read from the file's captured starting position to the
+// store.
 func (s *FileSource) Fill(store ByteStore) error {
+	if s.hasOffset {
+		if _, err := s.file.Seek(s.startOffset, io.SeekStart); err != nil {
+			return err
+		}
+	}
 	buf := make([]byte, defaultChunkSize)
 	for {
 		n, err := s.file.Read(buf)
@@ -120,11 +135,19 @@ func (s *FileSource) Fill(store ByteStore) error {
 	}
 }
 
-// Size reports the file size when it can be determined.
+// Size reports the remaining file size from the captured starting position when
+// it can be determined.
 func (s *FileSource) Size() (int64, bool) {
+	if !s.hasOffset {
+		return 0, false
+	}
 	info, err := s.file.Stat()
 	if err != nil {
 		return 0, false
 	}
-	return info.Size(), true
+	size := info.Size() - s.startOffset
+	if size < 0 {
+		size = 0
+	}
+	return size, true
 }
