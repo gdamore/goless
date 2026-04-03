@@ -3,10 +3,15 @@
 
 package view
 
-import "unicode"
+import (
+	"strings"
+	"unicode"
+
+	"github.com/rivo/uniseg"
+)
 
 type lineEditor struct {
-	buffer    []rune
+	buffer    []string
 	cursor    int
 	overwrite bool
 }
@@ -15,7 +20,7 @@ func (e *lineEditor) String() string {
 	if e == nil {
 		return ""
 	}
-	return string(e.buffer)
+	return strings.Join(e.buffer, "")
 }
 
 func (e *lineEditor) Cursor() int {
@@ -37,7 +42,7 @@ func (e *lineEditor) SetText(text string) {
 	if e == nil {
 		return
 	}
-	e.buffer = []rune(text)
+	e.buffer = splitGraphemes(text)
 	e.cursor = len(e.buffer)
 }
 
@@ -160,10 +165,10 @@ func (e *lineEditor) DeleteWordBackward() bool {
 	}
 
 	start := e.cursor
-	for start > 0 && unicode.IsSpace(e.buffer[start-1]) {
+	for start > 0 && clusterIsSpace(e.buffer[start-1]) {
 		start--
 	}
-	for start > 0 && !unicode.IsSpace(e.buffer[start-1]) {
+	for start > 0 && !clusterIsSpace(e.buffer[start-1]) {
 		start--
 	}
 	if start == e.cursor {
@@ -180,15 +185,15 @@ func (e *lineEditor) Insert(text string) bool {
 	if e == nil {
 		return false
 	}
-	insert := []rune(text)
+	insert := splitGraphemes(text)
 	if len(insert) == 0 {
 		return false
 	}
 	e.clampCursor()
 	if e.overwrite {
-		before := append([]rune(nil), e.buffer[:e.cursor]...)
+		before := append([]string(nil), e.buffer[:e.cursor]...)
 		afterStart := min(e.cursor+len(insert), len(e.buffer))
-		after := append([]rune(nil), e.buffer[afterStart:]...)
+		after := append([]string(nil), e.buffer[afterStart:]...)
 		e.buffer = append(before, insert...)
 		e.buffer = append(e.buffer, after...)
 		e.cursor += len(insert)
@@ -207,4 +212,30 @@ func (e *lineEditor) clampCursor() {
 	if e.cursor > len(e.buffer) {
 		e.cursor = len(e.buffer)
 	}
+}
+
+func splitGraphemes(text string) []string {
+	if text == "" {
+		return nil
+	}
+
+	gr := uniseg.NewGraphemes(text)
+	clusters := make([]string, 0, len(text))
+	for gr.Next() {
+		clusters = append(clusters, gr.Str())
+	}
+	return clusters
+}
+
+func clusterIsSpace(cluster string) bool {
+	if cluster == "" {
+		return false
+	}
+	for _, r := range cluster {
+		if unicode.IsMark(r) {
+			continue
+		}
+		return unicode.IsSpace(r)
+	}
+	return false
 }

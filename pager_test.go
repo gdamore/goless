@@ -919,12 +919,8 @@ func TestPagerTextHooksFormatStatusAndPrompt(t *testing.T) {
 	if !promptCellStyle.HasBold() {
 		t.Fatal("prompt style lost bold attribute")
 	}
-	errorCellStyle := pagerCellStyle(screen, len([]rune(" find>(")), 1)
-	if got, want := errorCellStyle.GetForeground(), promptErrorStyle.GetForeground(); got != want {
-		t.Fatalf("prompt error fg = %v, want %v", got, want)
-	}
-	if got, want := errorCellStyle.GetBackground(), promptErrorStyle.GetBackground(); got != want {
-		t.Fatalf("prompt error bg = %v, want %v", got, want)
+	if got := pagerRowString(screen, 1, 20); strings.Contains(got, "regex:error") {
+		t.Fatalf("prompt row = %q, want custom PromptLine to own error rendering", got)
 	}
 }
 
