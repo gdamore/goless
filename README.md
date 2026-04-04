@@ -1,11 +1,12 @@
+<img src="site/static/assets/logos/goless-light-transparent.png" style="float: right" width="240" alt="logo"/>
+
 # goless
 
-[![Go](https://github.com/gdamore/goless/actions/workflows/go.yaml/badge.svg?branch=main&event=push)](https://github.com/gdamore/goless/actions/workflows/go.yaml)
-[![codecov](https://codecov.io/gh/gdamore/goless/branch/main/graph/badge.svg)](https://codecov.io/gh/gdamore/goless)
-
-<p align="center">
-  <img src="site/static/assets/logos/goless-light-transparent.png" alt="goless logo" width="240">
-</p>
+[![Docs](https://img.shields.io/badge/godoc-reference-blue.svg?label=&logo=go)](https://pkg.go.dev/github.com/gdamore/goless)
+[![Linux](https://img.shields.io/github/actions/workflow/status/gdamore/goless/linux.yaml?branch=main&logoColor=grey&logo=linux&label=)](https://github.com/gdamore/goless/actions/workflows/linux.yaml)
+[![macOS](https://img.shields.io/github/actions/workflow/status/gdamore/goless/macos.yaml?branch=main&logoColor=grey&logo=apple&label=)](https://github.com/gdamore/goless/actions/workflows/macos.yaml)
+[![Windows](https://custom-icon-badges.demolab.com/github/actions/workflow/status/gdamore/goless/windows.yaml?branch=main&logoColor=grey&logo=windows10&label=)](https://github.com/gdamore/goless/actions/workflows/windows.yaml)
+[![Coverage](https://codecov.io/gh/gdamore/goless/branch/main/graph/badge.svg)](https://codecov.io/gh/gdamore/goless)
 
 `goless` is a modern terminal text viewer and embeddable pure-Go pager core
 for rendering textual content onto a `tcell.Screen` with behavior broadly
@@ -14,8 +15,8 @@ similar to `less`.
 It is designed both for applications that need to display untrusted text safely
 inside their own terminal UI and for the emerging standalone `goless` program,
 without shell escapes, subprocess hooks, or raw terminal control passthrough.
-It is implemented in pure Go, targets `tcell`, and does not rely on cgo in the
-pager core.
+It is implemented in pure Go, targets [`tcell`](https://github.com/gdamore/tcell),
+and does not rely on cgo.
 
 ## Status
 
@@ -28,6 +29,9 @@ still settling.
 ## Documentation Site
 
 Project documentation now lives in the Hugo site under `site/`.
+
+A preview of the site is [available](https://gdamore.github.io/goless), but
+be advised it is very far from complete still.
 
 The intended structure is:
 
@@ -289,7 +293,8 @@ For host chrome integration:
 
 ## Standalone Program
 
-The repository includes a small standalone program in `cmd/goless`.
+The repository includes a standalone program in `cmd/goless`, which
+has enough functionality to be used as your usual `$PAGER`.
 
 ```bash
 go run ./cmd/goless -- file.txt
