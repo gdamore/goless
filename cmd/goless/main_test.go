@@ -514,6 +514,14 @@ func TestParseProgramFlagsRejectsConflictingSearchCaseFlags(t *testing.T) {
 	}
 }
 
+func TestParseProgramFlagsRejectsNonPositiveTabWidth(t *testing.T) {
+	var out bytes.Buffer
+
+	if _, _, err := parseProgramFlags([]string{"-x", "0"}, &out); err == nil {
+		t.Fatal("parseProgramFlags(-x 0) = nil error, want invalid tab width error")
+	}
+}
+
 func TestParseProgramFlagsHelp(t *testing.T) {
 	var out bytes.Buffer
 	opts, args, err := parseProgramFlags([]string{"--help"}, &out)
@@ -543,6 +551,21 @@ func TestParseProgramFlagsHelp(t *testing.T) {
 	}
 	if got := out.String(); !strings.Contains(got, "usage: goless") {
 		t.Fatalf("help output for -? = %q, want usage text", got)
+	}
+
+	out.Reset()
+	opts, args, err = parseProgramFlags([]string{"-h"}, &out)
+	if err != nil {
+		t.Fatalf("parseProgramFlags(-h) failed: %v", err)
+	}
+	if !opts.showHelp {
+		t.Fatal("parseProgramFlags(-h) did not set showHelp")
+	}
+	if len(args) != 0 {
+		t.Fatalf("len(args) after -h = %d, want 0", len(args))
+	}
+	if got := out.String(); !strings.Contains(got, "usage: goless") {
+		t.Fatalf("help output for -h = %q, want usage text", got)
 	}
 }
 

@@ -325,7 +325,7 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 		opts.searchCaseMode = goless.SearchSmartCase
 	}
 	if opts.tabWidth <= 0 {
-		opts.tabWidth = 8
+		return programOptions{}, nil, fmt.Errorf("-x must be greater than 0")
 	}
 	return opts, fs.Args(), nil
 }
