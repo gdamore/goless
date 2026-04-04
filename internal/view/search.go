@@ -811,7 +811,9 @@ func (v *Viewer) runSetCommand(text string) bool {
 	case "smartcase":
 		v.SetSearchCaseMode(SearchSmartCase)
 	case "nosmartcase":
-		v.SetSearchCaseMode(SearchCaseInsensitive)
+		if v.SearchCaseMode() == SearchSmartCase {
+			v.SetSearchCaseMode(SearchCaseInsensitive)
+		}
 	default:
 		return false
 	}

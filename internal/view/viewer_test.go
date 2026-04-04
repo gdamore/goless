@@ -1361,6 +1361,23 @@ func TestSetSearchCaseCommand(t *testing.T) {
 	}
 }
 
+func TestSetNoSmartCasePreservesCaseSensitiveMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("Alpha\nbeta\nALPHA\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	runViewerCommand(v, "set noignorecase")
+	runViewerCommand(v, "set nosmartcase")
+
+	if got, want := v.SearchCaseMode(), SearchCaseSensitive; got != want {
+		t.Fatalf("SearchCaseMode after :set noignorecase + :set nosmartcase = %v, want %v", got, want)
+	}
+}
+
 func TestSetSearchModeCommand(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alphabet alpha\n")); err != nil {
@@ -1397,6 +1414,32 @@ func TestPromptSearchPreservesWhitespace(t *testing.T) {
 	}
 	if got, want := len(v.search.Matches), 1; got != want {
 		t.Fatalf("space search match count = %d, want %d", got, want)
+	}
+}
+
+func TestUnhandledPromptKeyReportsPromptContext(t *testing.T) {
+	v := New(model.NewDocument(4), Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.beginPrompt(promptCommand)
+
+	result := v.HandleKeyResult(tcell.NewEventKey(tcell.KeyF9, "", tcell.ModNone))
+	if result.Handled {
+		t.Fatal("HandleKeyResult(F9 in prompt) = handled, want unhandled")
+	}
+	if got, want := result.Context, KeyContextPrompt; got != want {
+		t.Fatalf("HandleKeyResult(F9 in prompt).Context = %v, want %v", got, want)
+	}
+}
+
+func TestUnhandledHelpKeyReportsHelpContext(t *testing.T) {
+	v := New(model.NewDocument(4), Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.mode = modeHelp
+
+	result := v.HandleKeyResult(tcell.NewEventKey(tcell.KeyF9, "", tcell.ModNone))
+	if result.Handled {
+		t.Fatal("HandleKeyResult(F9 in help) = handled, want unhandled")
+	}
+	if got, want := result.Context, KeyContextHelp; got != want {
+		t.Fatalf("HandleKeyResult(F9 in help).Context = %v, want %v", got, want)
 	}
 }
 
