@@ -83,6 +83,7 @@ func run() error {
 	session := newProgramSession(files, startup)
 	inputLoader := newProgramInputLoader(os.Stdin)
 	quitAtEOFPolicy := programQuitAtEOFPolicyFromFlags(opts.quitAtEOF, opts.quitAtEOFFirst)
+	quitIfOneScreenArmed := opts.quitIfOneScreen
 	chromeCfg, err := programChrome(opts.chromeName, opts.title, preset.Chrome)
 	if err != nil {
 		return err
@@ -154,7 +155,7 @@ func run() error {
 		readResult = startProgramRead(pager, os.Stdin, screen.EventQ(), nil)
 	}
 	pager.Draw(screen)
-	quit, err := handleProgramQuitIfOneScreen(opts.quitIfOneScreen, session, func() programViewportSnapshot { return pagerSnapshot }, readResult == nil, reloadCurrent)
+	quit, err := handleProgramQuitIfOneScreen(quitIfOneScreenArmed, session, func() programViewportSnapshot { return pagerSnapshot }, readResult == nil, reloadCurrent)
 	if err != nil {
 		return err
 	}
@@ -230,6 +231,9 @@ func run() error {
 			} else if quit {
 				return programExit(screen, quitAtEOFPolicy)
 			}
+			if readResult != nil {
+				quitIfOneScreenArmed = updateProgramQuitIfOneScreenArm(quitIfOneScreenArmed, pager)
+			}
 		case *tcell.EventInterrupt:
 			if readResult != nil {
 				select {
@@ -240,7 +244,7 @@ func run() error {
 					pagerSnapshot = snapshotProgramPager(pager)
 					applyStartupCommand(pager, startup)
 					readResult = nil
-					quit, err := handleProgramQuitIfOneScreen(opts.quitIfOneScreen, session, func() programViewportSnapshot { return pagerSnapshot }, true, reloadCurrent)
+					quit, err := handleProgramQuitIfOneScreen(quitIfOneScreenArmed, session, func() programViewportSnapshot { return pagerSnapshot }, true, reloadCurrent)
 					if err != nil {
 						return err
 					}
@@ -850,6 +854,24 @@ func snapshotProgramPager(pager *goless.Pager) programViewportSnapshot {
 		eofVisible: pager.EOFVisible(),
 		following:  pager.Following(),
 	}
+}
+
+func programViewportAtOrigin(pager *goless.Pager) bool {
+	if pager == nil {
+		return true
+	}
+	if pager.Following() {
+		return false
+	}
+	pos := pager.Position()
+	return pos.Row <= 1 && pos.Column <= 1
+}
+
+func updateProgramQuitIfOneScreenArm(armed bool, pager *goless.Pager) bool {
+	if !armed {
+		return false
+	}
+	return programViewportAtOrigin(pager)
 }
 
 func programInputs(args []string) (programStartup, []string, error) {
