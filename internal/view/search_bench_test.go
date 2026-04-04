@@ -20,7 +20,7 @@ func BenchmarkViewerSearchForward(b *testing.B) {
 	v := benchmarkViewerForSearch(b)
 	b.ReportAllocs()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		benchmarkSearchFound = v.SearchForward("needle")
 	}
 }
@@ -46,7 +46,7 @@ func benchmarkViewerForSearch(b *testing.B) *Viewer {
 
 func benchmarkSearchInput(lines int) string {
 	var sb strings.Builder
-	for i := 0; i < lines; i++ {
+	for i := range lines {
 		sb.WriteString("search line ")
 		sb.WriteString(strconv.Itoa(i))
 		sb.WriteString(" contains haystack text ")

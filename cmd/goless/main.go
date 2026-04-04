@@ -9,13 +9,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/gdamore/goless"
 	"github.com/gdamore/tcell/v3"
-	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/gdamore/tcell/v3/color"
 )
 
 type programQuitAtEOFPolicy int
@@ -356,7 +357,7 @@ func clearProgramStatusLine(screen tcell.Screen) {
 		return
 	}
 	y := height - 1
-	for x := 0; x < width; x++ {
+	for x := range width {
 		screen.SetContent(x, y, ' ', nil, tcell.StyleDefault)
 	}
 	screen.Show()
@@ -908,12 +909,7 @@ func programInputs(args []string) (programStartup, []string, error) {
 }
 
 func programInputsUseStdin(files []string) bool {
-	for _, path := range files {
-		if isProgramStdinInput(path) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(files, isProgramStdinInput)
 }
 
 func parseStartup(arg string) (programStartup, error) {
@@ -1043,7 +1039,7 @@ func programHyperlinkHandler(live bool) goless.HyperlinkHandler {
 	return func(info goless.HyperlinkInfo) goless.HyperlinkDecision {
 		return goless.HyperlinkDecision{
 			Style: info.Style.
-				Foreground(tcolor.Blue).
+				Foreground(color.Blue).
 				Underline(tcell.UnderlineStyleSolid),
 			Live:     live,
 			StyleSet: true,
@@ -1070,6 +1066,7 @@ func newProgramPager(
 		goless.WithLineNumbers(lineNumbers),
 		goless.WithSearchCaseMode(searchCaseMode),
 		goless.WithSqueezeBlankLines(squeeze),
+		goless.WithText(programText()),
 		goless.WithTheme(preset.Theme),
 		goless.WithVisualization(programVisualization(hidden)),
 		goless.WithHyperlinkHandler(programHyperlinkHandler(liveLinks)),
@@ -1077,6 +1074,12 @@ func newProgramPager(
 		goless.WithChrome(chrome),
 		goless.WithShowStatus(true),
 	)
+}
+
+func programText() goless.Text {
+	text := goless.DefaultText()
+	text.HelpBody = strings.TrimRight(text.HelpBody, "\n") + "\n\n\x1b[1;4mProgram\x1b[0m\n  F4              change theme\n"
+	return text
 }
 
 func programChrome(name, title string, base goless.Chrome) (goless.Chrome, error) {

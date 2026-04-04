@@ -15,7 +15,7 @@ import (
 
 	"github.com/gdamore/goless"
 	"github.com/gdamore/tcell/v3"
-	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/gdamore/tcell/v3/color"
 )
 
 func TestDemoPreset(t *testing.T) {
@@ -53,7 +53,7 @@ func TestDemoChromeUsesPresetAndOverrides(t *testing.T) {
 	}
 
 	base := goless.PrettyPreset.Chrome
-	base.StatusHelpKeyStyle = tcell.StyleDefault.Foreground(tcolor.Red).Bold(true)
+	base.StatusHelpKeyStyle = tcell.StyleDefault.Foreground(color.Red).Bold(true)
 	chrome, err = programChrome("single", "Demo", base)
 	if err != nil {
 		t.Fatalf("programChrome(single, custom help style) failed: %v", err)
@@ -107,6 +107,13 @@ func TestDemoVisualization(t *testing.T) {
 	}
 }
 
+func TestProgramTextDocumentsThemeShortcut(t *testing.T) {
+	text := programText()
+	if !strings.Contains(text.HelpBody, "\x1b[1;4mProgram\x1b[0m\n  F4              change theme\n") {
+		t.Fatalf("programText().HelpBody = %q, want standalone F4 help entry", text.HelpBody)
+	}
+}
+
 func TestDemoHyperlinkHandler(t *testing.T) {
 	handler := programHyperlinkHandler(false)
 	decision := handler(goless.HyperlinkInfo{
@@ -119,10 +126,10 @@ func TestDemoHyperlinkHandler(t *testing.T) {
 	if !decision.StyleSet {
 		t.Fatal("demo hyperlink handler did not set style")
 	}
-	if got, want := decision.Style.GetForeground(), tcolor.Blue; got != want {
+	if got, want := decision.Style.GetForeground(), color.Blue; got != want {
 		t.Fatalf("demo hyperlink foreground = %v, want %v", got, want)
 	}
-	if got, want := decision.Style.GetBackground(), tcolor.Default; got != want {
+	if got, want := decision.Style.GetBackground(), color.Default; got != want {
 		t.Fatalf("demo hyperlink background = %v, want %v", got, want)
 	}
 

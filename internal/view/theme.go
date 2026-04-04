@@ -5,7 +5,7 @@ package view
 
 import (
 	"github.com/gdamore/goless/internal/ansi"
-	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/gdamore/tcell/v3/color"
 )
 
 // Theme controls how document content colors are rendered.
@@ -13,12 +13,12 @@ import (
 // Zero-valued fields preserve the built-in mapping. color.Reset explicitly
 // maps a themed entry back to the terminal default color.
 type Theme struct {
-	DefaultFG tcolor.Color
-	DefaultBG tcolor.Color
-	ANSI      [16]tcolor.Color
+	DefaultFG color.Color
+	DefaultBG color.Color
+	ANSI      [16]color.Color
 }
 
-func (t Theme) resolveColor(c ansi.Color, foreground bool) tcolor.Color {
+func (t Theme) resolveColor(c ansi.Color, foreground bool) color.Color {
 	switch c.Kind {
 	case ansi.ColorDefault:
 		if foreground {
@@ -28,17 +28,17 @@ func (t Theme) resolveColor(c ansi.Color, foreground bool) tcolor.Color {
 		} else if t.DefaultBG != 0 {
 			return t.DefaultBG
 		}
-		return tcolor.Default
+		return color.Default
 	case ansi.ColorIndex:
 		if c.Index < 16 {
 			if mapped := t.ANSI[c.Index]; mapped != 0 {
 				return mapped
 			}
 		}
-		return tcolor.PaletteColor(int(c.Index))
+		return color.PaletteColor(int(c.Index))
 	case ansi.ColorRGB:
-		return tcolor.NewRGBColor(int32(c.R), int32(c.G), int32(c.B))
+		return color.NewRGBColor(int32(c.R), int32(c.G), int32(c.B))
 	default:
-		return tcolor.Default
+		return color.Default
 	}
 }
