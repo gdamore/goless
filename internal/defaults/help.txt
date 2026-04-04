@@ -1,44 +1,42 @@
 [1;4mGeneral[0m
-  h F1            help
-  q Q Esc         quit
-  r ^L            repaint
+  h F1                help
+  q Q Esc             quit
+  r ^L                repaint
 
 [1;4mNavigation[0m
-  Enter e ^E ^J ^N
-  ↑ ↓ j k         move one line forward/backward
-  y ^Y ^K ^P      move one line backward
-  PgDn ^F ^V
-  f Space         forward one page
-  PgUp ^B Alt-V b w backward one page
-  Ctrl-D d        forward half page
-  Ctrl-U u        backward half page
-  Home 0          jump to line start
-  End $           jump to line end
-  g <             jump to top
-  G >             jump to bottom
-  ← → l           scroll horizontally faster
-  Shift-← Shift-→ scroll horizontally by 1
-  W               toggle wrap
-  F               follow the end of the document
+  ↓ e j Enter ^E ^N   move one line forward
+  ↑ k y ^Y ^K ^P      move one line backward
+  f Space PgDn ^F ^V  forward one page
+  PgUp ^B b w         backward one page
+  d ^D                forward half page
+  u ^U                backward half page
+  Home 0              jump to line start
+  End $               jump to line end
+  g <                 jump to top
+  G >                 jump to bottom
+  ← → l               scroll horizontally faster
+  Shift+← Shift+→     scroll horizontally by 1
+  W                   toggle wrap
+  F                   follow the end of the document
 
 [1;4mSearch[0m
-  /               search forward
-  ?               search backward
-  n N             next/previous match
-  F2              cycle case mode (smart/case/nocase)
-  F3              cycle match mode (substring/word/regex)
+  /                   search forward
+  ?                   search backward
+  n N                 next/previous match
+  F2                  cycle case mode (smart/case/nocase)
+  F3                  cycle match mode (substring/word/regex)
 
 [1;4mPrompt Editing[0m
-  ← →             move within the prompt
-  Ctrl-B Ctrl-F   move backward/forward one character
-  Home End        jump to start/end of prompt input
-  Ctrl-A Ctrl-E   jump to start/end of prompt input
-  Backspace Del   delete left/right
-  Ctrl-K          delete to end of prompt input
-  Ctrl-W          delete backward one word
-  Ins             toggle insert/overwrite mode
-  ↑ ↓             recall prompt history
-  Ctrl-U          delete to beginning of prompt input
+  ← ^B                move backward one character
+  → ^F                move forward one character
+  Home ^A             jump to start of prompt
+  End ^E              jump to end of prompt
+  Backspace Del       delete left/right
+  ^K                  delete to end of prompt
+  ^W                  delete backward one word
+  ^U                  delete to beginning of prompt
+  Ins                 toggle insert/overwrite mode
+  ↑ ↓                 recall prompt history
 
 [1;4mCommands[0m
   :123                    jump to line 123
