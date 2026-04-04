@@ -1,0 +1,54 @@
+[1;4mGeneral[0m
+  h F1                help
+  q Q Esc             quit
+  r ^L                repaint
+  F4                  cycle themes
+
+[1;4mNavigation[0m
+  ↓ e j Enter ^E ^N   move one line forward
+  ↑ k y ^Y ^K ^P      move one line backward
+  f Space PgDn ^F ^V  forward one page
+  PgUp ^B b w         backward one page
+  d ^D                forward half page
+  u ^U                backward half page
+  Home 0              jump to line start
+  End $               jump to line end
+  g <                 jump to top
+  G >                 jump to bottom
+  ← → l               scroll horizontally faster
+  Shift+← Shift+→     scroll horizontally by 1
+  W                   toggle wrap
+  F                   follow the end of the document
+
+[1;4mSearch[0m
+  /                   search forward
+  ?                   search backward
+  n N                 next/previous match
+  F2                  cycle case mode (smart/case/nocase)
+  F3                  cycle match mode (substring/word/regex)
+
+[1;4mPrompt Editing[0m
+  ← ^B                move backward one character
+  → ^F                move forward one character
+  Home ^A             jump to start of prompt
+  End ^E              jump to end of prompt
+  Backspace Del       delete left/right
+  ^K                  delete to end of prompt
+  ^W                  delete backward one word
+  ^U                  delete to beginning of prompt
+  Ins                 toggle insert/overwrite mode
+  ↑ ↓                 recall prompt history
+
+[1;4mCommands[0m
+  :123                    jump to line 123
+  :50%                    jump to 50%
+  :set number             show line numbers
+  :set wrap               soft-wrap long lines
+  :set list               show hidden-character markers
+  :set squeeze            collapse adjacent blank lines
+  :set tabstop=[3mnum[0m        set tab width
+  :set pinlines=[3mnum[0m       pin top lines
+  :set pincols=[3mnum[0m        pin left columns
+  :set ignorecase         search without case sensitivity
+  :set smartcase          search smart-case
+  :set searchmode=[3mmode[0m    set match mode (sub|word|regex)
