@@ -748,6 +748,38 @@ func TestShouldHandleProgramStatusKey(t *testing.T) {
 	}
 }
 
+func TestUpdateProgramQuitIfOneScreenArm(t *testing.T) {
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	if err := pager.AppendString("one\ntwo\nthree\nfour\nfive\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if got := updateProgramQuitIfOneScreenArm(true, pager); !got {
+		t.Fatal("updateProgramQuitIfOneScreenArm(true, origin pager) = false, want true")
+	}
+
+	pager.ScrollDown(1)
+	if got := updateProgramQuitIfOneScreenArm(true, pager); got {
+		t.Fatal("updateProgramQuitIfOneScreenArm(true, scrolled pager) = true, want false")
+	}
+	if got := updateProgramQuitIfOneScreenArm(false, pager); got {
+		t.Fatal("updateProgramQuitIfOneScreenArm(false, scrolled pager) = true, want false")
+	}
+
+	pager = goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	if err := pager.AppendString("one\ntwo\nthree\nfour\nfive\n"); err != nil {
+		t.Fatalf("AppendString(second pager) failed: %v", err)
+	}
+	pager.Flush()
+	pager.Follow()
+	if got := updateProgramQuitIfOneScreenArm(true, pager); got {
+		t.Fatal("updateProgramQuitIfOneScreenArm(true, following pager) = true, want false")
+	}
+}
+
 func TestDemoSessionLabelsExplicitStdin(t *testing.T) {
 	session := newProgramSession([]string{"one.txt", "-", "three.txt"}, programStartup{})
 	reloads := 0
