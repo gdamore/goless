@@ -26,7 +26,7 @@ func BenchmarkBuild(b *testing.B) {
 			HorizontalOffset: 12,
 		}
 		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			benchmarkLayoutResult = Build(lines, cfg)
 		}
 	})
@@ -38,7 +38,7 @@ func BenchmarkBuild(b *testing.B) {
 			WrapMode: SoftWrap,
 		}
 		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			benchmarkLayoutResult = Build(lines, cfg)
 		}
 	})
@@ -57,7 +57,7 @@ func benchmarkLayoutLines(b *testing.B) []model.Line {
 
 func benchmarkLayoutInput(lines int) string {
 	var sb strings.Builder
-	for i := 0; i < lines; i++ {
+	for i := range lines {
 		sb.WriteString("layout line ")
 		sb.WriteString(strconv.Itoa(i))
 		sb.WriteString(" with segments, tabs\tand enough trailing text to force wrapping across multiple rows when width is constrained\n")

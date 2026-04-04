@@ -12,7 +12,7 @@ import (
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/tcell/v3"
-	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/gdamore/tcell/v3/color"
 	"github.com/rivo/uniseg"
 )
 
@@ -439,7 +439,7 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 	bodyX, bodyY, _, bodyHeight := v.contentRect()
 	v.drawLineNumberGutter(screen)
 	lineHyperlinks := v.resolveVisibleHyperlinks()
-	for y := 0; y < bodyHeight; y++ {
+	for y := range bodyHeight {
 		rowIndex, header, ok := v.visibleLayoutRowAt(y)
 		if !ok {
 			break
@@ -1032,7 +1032,7 @@ func (v *Viewer) resolveVisibleHyperlinks() map[int]rowHyperlinks {
 	}
 	result := make(map[int]rowHyperlinks)
 	bodyHeight := max(v.bodyHeight(), 0)
-	for y := 0; y < bodyHeight; y++ {
+	for y := range bodyHeight {
 		rowIndex, _, ok := v.visibleLayoutRowAt(y)
 		if !ok {
 			break
@@ -1281,10 +1281,7 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 
 	rightTextWidth := min(stringWidth(rightText), max(rightLimit-leftStart, 0))
 	rightText = truncateToWidth(rightText, rightTextWidth)
-	rightStart := rightLimit - stringWidth(rightText)
-	if rightStart < leftStart {
-		rightStart = leftStart
-	}
+	rightStart := max(rightLimit-stringWidth(rightText), leftStart)
 
 	leftWidth := max(rightStart-leftStart-1, 0)
 	if leftWidth > 0 {
@@ -1339,7 +1336,7 @@ func (v *Viewer) drawLineNumberGutter(screen tcell.Screen) {
 	}
 
 	blank := padRightToWidth("", gutterWidth)
-	for y := 0; y < gutterHeight; y++ {
+	for y := range gutterHeight {
 		rowIndex, header, ok := v.visibleLayoutRowAt(y)
 		rowFillStyle := applyChromeStyle(v.rowBaseStyle(header), v.cfg.Chrome.LineNumberStyle)
 		rowTextStyle := rowFillStyle
@@ -1365,10 +1362,10 @@ func (v *Viewer) rowBaseStyle(header bool) tcell.Style {
 }
 
 func applyChromeStyle(base, overlay tcell.Style) tcell.Style {
-	if fg := overlay.GetForeground(); fg != tcolor.Default {
+	if fg := overlay.GetForeground(); fg != color.Default {
 		base = base.Foreground(fg)
 	}
-	if bg := overlay.GetBackground(); bg != tcolor.Default {
+	if bg := overlay.GetBackground(); bg != color.Default {
 		base = base.Background(bg)
 	}
 	if overlay.HasBold() {
@@ -1384,7 +1381,7 @@ func applyChromeStyle(base, overlay tcell.Style) tcell.Style {
 		base = base.Reverse(true)
 	}
 	if ul := overlay.GetUnderlineStyle(); ul != tcell.UnderlineStyleNone {
-		if uc := overlay.GetUnderlineColor(); uc != tcolor.Default {
+		if uc := overlay.GetUnderlineColor(); uc != color.Default {
 			base = base.Underline(ul, uc)
 		} else {
 			base = base.Underline(ul)
@@ -1461,10 +1458,7 @@ func (v *Viewer) contentRect() (x, y, width, height int) {
 
 func (v *Viewer) baseContentRect() (x, y, width, height int) {
 	width = v.width
-	height = v.height - v.bottomBarRows()
-	if height < 0 {
-		height = 0
-	}
+	height = max(v.height-v.bottomBarRows(), 0)
 
 	if v.mode == modeHelp && !v.cfg.Chrome.Frame.enabled() {
 		y = 1
@@ -2044,10 +2038,7 @@ func clipPromptInput(input string, cursor, width int) (string, int) {
 		return input, min(cursorWidth, width-1)
 	}
 
-	start := max(inputWidth-width, 0)
-	if cursorWidth < start {
-		start = cursorWidth
-	}
+	start := min(cursorWidth, max(inputWidth-width, 0))
 	if start <= 0 {
 		return truncateToWidth(input, width), min(cursorWidth, width-1)
 	}
@@ -2158,10 +2149,10 @@ func toTCellUnderlineStyle(style ansi.UnderlineStyle) tcell.UnderlineStyle {
 func (v *Viewer) visualizationStyle(base tcell.Style) tcell.Style {
 	overlay := v.cfg.Visualization.Style
 	style := overlay
-	if style.GetForeground() == tcolor.Default {
+	if style.GetForeground() == color.Default {
 		style = style.Foreground(base.GetForeground())
 	}
-	if style.GetBackground() == tcolor.Default {
+	if style.GetBackground() == color.Default {
 		style = style.Background(base.GetBackground())
 	}
 	style = style.Attributes(base.GetAttributes() | overlay.GetAttributes())
@@ -2172,10 +2163,10 @@ func (v *Viewer) visualizationStyle(base tcell.Style) tcell.Style {
 }
 
 type matchStylePreset struct {
-	Fg             tcolor.Color
-	Bg             tcolor.Color
+	Fg             color.Color
+	Bg             color.Color
 	UnderlineStyle tcell.UnderlineStyle
-	UnderlineColor tcolor.Color
+	UnderlineColor color.Color
 	Bold           bool
 }
 
@@ -2184,18 +2175,18 @@ var (
 	// terminals without reliable RGB support. They are kept as style pairs so
 	// background changes always come with an explicit contrasting foreground.
 	inactiveMatchStyle = matchStylePreset{
-		Fg: tcolor.PaletteColor(0),
-		Bg: tcolor.PaletteColor(6),
+		Fg: color.PaletteColor(0),
+		Bg: color.PaletteColor(6),
 	}
 	currentMatchStyle = matchStylePreset{
-		Fg:             tcolor.PaletteColor(7),
-		Bg:             tcolor.PaletteColor(4),
+		Fg:             color.PaletteColor(7),
+		Bg:             color.PaletteColor(4),
 		UnderlineStyle: tcell.UnderlineStyleDouble,
-		UnderlineColor: tcolor.PaletteColor(5),
+		UnderlineColor: color.PaletteColor(5),
 		Bold:           true,
 	}
 
-	statusBarStyle = tcell.StyleDefault.Foreground(tcolor.PaletteColor(15)).Background(tcolor.PaletteColor(2))
+	statusBarStyle = tcell.StyleDefault.Foreground(color.PaletteColor(15)).Background(color.PaletteColor(2))
 )
 
 func truncateToWidth(s string, width int) string {
@@ -2221,35 +2212,6 @@ func truncateToWidth(s string, width int) string {
 		total += clusterWidth
 	}
 	return builder.String()
-}
-
-func truncateTailWithEllipsis(prefix, input string, width int) string {
-	full := prefix + input
-	if width <= 0 {
-		return ""
-	}
-	if stringWidth(full) <= width {
-		return full
-	}
-	if stringWidth(prefix) >= width {
-		return truncateToWidth(prefix, width)
-	}
-
-	availableInputWidth := width - stringWidth(prefix)
-	if availableInputWidth <= 0 {
-		return truncateToWidth(prefix, width)
-	}
-	if stringWidth(input) <= availableInputWidth {
-		return full
-	}
-
-	clip := "…"
-	clipWidth := stringWidth(clip)
-	if availableInputWidth <= clipWidth {
-		return prefix + trimLeftToWidth(input, max(stringWidth(input)-availableInputWidth, 0))
-	}
-	tailWidth := availableInputWidth - clipWidth
-	return prefix + clip + trimLeftToWidth(input, max(stringWidth(input)-tailWidth, 0))
 }
 
 func trimLeftToWidth(s string, skip int) string {

@@ -13,7 +13,7 @@ import (
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/tcell/v3"
-	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/gdamore/tcell/v3/color"
 	"github.com/gdamore/tcell/v3/vt"
 )
 
@@ -357,11 +357,11 @@ func TestViewerRuntimeSettersUpdateConfigAndState(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 2)
 
-	v.SetTheme(Theme{DefaultFG: tcolor.Green, DefaultBG: tcolor.Navy})
-	if got, want := v.cfg.Theme.DefaultFG, tcolor.Green; got != want {
+	v.SetTheme(Theme{DefaultFG: color.Green, DefaultBG: color.Navy})
+	if got, want := v.cfg.Theme.DefaultFG, color.Green; got != want {
 		t.Fatalf("theme fg = %v, want %v", got, want)
 	}
-	if got, want := v.cfg.Theme.DefaultBG, tcolor.Navy; got != want {
+	if got, want := v.cfg.Theme.DefaultBG, color.Navy; got != want {
 		t.Fatalf("theme bg = %v, want %v", got, want)
 	}
 
@@ -1890,7 +1890,7 @@ func TestSearchRevealOnlyScrollsEnoughVertically(t *testing.T) {
 }
 
 func TestApplyMatchCellStyleUsesUnderlineAccents(t *testing.T) {
-	base := tcell.StyleDefault.Foreground(tcolor.White)
+	base := tcell.StyleDefault.Foreground(color.White)
 
 	inactive := applyMatchCellStyle(base, false)
 	if got, want := inactive.GetUnderlineStyle(), tcell.UnderlineStyleNone; got != want {
@@ -2612,8 +2612,8 @@ func TestStatusHelpHintKeyUsesConfiguredStyle(t *testing.T) {
 		t.Fatalf("Append failed: %v", err)
 	}
 
-	keyStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(10)).Background(tcolor.PaletteColor(4)).Bold(true)
-	statusStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(15)).Background(tcolor.PaletteColor(2))
+	keyStyle := tcell.StyleDefault.Foreground(color.PaletteColor(10)).Background(color.PaletteColor(4)).Bold(true)
+	statusStyle := tcell.StyleDefault.Foreground(color.PaletteColor(15)).Background(color.PaletteColor(2))
 	v := New(doc, Config{
 		TabWidth:   4,
 		WrapMode:   layout.NoWrap,
@@ -2774,8 +2774,8 @@ func TestSearchPromptHintKeysUseHighlightedStyle(t *testing.T) {
 		t.Fatalf("Append failed: %v", err)
 	}
 
-	keyStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(10)).Background(tcolor.PaletteColor(4)).Bold(true)
-	promptStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(15)).Background(tcolor.PaletteColor(2))
+	keyStyle := tcell.StyleDefault.Foreground(color.PaletteColor(10)).Background(color.PaletteColor(4)).Bold(true)
+	promptStyle := tcell.StyleDefault.Foreground(color.PaletteColor(15)).Background(color.PaletteColor(2))
 	v := New(doc, Config{
 		TabWidth: 4,
 		WrapMode: layout.NoWrap,
@@ -2867,9 +2867,9 @@ func TestDrawStatusAndPromptUseConfiguredStyles(t *testing.T) {
 		t.Fatalf("Append failed: %v", err)
 	}
 
-	statusStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(3)).Background(tcolor.PaletteColor(7))
-	promptStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(2)).Background(tcolor.PaletteColor(0)).Bold(true)
-	promptErrorStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(1)).Background(tcolor.PaletteColor(0))
+	statusStyle := tcell.StyleDefault.Foreground(color.PaletteColor(3)).Background(color.PaletteColor(7))
+	promptStyle := tcell.StyleDefault.Foreground(color.PaletteColor(2)).Background(color.PaletteColor(0)).Bold(true)
+	promptErrorStyle := tcell.StyleDefault.Foreground(color.PaletteColor(1)).Background(color.PaletteColor(0))
 
 	v := New(doc, Config{
 		TabWidth:   4,
@@ -2927,32 +2927,32 @@ func TestDrawStatusAndPromptUseConfiguredStyles(t *testing.T) {
 func TestThemeRemapsDefaultsAndANSI16Only(t *testing.T) {
 	v := New(model.NewDocument(4), Config{
 		Theme: Theme{
-			DefaultFG: tcolor.Red,
-			DefaultBG: tcolor.Blue,
-			ANSI: [16]tcolor.Color{
-				1: tcolor.Aqua,
+			DefaultFG: color.Red,
+			DefaultBG: color.Blue,
+			ANSI: [16]color.Color{
+				1: color.Aqua,
 			},
 		},
 	})
 
 	defaultStyle := v.toTCellStyle(ansi.DefaultStyle())
-	if got, want := defaultStyle.GetForeground(), tcolor.Red; got != want {
+	if got, want := defaultStyle.GetForeground(), color.Red; got != want {
 		t.Fatalf("default fg = %v, want %v", got, want)
 	}
-	if got, want := defaultStyle.GetBackground(), tcolor.Blue; got != want {
+	if got, want := defaultStyle.GetBackground(), color.Blue; got != want {
 		t.Fatalf("default bg = %v, want %v", got, want)
 	}
 
 	indexedStyle := v.toTCellStyle(ansi.Style{Fg: ansi.IndexedColor(1), Bg: ansi.IndexedColor(16)})
-	if got, want := indexedStyle.GetForeground(), tcolor.Aqua; got != want {
+	if got, want := indexedStyle.GetForeground(), color.Aqua; got != want {
 		t.Fatalf("indexed fg = %v, want %v", got, want)
 	}
-	if got, want := indexedStyle.GetBackground(), tcolor.PaletteColor(16); got != want {
+	if got, want := indexedStyle.GetBackground(), color.PaletteColor(16); got != want {
 		t.Fatalf("indexed bg = %v, want %v", got, want)
 	}
 
 	rgbStyle := v.toTCellStyle(ansi.Style{Fg: ansi.RGBColor(1, 2, 3)})
-	if got, want := rgbStyle.GetForeground(), tcolor.NewRGBColor(1, 2, 3); got != want {
+	if got, want := rgbStyle.GetForeground(), color.NewRGBColor(1, 2, 3); got != want {
 		t.Fatalf("rgb fg = %v, want %v", got, want)
 	}
 }
@@ -2960,24 +2960,24 @@ func TestThemeRemapsDefaultsAndANSI16Only(t *testing.T) {
 func TestThemeAllowsExplicitResetMappings(t *testing.T) {
 	v := New(model.NewDocument(4), Config{
 		Theme: Theme{
-			DefaultFG: tcolor.Reset,
-			DefaultBG: tcolor.Reset,
-			ANSI: [16]tcolor.Color{
-				1: tcolor.Reset,
+			DefaultFG: color.Reset,
+			DefaultBG: color.Reset,
+			ANSI: [16]color.Color{
+				1: color.Reset,
 			},
 		},
 	})
 
 	defaultStyle := v.toTCellStyle(ansi.DefaultStyle())
-	if got, want := defaultStyle.GetForeground(), tcolor.Reset; got != want {
+	if got, want := defaultStyle.GetForeground(), color.Reset; got != want {
 		t.Fatalf("default fg = %v, want %v", got, want)
 	}
-	if got, want := defaultStyle.GetBackground(), tcolor.Reset; got != want {
+	if got, want := defaultStyle.GetBackground(), color.Reset; got != want {
 		t.Fatalf("default bg = %v, want %v", got, want)
 	}
 
 	indexedStyle := v.toTCellStyle(ansi.Style{Fg: ansi.IndexedColor(1)})
-	if got, want := indexedStyle.GetForeground(), tcolor.Reset; got != want {
+	if got, want := indexedStyle.GetForeground(), color.Reset; got != want {
 		t.Fatalf("indexed fg = %v, want %v", got, want)
 	}
 }
@@ -2992,7 +2992,7 @@ func TestDrawUsesThemedDefaultBackgroundForBlankContent(t *testing.T) {
 		TabWidth: 4,
 		WrapMode: layout.NoWrap,
 		Theme: Theme{
-			DefaultBG: tcolor.Blue,
+			DefaultBG: color.Blue,
 		},
 	})
 	v.SetSize(8, 3)
@@ -3003,12 +3003,12 @@ func TestDrawUsesThemedDefaultBackgroundForBlankContent(t *testing.T) {
 	v.Draw(screen)
 
 	_, eolStyle, _ := screen.Get(4, 0)
-	if got, want := eolStyle.GetBackground(), tcolor.Blue; got != want {
+	if got, want := eolStyle.GetBackground(), color.Blue; got != want {
 		t.Fatalf("blank cell after line bg = %v, want %v", got, want)
 	}
 
 	_, blankRowStyle, _ := screen.Get(0, 2)
-	if got, want := blankRowStyle.GetBackground(), tcolor.Blue; got != want {
+	if got, want := blankRowStyle.GetBackground(), color.Blue; got != want {
 		t.Fatalf("blank row bg = %v, want %v", got, want)
 	}
 }
@@ -3071,8 +3071,8 @@ func TestDrawFrameUsesBorderAndTitleStyles(t *testing.T) {
 		t.Fatalf("Append failed: %v", err)
 	}
 
-	borderStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(4))
-	titleStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(15)).Bold(true)
+	borderStyle := tcell.StyleDefault.Foreground(color.PaletteColor(4))
+	titleStyle := tcell.StyleDefault.Foreground(color.PaletteColor(15)).Bold(true)
 	v := New(doc, Config{
 		TabWidth: 4,
 		WrapMode: layout.NoWrap,
@@ -3208,8 +3208,8 @@ func TestHelpBodyUsesThemedDefaultBackground(t *testing.T) {
 		TabWidth: 4,
 		WrapMode: layout.NoWrap,
 		Theme: Theme{
-			DefaultFG: tcolor.NewRGBColor(0x65, 0x7b, 0x83),
-			DefaultBG: tcolor.NewRGBColor(0xfd, 0xf6, 0xe3),
+			DefaultFG: color.NewRGBColor(0x65, 0x7b, 0x83),
+			DefaultBG: color.NewRGBColor(0xfd, 0xf6, 0xe3),
 		},
 		Chrome: Chrome{
 			Frame: Frame{
@@ -3231,7 +3231,7 @@ func TestHelpBodyUsesThemedDefaultBackground(t *testing.T) {
 	v.Draw(screen)
 
 	_, style, _ := screen.Get(2, 1)
-	if got, want := style.GetBackground(), tcolor.NewRGBColor(0xfd, 0xf6, 0xe3); got != want {
+	if got, want := style.GetBackground(), color.NewRGBColor(0xfd, 0xf6, 0xe3); got != want {
 		t.Fatalf("help body background = %v, want %v", got, want)
 	}
 }
@@ -3365,7 +3365,7 @@ func TestLineNumberStyleAppliesToBlankGutterRows(t *testing.T) {
 		t.Fatalf("Append failed: %v", err)
 	}
 
-	gutterBG := tcolor.NewRGBColor(0x11, 0x22, 0x33)
+	gutterBG := color.NewRGBColor(0x11, 0x22, 0x33)
 	v := New(doc, Config{
 		TabWidth:    4,
 		WrapMode:    layout.SoftWrap,
@@ -3494,7 +3494,7 @@ func TestHeaderStyleAppliesToFixedRows(t *testing.T) {
 		t.Fatalf("Append failed: %v", err)
 	}
 
-	headerBG := tcolor.NewRGBColor(0xaa, 0xbb, 0xcc)
+	headerBG := color.NewRGBColor(0xaa, 0xbb, 0xcc)
 	v := New(doc, Config{
 		TabWidth:    4,
 		WrapMode:    layout.NoWrap,
@@ -3517,7 +3517,7 @@ func TestHeaderStyleAppliesToFixedRows(t *testing.T) {
 		t.Fatal("header style should be bold")
 	}
 	_, bodyStyle, _ := screen.Get(0, 1)
-	if got, want := bodyStyle.GetBackground(), tcolor.Default; got != want {
+	if got, want := bodyStyle.GetBackground(), color.Default; got != want {
 		t.Fatalf("body background = %v, want %v", got, want)
 	}
 }
@@ -3551,7 +3551,7 @@ func TestHeaderStyleAppliesToFixedColumns(t *testing.T) {
 		t.Fatalf("Append failed: %v", err)
 	}
 
-	headerBG := tcolor.NewRGBColor(0xaa, 0xbb, 0xcc)
+	headerBG := color.NewRGBColor(0xaa, 0xbb, 0xcc)
 	v := New(doc, Config{
 		TabWidth:      4,
 		WrapMode:      layout.NoWrap,
@@ -3571,7 +3571,7 @@ func TestHeaderStyleAppliesToFixedColumns(t *testing.T) {
 		t.Fatalf("header column background = %v, want %v", got, want)
 	}
 	_, bodyStyle, _ := screen.Get(2, 0)
-	if got, want := bodyStyle.GetBackground(), tcolor.Default; got != want {
+	if got, want := bodyStyle.GetBackground(), color.Default; got != want {
 		t.Fatalf("body background = %v, want %v", got, want)
 	}
 }
@@ -3606,7 +3606,7 @@ func cellRune(screen tcell.Screen, x, y int) rune {
 
 func screenRowString(screen tcell.Screen, y, width int) string {
 	var b strings.Builder
-	for x := 0; x < width; x++ {
+	for x := range width {
 		str, _, _ := screen.Get(x, y)
 		if str == "" {
 			b.WriteRune(' ')

@@ -5,7 +5,7 @@ package view
 
 import (
 	"github.com/gdamore/tcell/v3"
-	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/gdamore/tcell/v3/color"
 )
 
 // Visualization controls optional viewer-added markers for otherwise hidden
@@ -37,7 +37,7 @@ func (v Visualization) withDefaults() Visualization {
 		v.EOFGlyph = "∎"
 	}
 	if !v.StyleSet {
-		v.Style = tcell.StyleDefault.Foreground(tcolor.PaletteColor(8))
+		v.Style = tcell.StyleDefault.Foreground(color.PaletteColor(8))
 	}
 	return v
 }

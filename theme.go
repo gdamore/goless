@@ -3,7 +3,7 @@
 
 package goless
 
-import tcolor "github.com/gdamore/tcell/v3/color"
+import "github.com/gdamore/tcell/v3/color"
 
 // Theme controls how document content colors are rendered.
 //
@@ -19,11 +19,11 @@ import tcolor "github.com/gdamore/tcell/v3/color"
 type Theme struct {
 	// DefaultFG replaces the ANSI default foreground color.
 	// Zero preserves the built-in mapping. color.Reset forces the terminal default.
-	DefaultFG tcolor.Color
+	DefaultFG color.Color
 	// DefaultBG replaces the ANSI default background color.
 	// Zero preserves the built-in mapping. color.Reset forces the terminal default.
-	DefaultBG tcolor.Color
+	DefaultBG color.Color
 	// ANSI remaps ANSI indexed colors 0 through 15.
 	// Zero preserves the built-in mapping for that slot.
-	ANSI [16]tcolor.Color
+	ANSI [16]color.Color
 }

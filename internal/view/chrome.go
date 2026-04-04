@@ -5,7 +5,7 @@ package view
 
 import (
 	"github.com/gdamore/tcell/v3"
-	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/gdamore/tcell/v3/color"
 )
 
 // TitleAlign controls where frame titles are placed on the top border.
@@ -49,19 +49,19 @@ type Chrome struct {
 
 func (c Chrome) withDefaults() Chrome {
 	if c.BorderStyle == tcell.StyleDefault {
-		c.BorderStyle = tcell.StyleDefault.Foreground(tcolor.PaletteColor(4))
+		c.BorderStyle = tcell.StyleDefault.Foreground(color.PaletteColor(4))
 	}
 	if c.TitleStyle == tcell.StyleDefault {
-		c.TitleStyle = tcell.StyleDefault.Foreground(tcolor.PaletteColor(15)).Bold(true)
+		c.TitleStyle = tcell.StyleDefault.Foreground(color.PaletteColor(15)).Bold(true)
 	}
 	if c.StatusStyle == tcell.StyleDefault {
 		c.StatusStyle = statusBarStyle
 	}
 	if c.StatusHelpKeyStyle == tcell.StyleDefault {
-		c.StatusHelpKeyStyle = c.StatusStyle.Foreground(tcolor.PaletteColor(11)).Bold(true)
+		c.StatusHelpKeyStyle = c.StatusStyle.Foreground(color.PaletteColor(11)).Bold(true)
 	}
 	if c.LineNumberStyle == tcell.StyleDefault {
-		c.LineNumberStyle = tcell.StyleDefault.Foreground(tcolor.PaletteColor(8)).Dim(true)
+		c.LineNumberStyle = tcell.StyleDefault.Foreground(color.PaletteColor(8)).Dim(true)
 	}
 	if c.HeaderStyle == tcell.StyleDefault {
 		c.HeaderStyle = tcell.StyleDefault.Bold(true)
@@ -70,7 +70,7 @@ func (c Chrome) withDefaults() Chrome {
 		c.PromptStyle = tcell.StyleDefault.Reverse(true)
 	}
 	if c.PromptErrorStyle == tcell.StyleDefault {
-		c.PromptErrorStyle = c.PromptStyle.Foreground(tcolor.Red)
+		c.PromptErrorStyle = c.PromptStyle.Foreground(color.Red)
 	}
 	return c
 }

@@ -5,7 +5,7 @@ package goless
 
 import (
 	"github.com/gdamore/tcell/v3"
-	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/gdamore/tcell/v3/color"
 )
 
 // Preset bundles a Theme and Chrome configuration that work well together.
@@ -47,7 +47,7 @@ var DarkPreset = Preset{
 	Theme: Theme{
 		DefaultFG: solarizedBase0,
 		DefaultBG: solarizedBase03,
-		ANSI: [16]tcolor.Color{
+		ANSI: [16]color.Color{
 			solarizedBase02,
 			solarizedRed,
 			solarizedGreen,
@@ -84,7 +84,7 @@ var LightPreset = Preset{
 	Theme: Theme{
 		DefaultFG: solarizedBase00,
 		DefaultBG: solarizedBase3,
-		ANSI: [16]tcolor.Color{
+		ANSI: [16]color.Color{
 			solarizedBase02,
 			solarizedRed,
 			solarizedGreen,
@@ -119,23 +119,23 @@ var LightPreset = Preset{
 // PlainPreset keeps the pager monochrome and understated.
 var PlainPreset = Preset{
 	Theme: Theme{
-		ANSI: [16]tcolor.Color{
-			tcolor.Black,
-			tcolor.Black,
-			tcolor.Black,
-			tcolor.Black,
-			tcolor.Black,
-			tcolor.Black,
-			tcolor.Black,
-			tcolor.Silver,
-			tcolor.Gray,
-			tcolor.Gray,
-			tcolor.Gray,
-			tcolor.Gray,
-			tcolor.Gray,
-			tcolor.Gray,
-			tcolor.Gray,
-			tcolor.White,
+		ANSI: [16]color.Color{
+			color.Black,
+			color.Black,
+			color.Black,
+			color.Black,
+			color.Black,
+			color.Black,
+			color.Black,
+			color.Silver,
+			color.Gray,
+			color.Gray,
+			color.Gray,
+			color.Gray,
+			color.Gray,
+			color.Gray,
+			color.Gray,
+			color.White,
 		},
 	},
 	Chrome: Chrome{
@@ -164,6 +164,6 @@ var PrettyPreset = Preset{
 	},
 }
 
-func rgb(r, g, b uint8) tcolor.Color {
-	return tcolor.NewRGBColor(int32(r), int32(g), int32(b))
+func rgb(r, g, b uint8) color.Color {
+	return color.NewRGBColor(int32(r), int32(g), int32(b))
 }

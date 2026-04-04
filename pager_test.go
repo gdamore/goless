@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/gdamore/tcell/v3"
-	tcolor "github.com/gdamore/tcell/v3/color"
+	"github.com/gdamore/tcell/v3/color"
 	"github.com/gdamore/tcell/v3/vt"
 )
 
@@ -1030,9 +1030,9 @@ func TestPagerSearchStateShowsInvalidRegexPreview(t *testing.T) {
 func TestPagerTextHooksFormatStatusAndPrompt(t *testing.T) {
 	statusCalled := false
 	promptCalled := false
-	statusStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(3)).Background(tcolor.PaletteColor(7))
-	promptStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(2)).Background(tcolor.PaletteColor(0)).Bold(true)
-	promptErrorStyle := tcell.StyleDefault.Foreground(tcolor.PaletteColor(1)).Background(tcolor.PaletteColor(0))
+	statusStyle := tcell.StyleDefault.Foreground(color.PaletteColor(3)).Background(color.PaletteColor(7))
+	promptStyle := tcell.StyleDefault.Foreground(color.PaletteColor(2)).Background(color.PaletteColor(0)).Bold(true)
+	promptErrorStyle := tcell.StyleDefault.Foreground(color.PaletteColor(1)).Background(color.PaletteColor(0))
 	pager := New(Config{
 		TabWidth:   4,
 		WrapMode:   NoWrap,
@@ -1114,10 +1114,10 @@ func TestPagerThemeAffectsContentColorsOnly(t *testing.T) {
 		WrapMode:   NoWrap,
 		ShowStatus: true,
 		Theme: Theme{
-			DefaultFG: tcolor.Red,
-			DefaultBG: tcolor.Blue,
-			ANSI: [16]tcolor.Color{
-				1: tcolor.Aqua,
+			DefaultFG: color.Red,
+			DefaultBG: color.Blue,
+			ANSI: [16]color.Color{
+				1: color.Aqua,
 			},
 		},
 	})
@@ -1132,10 +1132,10 @@ func TestPagerThemeAffectsContentColorsOnly(t *testing.T) {
 
 	pager.Draw(screen)
 	_, plainStyle, _ := screen.Get(0, 0)
-	if got, want := plainStyle.GetForeground(), tcolor.Red; got != want {
+	if got, want := plainStyle.GetForeground(), color.Red; got != want {
 		t.Fatalf("plain fg = %v, want %v", got, want)
 	}
-	if got, want := plainStyle.GetBackground(), tcolor.Blue; got != want {
+	if got, want := plainStyle.GetBackground(), color.Blue; got != want {
 		t.Fatalf("plain bg = %v, want %v", got, want)
 	}
 
@@ -1143,10 +1143,10 @@ func TestPagerThemeAffectsContentColorsOnly(t *testing.T) {
 	screen.Clear()
 	pager.Draw(screen)
 	_, ansiStyle, _ := screen.Get(0, 0)
-	if got, want := ansiStyle.GetForeground(), tcolor.Aqua; got != want {
+	if got, want := ansiStyle.GetForeground(), color.Aqua; got != want {
 		t.Fatalf("ansi fg = %v, want %v", got, want)
 	}
-	if got, want := ansiStyle.GetBackground(), tcolor.Blue; got != want {
+	if got, want := ansiStyle.GetBackground(), color.Blue; got != want {
 		t.Fatalf("ansi bg = %v, want %v", got, want)
 	}
 }
@@ -1159,8 +1159,8 @@ func TestPagerSetThemeAffectsSubsequentDraw(t *testing.T) {
 	}
 	pager.Flush()
 	pager.SetTheme(Theme{
-		DefaultFG: tcolor.Green,
-		DefaultBG: tcolor.Navy,
+		DefaultFG: color.Green,
+		DefaultBG: color.Navy,
 	})
 
 	screen := newPagerMockScreen(t, 20, 2)
@@ -1168,18 +1168,18 @@ func TestPagerSetThemeAffectsSubsequentDraw(t *testing.T) {
 
 	pager.Draw(screen)
 	_, style, _ := screen.Get(0, 0)
-	if got, want := style.GetForeground(), tcolor.Green; got != want {
+	if got, want := style.GetForeground(), color.Green; got != want {
 		t.Fatalf("plain fg after SetTheme = %v, want %v", got, want)
 	}
-	if got, want := style.GetBackground(), tcolor.Navy; got != want {
+	if got, want := style.GetBackground(), color.Navy; got != want {
 		t.Fatalf("plain bg after SetTheme = %v, want %v", got, want)
 	}
 }
 
 func TestPagerSetChromeAffectsSubsequentDraw(t *testing.T) {
-	borderStyle := tcell.StyleDefault.Foreground(tcolor.Blue)
-	titleStyle := tcell.StyleDefault.Foreground(tcolor.Fuchsia).Bold(true)
-	statusStyle := tcell.StyleDefault.Foreground(tcolor.White).Background(tcolor.Navy)
+	borderStyle := tcell.StyleDefault.Foreground(color.Blue)
+	titleStyle := tcell.StyleDefault.Foreground(color.Fuchsia).Bold(true)
+	statusStyle := tcell.StyleDefault.Foreground(color.White).Background(color.Navy)
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
 	if err := pager.AppendString("plain\n"); err != nil {
@@ -1464,7 +1464,7 @@ func TestPagerRendersOSC8HyperlinkStyleOverride(t *testing.T) {
 			}
 			return HyperlinkDecision{
 				Style: info.Style.
-					Foreground(tcolor.Blue).
+					Foreground(color.Blue).
 					Underline(tcell.UnderlineStyleSolid),
 				StyleSet: true,
 			}
@@ -1484,8 +1484,8 @@ func TestPagerRendersOSC8HyperlinkStyleOverride(t *testing.T) {
 	if got, want := pagerRowString(screen, 0, 4), "demo"; got != want {
 		t.Fatalf("rendered text = %q, want %q", got, want)
 	}
-	if fg := pagerCellStyle(screen, 0, 0).GetForeground(); fg != tcolor.Blue {
-		t.Fatalf("foreground = %v, want %v", fg, tcolor.Blue)
+	if fg := pagerCellStyle(screen, 0, 0).GetForeground(); fg != color.Blue {
+		t.Fatalf("foreground = %v, want %v", fg, color.Blue)
 	}
 	if !pagerCellStyle(screen, 0, 0).HasUnderline() {
 		t.Fatal("style override did not enable underline")
@@ -1499,7 +1499,7 @@ func TestPagerOSC8StyleOverrideReplacesBaseStyle(t *testing.T) {
 		RenderMode: RenderPresentation,
 		HyperlinkHandler: func(info HyperlinkInfo) HyperlinkDecision {
 			return HyperlinkDecision{
-				Style:    tcell.StyleDefault.Foreground(tcolor.Blue),
+				Style:    tcell.StyleDefault.Foreground(color.Blue),
 				StyleSet: true,
 			}
 		},
@@ -1516,10 +1516,10 @@ func TestPagerOSC8StyleOverrideReplacesBaseStyle(t *testing.T) {
 	pager.Draw(screen)
 
 	style := pagerCellStyle(screen, 0, 0)
-	if fg := style.GetForeground(); fg != tcolor.Blue {
-		t.Fatalf("foreground = %v, want %v", fg, tcolor.Blue)
+	if fg := style.GetForeground(); fg != color.Blue {
+		t.Fatalf("foreground = %v, want %v", fg, color.Blue)
 	}
-	if style.GetBackground() != tcolor.Default {
+	if style.GetBackground() != color.Default {
 		t.Fatalf("background = %v, want default", style.GetBackground())
 	}
 	if style.GetAttributes() != 0 {
@@ -1551,7 +1551,7 @@ func TestPagerRendersUnderlineVariantAndColor(t *testing.T) {
 	if got, want := style.GetUnderlineStyle(), tcell.UnderlineStyleCurly; got != want {
 		t.Fatalf("underline style = %v, want %v", got, want)
 	}
-	if got, want := style.GetUnderlineColor(), tcolor.NewRGBColor(1, 2, 3); got != want {
+	if got, want := style.GetUnderlineColor(), color.NewRGBColor(1, 2, 3); got != want {
 		t.Fatalf("underline color = %v, want %v", got, want)
 	}
 }
@@ -1633,7 +1633,7 @@ func TestPagerVisualizationStyleDefaultCanBeExplicit(t *testing.T) {
 	pager.Draw(screen)
 
 	style := pagerCellStyle(screen, 1, 0)
-	if got, want := style.GetForeground(), tcolor.Default; got != want {
+	if got, want := style.GetForeground(), color.Default; got != want {
 		t.Fatalf("marker fg = %v, want %v", got, want)
 	}
 }
@@ -1754,7 +1754,7 @@ func pagerCellStyle(screen tcell.Screen, x, y int) tcell.Style {
 
 func pagerRowString(screen tcell.Screen, y, width int) string {
 	var out strings.Builder
-	for x := 0; x < width; x++ {
+	for x := range width {
 		str, _, _ := screen.Get(x, y)
 		if str == "" {
 			out.WriteRune(' ')
@@ -1766,7 +1766,7 @@ func pagerRowString(screen tcell.Screen, y, width int) string {
 }
 
 func pagerFindRune(screen tcell.Screen, y int, want rune, width int) int {
-	for x := 0; x < width; x++ {
+	for x := range width {
 		if pagerCellRune(screen, x, y) == want {
 			return x
 		}

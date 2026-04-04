@@ -21,7 +21,7 @@ func (v *Viewer) drawHelp(screen tcell.Screen) {
 
 	lines := v.helpLines()
 	bodyX, bodyY, bodyWidth, bodyHeight := v.contentRect()
-	for y := 0; y < bodyHeight; y++ {
+	for y := range bodyHeight {
 		screen.PutStrStyled(bodyX, bodyY+y, padRightToWidth("", bodyWidth), bodyStyle)
 		lineIndex := v.helpOffset + y
 		if lineIndex >= len(lines) {
