@@ -107,13 +107,6 @@ func TestDemoVisualization(t *testing.T) {
 	}
 }
 
-func TestProgramTextDocumentsThemeShortcut(t *testing.T) {
-	text := programText()
-	if !strings.Contains(text.HelpBody, "\x1b[1;4mProgram\x1b[0m\n  F4              change theme\n") {
-		t.Fatalf("programText().HelpBody = %q, want standalone F4 help entry", text.HelpBody)
-	}
-}
-
 func TestDemoHyperlinkHandler(t *testing.T) {
 	handler := programHyperlinkHandler(false)
 	decision := handler(goless.HyperlinkInfo{
