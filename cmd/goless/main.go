@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	_ "embed"
 	"flag"
 	"fmt"
 	"io"
@@ -1076,9 +1077,12 @@ func newProgramPager(
 	)
 }
 
+//go:embed  help.txt
+var helpText string
+
 func programText() goless.Text {
 	text := goless.DefaultText()
-	text.HelpBody = strings.TrimRight(text.HelpBody, "\n") + "\n\n\x1b[1;4mProgram\x1b[0m\n  F4              change theme\n"
+	text.HelpBody = helpText
 	return text
 }
 
