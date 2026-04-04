@@ -645,6 +645,61 @@ func TestSetDisplayCommands(t *testing.T) {
 	}
 }
 
+func TestSetDisplayToggleCommands(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ttwo\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	runViewerCommand(v, "set invwrap")
+	if got, want := v.WrapMode(), layout.SoftWrap; got != want {
+		t.Fatalf("WrapMode after first :set invwrap = %v, want %v", got, want)
+	}
+	runViewerCommand(v, "set invwrap")
+	if got, want := v.WrapMode(), layout.NoWrap; got != want {
+		t.Fatalf("WrapMode after second :set invwrap = %v, want %v", got, want)
+	}
+
+	runViewerCommand(v, "set list")
+	runViewerCommand(v, "set nolist")
+	if got, want := v.cfg.Visualization.ShowTabs, false; got != want {
+		t.Fatalf("Visualization.ShowTabs after :set nolist = %v, want %v", got, want)
+	}
+	runViewerCommand(v, "set invlist")
+	if got, want := v.cfg.Visualization.ShowTabs, true; got != want {
+		t.Fatalf("Visualization.ShowTabs after :set invlist = %v, want %v", got, want)
+	}
+}
+
+func TestSetInvalidCommandsLeaveStateUnchanged(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ttwo\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	runViewerCommand(v, "set tabstop=0")
+	if got, want := v.cfg.TabWidth, 4; got != want {
+		t.Fatalf("TabWidth after invalid :set tabstop=0 = %d, want %d", got, want)
+	}
+	if !strings.Contains(v.message, "set tabstop=0") {
+		t.Fatalf("message after invalid tabstop = %q, want invalid command text", v.message)
+	}
+
+	runViewerCommand(v, "set pinlines=1 extra")
+	if got, want := v.HeaderLines(), 0; got != want {
+		t.Fatalf("HeaderLines after malformed assignment = %d, want %d", got, want)
+	}
+	if !strings.Contains(v.message, "set pinlines=1 extra") {
+		t.Fatalf("message after malformed assignment = %q, want invalid command text", v.message)
+	}
+}
+
 func TestKeyBindingMatchesRequireExactNoModifierByDefault(t *testing.T) {
 	binding := keyBinding{
 		key:    tcell.KeyRune,
