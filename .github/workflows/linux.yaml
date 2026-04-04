@@ -1,38 +1,26 @@
-name: Go
+name: linux
 
 on:
   pull_request:
   push:
     branches:
-      - nosuchmain
+      - main
 
 permissions:
   contents: read
 
-defaults:
-  run:
-    shell: bash
-
 jobs:
   test:
-    name: Test (${{ matrix.name }})
-    runs-on: ${{ matrix.os }}
+    name: build
+    runs-on: [ubuntu-latest]
+
     permissions:
       contents: read
       id-token: write
     strategy:
-      fail-fast: false
       matrix:
-        include:
-          - name: Linux
-            os: ubuntu-latest
-            upload_coverage: true
-          - name: macOS
-            os: macos-latest
-            upload_coverage: false
-          - name: Windows
-            os: windows-latest
-            upload_coverage: false
+        go: ["stable", "oldstable"]
+      fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -40,26 +28,22 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: ${{ matrix.go }}
           cache-dependency-path: go.sum
 
       - name: Show Go version
         run: go version
 
       - name: Run tests
-        if: ${{ !matrix.upload_coverage }}
         run: go test ./...
 
       - name: Run tests with coverage
-        if: ${{ matrix.upload_coverage }}
         run: go test -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Show coverage summary
-        if: ${{ matrix.upload_coverage }}
         run: go tool cover -func=coverage.out
 
       - name: Upload coverage to Codecov
-        if: ${{ matrix.upload_coverage }}
         uses: codecov/codecov-action@v6
         with:
           disable_search: true
