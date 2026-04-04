@@ -1879,7 +1879,7 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 	case actionGoBottom:
 		v.helpOffset = v.maxHelpOffset()
 	default:
-		return KeyResult{}
+		return KeyResult{Context: KeyContextHelp}
 	}
 	v.clampHelpOffset()
 	return KeyResult{Handled: true, Action: KeyAction(a), Context: KeyContextHelp}
@@ -1981,7 +1981,7 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		v.updatePromptPreview()
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	}
-	return KeyResult{}
+	return KeyResult{Context: KeyContextPrompt}
 }
 
 func (v *Viewer) promptMoveLeft() {

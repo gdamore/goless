@@ -47,6 +47,11 @@ type programOptions struct {
 	title             string
 }
 
+type programViewportSnapshot struct {
+	eofVisible bool
+	following  bool
+}
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -107,6 +112,7 @@ func run() error {
 
 	var (
 		pager             *goless.Pager
+		pagerSnapshot     programViewportSnapshot
 		readResult        chan error
 		reloadCurrent     func() (bool, error)
 		buildProgramPager func() *goless.Pager
@@ -133,7 +139,11 @@ func run() error {
 	}
 	if session.hasFiles() {
 		reloadCurrent = func() (bool, error) {
-			return reloadProgramInput(session, inputLoader, &pager, buildProgramPager, width, height, screen.EventQ(), &readResult)
+			loaded, snapshot, err := reloadProgramInput(session, inputLoader, &pager, buildProgramPager, width, height, screen.EventQ(), &readResult)
+			if err == nil {
+				pagerSnapshot = snapshot
+			}
+			return loaded, err
 		}
 		if _, err := reloadCurrent(); err != nil {
 			return err
@@ -144,7 +154,7 @@ func run() error {
 		readResult = startProgramRead(pager, os.Stdin, screen.EventQ(), nil)
 	}
 	pager.Draw(screen)
-	quit, err := handleProgramQuitIfOneScreen(opts.quitIfOneScreen, session, func() *goless.Pager { return pager }, readResult == nil, reloadCurrent)
+	quit, err := handleProgramQuitIfOneScreen(opts.quitIfOneScreen, session, func() programViewportSnapshot { return pagerSnapshot }, readResult == nil, reloadCurrent)
 	if err != nil {
 		return err
 	}
@@ -191,7 +201,7 @@ func run() error {
 			before := pager.Position()
 			beforeFollowing := pager.Following()
 			result := pager.HandleKeyResult(event)
-			if !result.Handled && handleProgramStatusKey(pager, event) {
+			if shouldHandleProgramStatusKey(result) && handleProgramStatusKey(pager, event) {
 				pager.Draw(screen)
 				break
 			}
@@ -227,9 +237,10 @@ func run() error {
 					if err != nil {
 						return err
 					}
+					pagerSnapshot = snapshotProgramPager(pager)
 					applyStartupCommand(pager, startup)
 					readResult = nil
-					quit, err := handleProgramQuitIfOneScreen(opts.quitIfOneScreen, session, func() *goless.Pager { return pager }, true, reloadCurrent)
+					quit, err := handleProgramQuitIfOneScreen(opts.quitIfOneScreen, session, func() programViewportSnapshot { return pagerSnapshot }, true, reloadCurrent)
 					if err != nil {
 						return err
 					}
@@ -300,6 +311,9 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	if opts.showHelp {
 		fs.Usage()
 		return opts, nil, nil
+	}
+	if ignoreSmartCase && ignoreCase {
+		return programOptions{}, nil, fmt.Errorf("-i and -I are mutually exclusive")
 	}
 	if ignoreCase {
 		opts.searchCaseMode = goless.SearchCaseInsensitive
@@ -440,18 +454,18 @@ func handleProgramVisibleEOF(
 func handleProgramQuitIfOneScreen(
 	enabled bool,
 	session *programSession,
-	currentPager func() *goless.Pager,
+	currentSnapshot func() programViewportSnapshot,
 	inputComplete bool,
 	reload func() (bool, error),
 ) (bool, error) {
 	if !enabled || !inputComplete {
 		return false, nil
 	}
-	pager := currentPager()
-	if pager == nil || pager.Following() {
+	snapshot := currentSnapshot()
+	if snapshot.following {
 		return false, nil
 	}
-	for pager.EOFVisible() {
+	for snapshot.eofVisible {
 		quit, loaded, err := advanceProgramSessionOrQuit(session, reload)
 		if err != nil || quit {
 			return quit, err
@@ -459,8 +473,8 @@ func handleProgramQuitIfOneScreen(
 		if !loaded {
 			return false, nil
 		}
-		pager = currentPager()
-		if pager == nil || pager.Following() {
+		snapshot = currentSnapshot()
+		if snapshot.following {
 			return false, nil
 		}
 	}
@@ -626,9 +640,9 @@ func reloadProgramInput(
 	width, height int,
 	eventQ chan tcell.Event,
 	readResult *chan error,
-) (bool, error) {
+) (bool, programViewportSnapshot, error) {
 	if readResult != nil && *readResult != nil {
-		return false, fmt.Errorf("stdin still reading")
+		return false, programViewportSnapshot{}, fmt.Errorf("stdin still reading")
 	}
 	nextPager := buildPager()
 	nextPager.SetSize(width, height)
@@ -636,7 +650,7 @@ func reloadProgramInput(
 	if loader != nil && loader.canStream(currentPath) {
 		reader, finish, err := loader.startStdinStream()
 		if err != nil {
-			return false, err
+			return false, programViewportSnapshot{}, err
 		}
 		var cache bytes.Buffer
 		*pager = nextPager
@@ -645,16 +659,17 @@ func reloadProgramInput(
 				finish(err, cache.Bytes())
 			})
 		}
-		return false, nil
+		return false, programViewportSnapshot{}, nil
 	}
-	if err := loadProgramInput(nextPager, loader, currentPath, session.startup); err != nil {
-		return false, err
+	snapshot, err := loadProgramInput(nextPager, loader, currentPath, session.startup)
+	if err != nil {
+		return false, programViewportSnapshot{}, err
 	}
 	*pager = nextPager
 	if readResult != nil {
 		*readResult = nil
 	}
-	return true, nil
+	return true, snapshot, nil
 }
 
 type programStartup struct {
@@ -823,6 +838,20 @@ func handleProgramStatusKey(pager *goless.Pager, ev *tcell.EventKey) bool {
 	return true
 }
 
+func shouldHandleProgramStatusKey(result goless.KeyResult) bool {
+	return !result.Handled && result.Context == goless.NormalKeyContext
+}
+
+func snapshotProgramPager(pager *goless.Pager) programViewportSnapshot {
+	if pager == nil {
+		return programViewportSnapshot{}
+	}
+	return programViewportSnapshot{
+		eofVisible: pager.EOFVisible(),
+		following:  pager.Following(),
+	}
+}
+
 func programInputs(args []string) (programStartup, []string, error) {
 	var startup programStartup
 	positional := args
@@ -892,7 +921,7 @@ func applyStartupCommand(pager *goless.Pager, startup programStartup) {
 	}
 }
 
-func loadProgramInput(pager *goless.Pager, loader *programInputLoader, path string, startup programStartup) error {
+func loadProgramInput(pager *goless.Pager, loader *programInputLoader, path string, startup programStartup) (programViewportSnapshot, error) {
 	var (
 		file io.ReadCloser
 		err  error
@@ -905,15 +934,16 @@ func loadProgramInput(pager *goless.Pager, loader *programInputLoader, path stri
 		file, err = os.Open(path)
 	}
 	if err != nil {
-		return err
+		return programViewportSnapshot{}, err
 	}
 	defer file.Close()
 	if _, err := pager.ReadFrom(file); err != nil {
-		return err
+		return programViewportSnapshot{}, err
 	}
 	pager.Flush()
+	snapshot := snapshotProgramPager(pager)
 	applyStartupCommand(pager, startup)
-	return nil
+	return snapshot, nil
 }
 
 func stdinIsTerminal() bool {

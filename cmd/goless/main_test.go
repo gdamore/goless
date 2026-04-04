@@ -160,14 +160,8 @@ func TestDemoQuitAtEOFPolicyFromFlags(t *testing.T) {
 
 func TestHandleProgramQuitIfOneScreenQuitsAtLastFile(t *testing.T) {
 	session := newProgramSession([]string{"one.txt"}, programStartup{})
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 5)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
-
-	quit, err := handleProgramQuitIfOneScreen(true, session, func() *goless.Pager { return pager }, true, func() (bool, error) { return true, nil })
+	snapshot := programViewportSnapshot{eofVisible: true}
+	quit, err := handleProgramQuitIfOneScreen(true, session, func() programViewportSnapshot { return snapshot }, true, func() (bool, error) { return true, nil })
 	if err != nil {
 		t.Fatalf("handleProgramQuitIfOneScreen returned error: %v", err)
 	}
@@ -178,25 +172,11 @@ func TestHandleProgramQuitIfOneScreenQuitsAtLastFile(t *testing.T) {
 
 func TestHandleProgramQuitIfOneScreenAdvancesPastShortFile(t *testing.T) {
 	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
-	short := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	short.SetSize(20, 5)
-	if err := short.AppendString("one\ntwo\n"); err != nil {
-		t.Fatalf("AppendString(short) failed: %v", err)
-	}
-	short.Flush()
-
-	tall := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	tall.SetSize(20, 3)
-	if err := tall.AppendString("one\ntwo\nthree\nfour\nfive\n"); err != nil {
-		t.Fatalf("AppendString(tall) failed: %v", err)
-	}
-	tall.Flush()
-
-	current := short
+	current := programViewportSnapshot{eofVisible: true}
 	reloads := 0
-	quit, err := handleProgramQuitIfOneScreen(true, session, func() *goless.Pager { return current }, true, func() (bool, error) {
+	quit, err := handleProgramQuitIfOneScreen(true, session, func() programViewportSnapshot { return current }, true, func() (bool, error) {
 		reloads++
-		current = tall
+		current = programViewportSnapshot{eofVisible: false}
 		return true, nil
 	})
 	if err != nil {
@@ -215,19 +195,26 @@ func TestHandleProgramQuitIfOneScreenAdvancesPastShortFile(t *testing.T) {
 
 func TestHandleProgramQuitIfOneScreenDisabledWhenInputIncomplete(t *testing.T) {
 	session := newProgramSession([]string{"one.txt"}, programStartup{})
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 5)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
-
-	quit, err := handleProgramQuitIfOneScreen(true, session, func() *goless.Pager { return pager }, false, func() (bool, error) { return true, nil })
+	snapshot := programViewportSnapshot{eofVisible: true}
+	quit, err := handleProgramQuitIfOneScreen(true, session, func() programViewportSnapshot { return snapshot }, false, func() (bool, error) { return true, nil })
 	if err != nil {
 		t.Fatalf("handleProgramQuitIfOneScreen returned error: %v", err)
 	}
 	if quit {
 		t.Fatal("handleProgramQuitIfOneScreen(...) = true, want false")
+	}
+}
+
+func TestHandleProgramQuitIfOneScreenIgnoresPostStartupViewport(t *testing.T) {
+	session := newProgramSession([]string{"one.txt"}, programStartup{line: 999})
+	snapshot := programViewportSnapshot{eofVisible: false}
+
+	quit, err := handleProgramQuitIfOneScreen(true, session, func() programViewportSnapshot { return snapshot }, true, func() (bool, error) { return true, nil })
+	if err != nil {
+		t.Fatalf("handleProgramQuitIfOneScreen returned error: %v", err)
+	}
+	if quit {
+		t.Fatal("handleProgramQuitIfOneScreen(...) = true, want false when top-of-file viewport does not fit")
 	}
 }
 
@@ -519,6 +506,14 @@ func TestParseProgramFlagsCompatibilityAliases(t *testing.T) {
 	}
 }
 
+func TestParseProgramFlagsRejectsConflictingSearchCaseFlags(t *testing.T) {
+	var out bytes.Buffer
+
+	if _, _, err := parseProgramFlags([]string{"-i", "-I"}, &out); err == nil {
+		t.Fatal("parseProgramFlags(-i, -I) = nil error, want mutual exclusion error")
+	}
+}
+
 func TestParseProgramFlagsHelp(t *testing.T) {
 	var out bytes.Buffer
 	opts, args, err := parseProgramFlags([]string{"--help"}, &out)
@@ -729,6 +724,27 @@ func TestHandleProgramStatusKey(t *testing.T) {
 
 	if handleProgramStatusKey(pager, tcell.NewEventKey(tcell.KeyRune, "=", tcell.ModAlt)) {
 		t.Fatal("handleProgramStatusKey(Alt-=) = true, want false")
+	}
+}
+
+func TestShouldHandleProgramStatusKey(t *testing.T) {
+	tests := []struct {
+		name   string
+		result goless.KeyResult
+		want   bool
+	}{
+		{name: "normal-unhandled", result: goless.KeyResult{}, want: true},
+		{name: "normal-handled", result: goless.KeyResult{Handled: true, Context: goless.NormalKeyContext}, want: false},
+		{name: "prompt-unhandled", result: goless.KeyResult{Context: goless.PromptKeyContext}, want: false},
+		{name: "help-unhandled", result: goless.KeyResult{Context: goless.HelpKeyContext}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldHandleProgramStatusKey(tt.result); got != tt.want {
+				t.Fatalf("shouldHandleProgramStatusKey(%+v) = %v, want %v", tt.result, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -1150,8 +1166,12 @@ func TestLoadProgramInputFromFile(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
-	if err := loadProgramInput(pager, nil, path, programStartup{line: 3}); err != nil {
+	snapshot, err := loadProgramInput(pager, nil, path, programStartup{line: 3})
+	if err != nil {
 		t.Fatalf("loadProgramInput(file) failed: %v", err)
+	}
+	if snapshot.eofVisible {
+		t.Fatal("snapshot.eofVisible after loading tall file = true, want false before startup positioning")
 	}
 	if got, want := pager.Position().Row, 3; got != want {
 		t.Fatalf("Position().Row = %d, want %d", got, want)
@@ -1172,7 +1192,7 @@ func TestLoadProgramInputFromCachedStdin(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
-	if err := loadProgramInput(pager, loader, "-", programStartup{query: "beta"}); err != nil {
+	if _, err := loadProgramInput(pager, loader, "-", programStartup{query: "beta"}); err != nil {
 		t.Fatalf("loadProgramInput(stdin) failed: %v", err)
 	}
 	state := pager.SearchState()
@@ -1194,7 +1214,7 @@ func TestReloadProgramInputStreamsExplicitStdin(t *testing.T) {
 		return next
 	}
 
-	loaded, err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, events, &readResult)
+	loaded, _, err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, events, &readResult)
 	if err != nil {
 		t.Fatalf("reloadProgramInput(stream) failed: %v", err)
 	}
@@ -1227,7 +1247,7 @@ func TestReloadProgramInputBlocksWhileReading(t *testing.T) {
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	readResult := make(chan error, 1)
 
-	loaded, err := reloadProgramInput(session, loader, &pager, func() *goless.Pager {
+	loaded, _, err := reloadProgramInput(session, loader, &pager, func() *goless.Pager {
 		return goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	}, 20, 3, make(chan tcell.Event, 1), &readResult)
 	if err == nil {
@@ -1260,7 +1280,7 @@ func TestReloadProgramInputLoadsCachedStdinSynchronously(t *testing.T) {
 		return goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	}
 
-	loaded, err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, make(chan tcell.Event, 1), &readResult)
+	loaded, _, err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, make(chan tcell.Event, 1), &readResult)
 	if err != nil {
 		t.Fatalf("reloadProgramInput(cached) failed: %v", err)
 	}
