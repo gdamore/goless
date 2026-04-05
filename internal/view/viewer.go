@@ -1567,11 +1567,11 @@ func (v *Viewer) statusText() (left, right string) {
 	current := v.logicalRowNumber(rowIndex, ok)
 	column := v.logicalColumnNumber(rowIndex, ok)
 	right = v.text.StatusPosition(current, len(v.sourceLines), column, v.maxContentColumns())
-	if v.EOFVisible() {
+	if eofHint := v.statusEOFHint(); eofHint != "" {
 		if right != "" {
-			right += "  " + v.text.StatusEOF
+			right += "  " + eofHint
 		} else {
-			right = v.text.StatusEOF
+			right = eofHint
 		}
 	}
 	if modeHint := v.statusModeHint(); modeHint != "" {
@@ -1579,6 +1579,13 @@ func (v *Viewer) statusText() (left, right string) {
 			right += "  " + modeHint
 		} else {
 			right = modeHint
+		}
+	}
+	if scrollHint := v.statusScrollHint(); scrollHint != "" {
+		if right != "" {
+			right += "  " + scrollHint
+		} else {
+			right = scrollHint
 		}
 	}
 	if v.text.StatusLine != nil {
@@ -1605,6 +1612,36 @@ func (v *Viewer) statusModeHint() string {
 		return "↪"
 	}
 	return "⇆"
+}
+
+func (v *Viewer) statusEOFHint() string {
+	width := max(stringWidth(v.text.StatusEOF), 1)
+	if v.EOFVisible() {
+		return v.text.StatusEOF
+	}
+	return strings.Repeat(" ", width)
+}
+
+func (v *Viewer) statusScrollHint() string {
+	canScrollUp, canScrollDown := v.statusScrollable()
+	if !canScrollUp && !canScrollDown && v.maxRowOffset() == 0 {
+		return ""
+	}
+	top := " "
+	bottom := " "
+	if canScrollUp {
+		top = v.text.TopScrollableIndicator
+	}
+	if canScrollDown {
+		bottom = v.text.BottomScrollableIndicator
+	}
+	return top + " " + bottom
+}
+
+func (v *Viewer) statusScrollable() (up, down bool) {
+	v.ensureLayout()
+	maxOffset := v.maxRowOffset()
+	return v.rowOffset > 0, v.rowOffset < maxOffset
 }
 
 func (v *Viewer) statusOverflow() (left, right bool) {
