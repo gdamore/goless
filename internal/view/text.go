@@ -35,9 +35,11 @@ type Text struct {
 	CommandOutOfRange func(line int) string
 	CommandLine       func(line int) string
 
-	LeftOverflowIndicator  string
-	RightOverflowIndicator string
-	PromptLine             func(PromptInfo) string
+	LeftOverflowIndicator     string
+	RightOverflowIndicator    string
+	TopScrollableIndicator    string
+	BottomScrollableIndicator string
+	PromptLine                func(PromptInfo) string
 }
 
 func (t Text) helpLines() []string {
@@ -104,6 +106,12 @@ func (t Text) withDefaults() Text {
 	if t.RightOverflowIndicator == "" {
 		t.RightOverflowIndicator = defaults.RightOverflowIndicator
 	}
+	if t.TopScrollableIndicator == "" {
+		t.TopScrollableIndicator = defaults.TopScrollableIndicator
+	}
+	if t.BottomScrollableIndicator == "" {
+		t.BottomScrollableIndicator = defaults.BottomScrollableIndicator
+	}
 
 	return t
 }
@@ -121,7 +129,7 @@ func defaultText() Text {
 		},
 		StatusHelpHint: "F1 Help",
 		FollowMode:     "follow",
-		StatusEOF:      "EOF",
+		StatusEOF:      "∎",
 		SearchEmpty:    "empty search",
 		SearchNotFound: func(query string) string {
 			return fmt.Sprintf("%s not found", query)
@@ -140,7 +148,9 @@ func defaultText() Text {
 		CommandLine: func(line int) string {
 			return fmt.Sprintf("line %d", line)
 		},
-		LeftOverflowIndicator:  "◀",
-		RightOverflowIndicator: "▶",
+		LeftOverflowIndicator:     "◀",
+		RightOverflowIndicator:    "▶",
+		TopScrollableIndicator:    "▲",
+		BottomScrollableIndicator: "▼",
 	}
 }

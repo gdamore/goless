@@ -239,7 +239,7 @@ The built-in pager UI exposes search mode controls directly:
   Embedders can replace it with `Text.StatusHelpHint` or suppress it with `Text.HideStatusHelpHint`
 - the right side of the status bar shows row and column as `current/total`
   These are 1-based logical coordinates rather than wrapped visual row numbers
-- the built-in status bar appends `EOF` when the end of the document is visible
+- the built-in status bar reserves an EOF slot and shows `∎` when the end of the document is visible
 - the right side of the status bar adds contextual wrap/scroll glyphs such as `↪` and `⇆`
 - `:set number|nonumber|invnumber` is available as a fallback
 - `:set wrap|nowrap|invwrap` is available as a fallback

@@ -77,7 +77,7 @@ func DefaultText() Text {
 		},
 		StatusHelpHint: "F1 Help",
 		FollowMode:     "follow",
-		StatusEOF:      "EOF",
+		StatusEOF:      "∎",
 		SearchEmpty:    "empty search",
 		SearchNotFound: func(query string) string {
 			return fmt.Sprintf("%s not found", query)

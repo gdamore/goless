@@ -2352,8 +2352,27 @@ func TestStatusTextShowsEOFWhenVisible(t *testing.T) {
 	v.relayout()
 
 	_, rightText := v.statusText()
-	if !strings.Contains(rightText, "EOF") {
+	if !strings.Contains(rightText, "∎") {
 		t.Fatalf("right status text = %q, want EOF indicator", rightText)
+	}
+}
+
+func TestStatusTextReservesEOFSpaceWhenNotVisible(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nbeta\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.relayout()
+
+	_, rightText := v.statusText()
+	if strings.Contains(rightText, "∎") {
+		t.Fatalf("right status text = %q, want blank EOF slot when EOF is not visible", rightText)
+	}
+	if !strings.Contains(rightText, "col 1/5") || !strings.Contains(rightText, "⇆") {
+		t.Fatalf("right status text = %q, want position text and wrap hint", rightText)
 	}
 }
 
@@ -2447,15 +2466,34 @@ func TestStatusHelpHintDoesNotShiftWhenLeftOverflowAppears(t *testing.T) {
 	}
 
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
-	v.SetSize(30, 2)
+	v.SetSize(40, 2)
 	v.relayout()
 
-	_, screen := newMockScreen(t, 30, 2)
+	_, screen := newMockScreen(t, 40, 2)
 	defer screen.Fini()
 
+	findHelpHint := func(row string) int {
+		runes := []rune(row)
+		target := []rune("F1 Help")
+		for i := 0; i+len(target) <= len(runes); i++ {
+			match := true
+			for j := range target {
+				if runes[i+j] != target[j] {
+					match = false
+					break
+				}
+			}
+			if match {
+				return i
+			}
+		}
+		return -1
+	}
+
 	v.drawStatus(screen, 1)
-	if got := cellRune(screen, 3, 1); got != 'F' {
-		t.Fatalf("help hint start before scroll = %q, want %q", got, 'F')
+	before := findHelpHint(screenRowString(screen, 1, 40))
+	if before < 0 {
+		t.Fatalf("status row before scroll = %q, want help hint", screenRowString(screen, 1, 40))
 	}
 
 	v.colOffset = 1
@@ -2465,8 +2503,12 @@ func TestStatusHelpHintDoesNotShiftWhenLeftOverflowAppears(t *testing.T) {
 	if got := cellRune(screen, 1, 1); got != '◀' {
 		t.Fatalf("left overflow indicator = %q, want %q", got, '◀')
 	}
-	if got := cellRune(screen, 3, 1); got != 'F' {
-		t.Fatalf("help hint start after scroll = %q, want %q", got, 'F')
+	after := findHelpHint(screenRowString(screen, 1, 40))
+	if after < 0 {
+		t.Fatalf("status row after scroll = %q, want help hint", screenRowString(screen, 1, 40))
+	}
+	if got, want := after, before; got != want {
+		t.Fatalf("help hint column after scroll = %d, want %d", got, want)
 	}
 }
 
@@ -2542,6 +2584,63 @@ func TestStatusTextShowsColumnTotalsWhenScrolled(t *testing.T) {
 		t.Fatalf("right status text = %q, want no-wrap glyph", rightText)
 	}
 }
+
+func TestStatusTextShowsBottomScrollableIndicatorWhenScrollDownPossible(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nbeta\ngamma\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.relayout()
+
+	_, rightText := v.statusText()
+	if !strings.Contains(rightText, "  ▼") {
+		t.Fatalf("right status text = %q, want bottom scroll indicator", rightText)
+	}
+	if strings.Contains(rightText, "▲") {
+		t.Fatalf("right status text = %q, want no top scroll indicator", rightText)
+	}
+}
+
+func TestStatusTextShowsTopAndBottomScrollableIndicatorsMidScroll(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nbeta\ngamma\ndelta\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.rowOffset = 1
+	v.relayout()
+
+	_, rightText := v.statusText()
+	if !strings.Contains(rightText, "▲ ▼") {
+		t.Fatalf("right status text = %q, want both vertical scroll indicators", rightText)
+	}
+}
+
+func TestStatusTextSuppressesScrollableIndicatorsAtBottom(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nbeta\ngamma\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.relayout()
+	v.rowOffset = v.maxRowOffset()
+
+	_, rightText := v.statusText()
+	if !strings.Contains(rightText, "▲  ") {
+		t.Fatalf("right status text = %q, want top scroll indicator", rightText)
+	}
+	if strings.Contains(rightText, "▼") {
+		t.Fatalf("right status text = %q, want no bottom scroll indicator", rightText)
+	}
+}
+
 
 func TestStatusBarUsesDisplayWidthForRightAlignedText(t *testing.T) {
 	doc := model.NewDocument(4)
