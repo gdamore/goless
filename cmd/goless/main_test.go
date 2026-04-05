@@ -84,8 +84,7 @@ func TestNextDemoPresetName(t *testing.T) {
 		"dark":   "light",
 		"light":  "plain",
 		"plain":  "pretty",
-		"pretty": "none",
-		"none":   "dark",
+		"pretty": "dark",
 		"bogus":  "dark",
 	}
 	for current, want := range cases {
