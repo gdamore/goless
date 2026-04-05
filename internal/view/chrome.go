@@ -40,6 +40,8 @@ type Chrome struct {
 	BorderStyle        tcell.Style
 	TitleStyle         tcell.Style
 	StatusStyle        tcell.Style
+	StatusIconOnStyle  tcell.Style
+	StatusIconOffStyle tcell.Style
 	StatusHelpKeyStyle tcell.Style
 	LineNumberStyle    tcell.Style
 	HeaderStyle        tcell.Style
@@ -56,6 +58,12 @@ func (c Chrome) withDefaults() Chrome {
 	}
 	if c.StatusStyle == tcell.StyleDefault {
 		c.StatusStyle = statusBarStyle
+	}
+	if c.StatusIconOnStyle == tcell.StyleDefault {
+		c.StatusIconOnStyle = c.StatusStyle.Foreground(color.PaletteColor(11)).Dim(true)
+	}
+	if c.StatusIconOffStyle == tcell.StyleDefault {
+		c.StatusIconOffStyle = c.StatusStyle.Dim(true)
 	}
 	if c.StatusHelpKeyStyle == tcell.StyleDefault {
 		c.StatusHelpKeyStyle = c.StatusStyle.Foreground(color.PaletteColor(11)).Bold(true)

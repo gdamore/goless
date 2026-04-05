@@ -48,6 +48,10 @@ type Chrome struct {
 	TitleStyle tcell.Style
 	// StatusStyle controls the style used when drawing the status bar.
 	StatusStyle tcell.Style
+	// StatusIconOnStyle controls the style used for the active icons in the status bar.
+	StatusIconOnStyle tcell.Style
+	// StatusIconOffStyle controls the style used for the inactive icons in the status bar.
+	StatusIconOffStyle tcell.Style
 	// StatusHelpKeyStyle controls the style used for the leading key token in the built-in idle help hint.
 	StatusHelpKeyStyle tcell.Style
 	// LineNumberStyle controls the style used when drawing the optional line-number gutter.

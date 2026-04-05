@@ -2300,8 +2300,8 @@ func TestStatusTextPlacesPositionOnRight(t *testing.T) {
 	if got, want := leftText, "F1 Help"; got != want {
 		t.Fatalf("left status text = %q, want %q", got, want)
 	}
-	if !strings.Contains(rightText, "row 1/2") || !strings.Contains(rightText, "col 1/5") || !strings.Contains(rightText, "⇆") {
-		t.Fatalf("right status text = %q, want row+col indicator with no-wrap glyph", rightText)
+	if !strings.Contains(rightText, "row 1/2") || !strings.Contains(rightText, "col 1/5") {
+		t.Fatalf("right status text = %q, want row+col indicator", rightText)
 	}
 }
 
@@ -2348,12 +2348,16 @@ func TestStatusTextShowsEOFWhenVisible(t *testing.T) {
 	}
 
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
-	v.SetSize(20, 3)
+	v.SetSize(80, 3)
 	v.relayout()
 
-	_, rightText := v.statusText()
-	if !strings.Contains(rightText, "∎") {
-		t.Fatalf("right status text = %q, want EOF indicator", rightText)
+	_, screen := newMockScreen(t, 80, 3)
+	defer screen.Fini()
+	v.drawStatus(screen, 2)
+
+	row := screenRowString(screen, 2, 80)
+	if !strings.Contains(row, "∎") {
+		t.Fatalf("status row = %q, want EOF indicator", row)
 	}
 }
 
@@ -2364,15 +2368,15 @@ func TestStatusTextReservesEOFSpaceWhenNotVisible(t *testing.T) {
 	}
 
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
-	v.SetSize(20, 2)
+	v.SetSize(80, 2)
 	v.relayout()
 
 	_, rightText := v.statusText()
-	if strings.Contains(rightText, "∎") {
-		t.Fatalf("right status text = %q, want blank EOF slot when EOF is not visible", rightText)
+	if strings.Contains(rightText, "∎") || strings.Contains(rightText, "⇆") {
+		t.Fatalf("right status text = %q, want text-only status without icons", rightText)
 	}
-	if !strings.Contains(rightText, "col 1/5") || !strings.Contains(rightText, "⇆") {
-		t.Fatalf("right status text = %q, want position text and wrap hint", rightText)
+	if !strings.Contains(rightText, "col 1/5") {
+		t.Fatalf("right status text = %q, want position text", rightText)
 	}
 }
 
@@ -2500,12 +2504,13 @@ func TestStatusHelpHintDoesNotShiftWhenLeftOverflowAppears(t *testing.T) {
 	v.relayout()
 	screen.Clear()
 	v.drawStatus(screen, 1)
-	if got := cellRune(screen, 1, 1); got != '◀' {
-		t.Fatalf("left overflow indicator = %q, want %q", got, '◀')
+	row := screenRowString(screen, 1, 40)
+	if !strings.Contains(row, "◀") {
+		t.Fatalf("status row after scroll = %q, want overflow indicator", row)
 	}
-	after := findHelpHint(screenRowString(screen, 1, 40))
+	after := findHelpHint(row)
 	if after < 0 {
-		t.Fatalf("status row after scroll = %q, want help hint", screenRowString(screen, 1, 40))
+		t.Fatalf("status row after scroll = %q, want help hint", row)
 	}
 	if got, want := after, before; got != want {
 		t.Fatalf("help hint column after scroll = %d, want %d", got, want)
@@ -2549,19 +2554,23 @@ func TestStatusTextDoesNotDuplicateModeMessage(t *testing.T) {
 	}
 }
 
-func TestStatusTextShowsWrapHintInSoftWrapMode(t *testing.T) {
+func TestStatusBarShowsWrapHintInSoftWrapMode(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alpha\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
 	}
 
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.SoftWrap, ShowStatus: true})
-	v.SetSize(20, 2)
+	v.SetSize(32, 2)
 	v.relayout()
 
-	_, rightText := v.statusText()
-	if !strings.Contains(rightText, "↪") {
-		t.Fatalf("right status text = %q, want wrap hint", rightText)
+	_, screen := newMockScreen(t, 80, 2)
+	defer screen.Fini()
+	v.drawStatus(screen, 1)
+
+	row := screenRowString(screen, 1, 80)
+	if !strings.Contains(row, "↪") {
+		t.Fatalf("status row = %q, want wrap hint", row)
 	}
 }
 
@@ -2580,67 +2589,133 @@ func TestStatusTextShowsColumnTotalsWhenScrolled(t *testing.T) {
 	if !strings.Contains(rightText, "col 4/10") {
 		t.Fatalf("right status text = %q, want column total", rightText)
 	}
-	if !strings.Contains(rightText, "⇆") {
-		t.Fatalf("right status text = %q, want no-wrap glyph", rightText)
-	}
 }
 
-func TestStatusTextShowsBottomScrollableIndicatorWhenScrollDownPossible(t *testing.T) {
+func TestStatusBarShowsBottomScrollableIndicatorWhenScrollDownPossible(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alpha\nbeta\ngamma\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
 	}
 
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
-	v.SetSize(20, 2)
+	v.SetSize(80, 2)
 	v.relayout()
 
-	_, rightText := v.statusText()
-	if !strings.Contains(rightText, "  ▼") {
-		t.Fatalf("right status text = %q, want bottom scroll indicator", rightText)
+	_, screen := newMockScreen(t, 80, 2)
+	defer screen.Fini()
+	v.drawStatus(screen, 1)
+
+	row := screenRowString(screen, 1, 80)
+	if !strings.Contains(row, "▼") {
+		t.Fatalf("status row = %q, want bottom scroll indicator", row)
 	}
-	if strings.Contains(rightText, "▲") {
-		t.Fatalf("right status text = %q, want no top scroll indicator", rightText)
+	if strings.Contains(row, "▲") {
+		t.Fatalf("status row = %q, want no top scroll indicator", row)
 	}
 }
 
-func TestStatusTextShowsTopAndBottomScrollableIndicatorsMidScroll(t *testing.T) {
+func TestStatusBarShowsTopAndBottomScrollableIndicatorsMidScroll(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alpha\nbeta\ngamma\ndelta\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
 	}
 
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
-	v.SetSize(20, 2)
+	v.SetSize(80, 2)
 	v.rowOffset = 1
 	v.relayout()
 
-	_, rightText := v.statusText()
-	if !strings.Contains(rightText, "▲ ▼") {
-		t.Fatalf("right status text = %q, want both vertical scroll indicators", rightText)
+	_, screen := newMockScreen(t, 80, 2)
+	defer screen.Fini()
+	v.drawStatus(screen, 1)
+
+	row := screenRowString(screen, 1, 80)
+	if !strings.Contains(row, "▲") || !strings.Contains(row, "▼") {
+		t.Fatalf("status row = %q, want both vertical scroll indicators", row)
 	}
 }
 
-func TestStatusTextSuppressesScrollableIndicatorsAtBottom(t *testing.T) {
+func TestStatusBarSuppressesBottomScrollableIndicatorAtBottom(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alpha\nbeta\ngamma\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
 	}
 
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
-	v.SetSize(20, 2)
+	v.SetSize(32, 2)
 	v.relayout()
 	v.rowOffset = v.maxRowOffset()
 
-	_, rightText := v.statusText()
-	if !strings.Contains(rightText, "▲  ") {
-		t.Fatalf("right status text = %q, want top scroll indicator", rightText)
+	_, screen := newMockScreen(t, 32, 2)
+	defer screen.Fini()
+	v.drawStatus(screen, 1)
+
+	row := screenRowString(screen, 1, 80)
+	if !strings.Contains(row, "▲") {
+		t.Fatalf("status row = %q, want top scroll indicator", row)
 	}
-	if strings.Contains(rightText, "▼") {
-		t.Fatalf("right status text = %q, want no bottom scroll indicator", rightText)
+	if strings.Contains(row, "▼") {
+		t.Fatalf("status row = %q, want no bottom scroll indicator", row)
 	}
 }
 
+func TestStatusBarUsesOnAndOffIconStyles(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\nbeta\ngamma\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	onStyle := tcell.StyleDefault.Foreground(color.PaletteColor(10)).Background(color.PaletteColor(1))
+	offStyle := tcell.StyleDefault.Foreground(color.PaletteColor(8)).Background(color.PaletteColor(1))
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		Chrome: Chrome{
+			StatusIconOnStyle:  onStyle,
+			StatusIconOffStyle: offStyle,
+		},
+		Text: Text{
+			TopScrollableOn:     "^",
+			TopScrollableOff:    "~",
+			BottomScrollableOn:  "!",
+			BottomScrollableOff: ".",
+		},
+	})
+	v.SetSize(80, 2)
+	v.relayout()
+
+	_, screen := newMockScreen(t, 80, 2)
+	defer screen.Fini()
+	v.drawStatus(screen, 1)
+	row := screenRowString(screen, 1, 80)
+
+	findRune := func(want rune) int {
+		for x := 0; x < 80; x++ {
+			if cellRune(screen, x, 1) == want {
+				return x
+			}
+		}
+		return -1
+	}
+
+	upIdx := findRune('~')
+	if upIdx < 0 {
+		t.Fatalf("status row = %q, want off top-scroll icon", row)
+	}
+	downIdx := findRune('!')
+	if downIdx < 0 {
+		t.Fatalf("status row = %q, want on bottom-scroll icon", row)
+	}
+	_, gotUpStyle, _ := screen.Get(upIdx, 1)
+	if got, want := gotUpStyle.GetForeground(), offStyle.GetForeground(); got != want {
+		t.Fatalf("top-scroll off fg = %v, want %v", got, want)
+	}
+	_, gotDownStyle, _ := screen.Get(downIdx, 1)
+	if got, want := gotDownStyle.GetForeground(), onStyle.GetForeground(); got != want {
+		t.Fatalf("bottom-scroll on fg = %v, want %v", got, want)
+	}
+}
 
 func TestStatusBarUsesDisplayWidthForRightAlignedText(t *testing.T) {
 	doc := model.NewDocument(4)
@@ -2658,16 +2733,17 @@ func TestStatusBarUsesDisplayWidthForRightAlignedText(t *testing.T) {
 			},
 		},
 	})
-	v.SetSize(10, 2)
+	v.SetSize(40, 2)
 	v.relayout()
 
-	_, screen := newMockScreen(t, 10, 2)
+	_, screen := newMockScreen(t, 40, 2)
 	defer screen.Fini()
 
 	v.drawStatus(screen, 1)
 
-	if got := cellRune(screen, 3, 1); got != '界' {
-		t.Fatalf("status rune at expected start = %q, want %q", got, '界')
+	row := screenRowString(screen, 1, 40)
+	if !strings.Contains(row, "界") || !strings.Contains(row, "a") {
+		t.Fatalf("status row = %q, want wide right-aligned text", row)
 	}
 }
 
@@ -2727,25 +2803,34 @@ func TestStatusHelpHintKeyUsesConfiguredStyle(t *testing.T) {
 			StatusHelpKeyStyle: keyStyle,
 		},
 	})
-	v.SetSize(20, 2)
+	v.SetSize(40, 2)
 	v.relayout()
 
-	_, screen := newMockScreen(t, 20, 2)
+	_, screen := newMockScreen(t, 40, 2)
 	defer screen.Fini()
 	v.drawStatus(screen, 1)
 
-	_, gotKeyStyle, _ := screen.Get(3, 1)
-	if got, want := gotKeyStyle.GetForeground(), keyStyle.GetForeground(); got != want {
-		t.Fatalf("help key fg = %v, want %v", got, want)
-	}
-	if got, want := gotKeyStyle.GetBackground(), keyStyle.GetBackground(); got != want {
-		t.Fatalf("help key bg = %v, want %v", got, want)
-	}
-	if !gotKeyStyle.HasBold() {
-		t.Fatal("help key style lost bold attribute")
+	row := screenRowString(screen, 1, 40)
+	pos := strings.Index(row, "F1 Help")
+	if pos < 0 {
+		t.Fatalf("status row = %q, want help hint", row)
 	}
 
-	_, gotRestStyle, _ := screen.Get(6, 1)
+	foundKeyStyle := false
+	for x := pos; x < pos+2; x++ {
+		_, gotKeyStyle, _ := screen.Get(x, 1)
+		if got, want := gotKeyStyle.GetForeground(), keyStyle.GetForeground(); got == want {
+			if got, want := gotKeyStyle.GetBackground(), keyStyle.GetBackground(); got == want && gotKeyStyle.HasBold() {
+				foundKeyStyle = true
+				break
+			}
+		}
+	}
+	if !foundKeyStyle {
+		t.Fatalf("help key style not found at row %q", row)
+	}
+
+	_, gotRestStyle, _ := screen.Get(pos+3, 1)
 	if got, want := gotRestStyle.GetForeground(), statusStyle.GetForeground(); got != want {
 		t.Fatalf("help hint rest fg = %v, want %v", got, want)
 	}

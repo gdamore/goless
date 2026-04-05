@@ -32,6 +32,8 @@ type Text struct {
 	FollowMode string
 	// StatusEOF is appended to the built-in status bar when EOF is visible.
 	StatusEOF string
+	// StatusNotEOF is shown in the EOF indicator slot when EOF is not visible.
+	StatusNotEOF string
 	// StatusLine can override the full left and right status bar text.
 	// When nil, the pager assembles the built-in status line from the fields above.
 	StatusLine func(StatusInfo) (left, right string)
@@ -54,10 +56,22 @@ type Text struct {
 	// CommandLine formats the message shown after a successful line jump.
 	CommandLine func(line int) string
 
-	// LeftOverflowIndicator marks undisplayed content to the left in no-wrap mode.
-	LeftOverflowIndicator string
-	// RightOverflowIndicator marks undisplayed content to the right in no-wrap mode.
-	RightOverflowIndicator string
+	// LeftOverflowOn marks undisplayed content to the left in no-wrap mode.
+	LeftOverflowOn string
+	// LeftOverflowOff is shown in the left-overflow indicator slot when inactive.
+	LeftOverflowOff string
+	// RightOverflowOn marks undisplayed content to the right in no-wrap mode.
+	RightOverflowOn string
+	// RightOverflowOff is shown in the right-overflow indicator slot when inactive.
+	RightOverflowOff string
+	// TopScrollableOn marks that vertical scrolling upward is possible.
+	TopScrollableOn string
+	// TopScrollableOff is shown in the top-scroll indicator slot when inactive.
+	TopScrollableOff string
+	// BottomScrollableOn marks that vertical scrolling downward is possible.
+	BottomScrollableOn string
+	// BottomScrollableOff is shown in the bottom-scroll indicator slot when inactive.
+	BottomScrollableOff string
 	// PromptLine can override the full built-in prompt text.
 	// When nil, the pager uses the built-in prefix plus the current input buffer.
 	PromptLine func(PromptInfo) string
@@ -78,6 +92,7 @@ func DefaultText() Text {
 		StatusHelpHint: "F1 Help",
 		FollowMode:     "follow",
 		StatusEOF:      "∎",
+		StatusNotEOF:   " ",
 		SearchEmpty:    "empty search",
 		SearchNotFound: func(query string) string {
 			return fmt.Sprintf("%s not found", query)
@@ -96,7 +111,13 @@ func DefaultText() Text {
 		CommandLine: func(line int) string {
 			return fmt.Sprintf("line %d", line)
 		},
-		LeftOverflowIndicator:  "◀",
-		RightOverflowIndicator: "▶",
+		LeftOverflowOn:      "◀",
+		LeftOverflowOff:     " ",
+		RightOverflowOn:     "▶",
+		RightOverflowOff:    " ",
+		TopScrollableOn:     "▲",
+		TopScrollableOff:    " ",
+		BottomScrollableOn:  "▼",
+		BottomScrollableOff: " ",
 	}
 }

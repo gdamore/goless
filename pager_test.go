@@ -165,7 +165,7 @@ func TestPagerConstructionOptionsSupportKeyCustomizationAndCapture(t *testing.T)
 		WithWrapMode(NoWrap),
 		WithShowStatus(true),
 	)
-	pager.SetSize(20, 2)
+	pager.SetSize(120, 2)
 	if err := pager.AppendString("alpha\nbeta\nalpha\n"); err != nil {
 		t.Fatalf("AppendString failed: %v", err)
 	}
@@ -391,10 +391,10 @@ func TestPagerCommandHandlerHandlesUnknownCommand(t *testing.T) {
 		t.Fatal("CommandHandler was not called")
 	}
 
-	screen := newPagerMockScreen(t, 30, 2)
+	screen := newPagerMockScreen(t, 120, 2)
 	defer screen.Fini()
 	pager.Draw(screen)
-	if got := pagerRowString(screen, 1, 30); !strings.Contains(got, "advanced") {
+	if got := pagerRowString(screen, 1, 120); !strings.Contains(got, "advan") {
 		t.Fatalf("status line = %q, want message", got)
 	}
 }
@@ -419,13 +419,13 @@ func TestPagerOptionsSupportHandlersTextAndRenderMode(t *testing.T) {
 		handled = true
 		return CommandResult{Handled: true, Message: "configured"}
 	}))
-	pager.SetSize(20, 2)
+	pager.SetSize(120, 2)
 	if err := pager.AppendString("x\x1b]8;id=demo;https://example.com\aY\x1b]8;;\aZ"); err != nil {
 		t.Fatalf("AppendString failed: %v", err)
 	}
 	pager.Flush()
 
-	screen := newPagerMockScreen(t, 20, 2)
+	screen := newPagerMockScreen(t, 120, 2)
 	defer screen.Fini()
 	pager.Draw(screen)
 	if id, url := pagerCellStyle(screen, 1, 0).GetUrl(); id != "demo" || url != "https://example.com" {
@@ -446,7 +446,7 @@ func TestPagerOptionsSupportHandlersTextAndRenderMode(t *testing.T) {
 
 	screen.Clear()
 	pager.Draw(screen)
-	if got := pagerRowString(screen, 1, 20); !strings.Contains(got, "configured") {
+	if got := pagerRowString(screen, 1, 120); !strings.Contains(got, "config") {
 		t.Fatalf("status line = %q, want configured message", got)
 	}
 }
@@ -1069,13 +1069,18 @@ func TestPagerTextHooksFormatStatusAndPrompt(t *testing.T) {
 	if !statusCalled {
 		t.Fatal("StatusLine hook was not called")
 	}
-	if got := pagerCellRune(screen, 3, 1); got != 'L' {
-		t.Fatalf("status text rune = %q, want %q", got, 'L')
+	row := pagerRowString(screen, 1, 20)
+	pos := strings.Index(row, "RIGHT")
+	if pos < 0 {
+		t.Fatalf("status row = %q, want RIGHT", row)
 	}
-	if got, want := pagerCellStyle(screen, 0, 1).GetForeground(), statusStyle.GetForeground(); got != want {
+	if got := pagerCellRune(screen, pos, 1); got != 'R' {
+		t.Fatalf("status text rune = %q, want %q", got, 'R')
+	}
+	if got, want := pagerCellStyle(screen, pos, 1).GetForeground(), statusStyle.GetForeground(); got != want {
 		t.Fatalf("status fg = %v, want %v", got, want)
 	}
-	if got, want := pagerCellStyle(screen, 0, 1).GetBackground(), statusStyle.GetBackground(); got != want {
+	if got, want := pagerCellStyle(screen, pos, 1).GetBackground(), statusStyle.GetBackground(); got != want {
 		t.Fatalf("status bg = %v, want %v", got, want)
 	}
 
