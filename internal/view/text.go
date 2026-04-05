@@ -5,7 +5,6 @@ package view
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/gdamore/goless/internal/defaults"
 )
@@ -45,13 +44,6 @@ type Text struct {
 	BottomScrollableOn  string
 	BottomScrollableOff string
 	PromptLine          func(PromptInfo) string
-}
-
-func (t Text) helpLines() []string {
-	if t.HelpBody == "" {
-		return nil
-	}
-	return strings.Split(t.HelpBody, "\n")
 }
 
 func (t Text) withDefaults() Text {
