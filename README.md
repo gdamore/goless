@@ -335,7 +335,7 @@ Program flags:
 - `-i` for smart-case search behavior
 - `-I` for case-insensitive search behavior
 - `-x n` to set tab width
-- `-preset none|dark|light|plain|pretty`
+- `-preset dark|light|plain|pretty`
 - `-chrome auto|none|single|rounded`
 - `-hidden`
 - `-live-links`
