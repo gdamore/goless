@@ -272,7 +272,7 @@ func run() error {
 
 func parseProgramFlags(args []string, output io.Writer) (programOptions, []string, error) {
 	opts := programOptions{
-		presetName:     "none",
+		presetName:     "pretty",
 		chromeName:     "auto",
 		renderName:     "hybrid",
 		searchCaseMode: goless.SearchSmartCase,
@@ -300,7 +300,7 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	fs.BoolVar(&opts.quitAtEOFFirst, "QUIT-AT-EOF", false, "long form of -E")
 	fs.BoolVar(&opts.squeeze, "s", false, "collapse repeated blank lines in the current view")
 	fs.BoolVar(&opts.squeeze, "squeeze", false, "collapse repeated blank lines in the current view")
-	fs.StringVar(&opts.presetName, "preset", "none", "visual preset: none, dark, light, plain, pretty")
+	fs.StringVar(&opts.presetName, "preset", "pretty", "visual preset: none, dark, light, plain, pretty")
 	fs.StringVar(&opts.chromeName, "chrome", "auto", "chrome override: auto, none, single, rounded")
 	fs.StringVar(&opts.renderName, "render", "hybrid", "render mode: hybrid, literal, presentation")
 	fs.StringVar(&opts.title, "title", "", "frame title")
@@ -1002,8 +1002,6 @@ func programPreset(name string) (goless.Preset, error) {
 		return goless.PlainPreset, nil
 	case "pretty":
 		return goless.PrettyPreset, nil
-	case "none", "":
-		return goless.Preset{}, nil
 	default:
 		return goless.Preset{}, fmt.Errorf("unknown preset %q; expected none, dark, light, plain, or pretty", name)
 	}
@@ -1017,8 +1015,6 @@ func nextProgramPresetName(current string) string {
 		return "plain"
 	case "plain":
 		return "pretty"
-	case "pretty":
-		return "none"
 	default:
 		return "dark"
 	}
