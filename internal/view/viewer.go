@@ -579,7 +579,11 @@ func (v *Viewer) ScrollRight(n int) {
 	if v.cfg.WrapMode != layout.NoWrap {
 		return
 	}
+	v.ensureLayout()
 	v.colOffset += max(n, 0)
+	if maxOffset := v.maxColOffset(); v.colOffset > maxOffset {
+		v.colOffset = maxOffset
+	}
 	v.relayout()
 }
 
@@ -588,7 +592,11 @@ func (v *Viewer) ScrollLeft(n int) {
 	if v.cfg.WrapMode != layout.NoWrap {
 		return
 	}
+	v.ensureLayout()
 	v.colOffset -= max(n, 0)
+	if v.colOffset < 0 {
+		v.colOffset = 0
+	}
 	v.relayout()
 }
 
@@ -626,6 +634,9 @@ func (v *Viewer) GoLineEnd() {
 	totalCells := v.layout.Lines[lineIndex].TotalCells + v.trailingMarkerCellWidth(lineIndex)
 	frozen := v.headerColumnWidth(v.rawContentWidth())
 	v.colOffset = max(totalCells-frozen-max(v.bodyContentWidth(), 1), 0)
+	if maxOffset := v.maxColOffset(); v.colOffset > maxOffset {
+		v.colOffset = maxOffset
+	}
 	v.relayout()
 }
 

@@ -839,6 +839,36 @@ func TestHorizontalScrollStepUsesQuarterWidthCappedAtEight(t *testing.T) {
 	}
 }
 
+func TestScrollRightDoesNotMoveWhenLineFullyVisible(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abc")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(3, 1)
+
+	_, screen := newMockScreen(t, 3, 1)
+	defer screen.Fini()
+
+	v.Draw(screen)
+	before := screenRowString(screen, 0, 3)
+
+	v.HandleKey(keyKey(tcell.KeyRight))
+	v.Draw(screen)
+	after := screenRowString(screen, 0, 3)
+
+	if got, want := before, "abc"; got != want {
+		t.Fatalf("initial row = %q, want %q", got, want)
+	}
+	if got, want := after, before; got != want {
+		t.Fatalf("row after Right = %q, want %q", got, want)
+	}
+	if got, want := v.colOffset, 0; got != want {
+		t.Fatalf("col offset after Right = %d, want %d", got, want)
+	}
+}
+
 func TestAngleBracketsRemainFineHorizontalScroll(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyz\n")); err != nil {
