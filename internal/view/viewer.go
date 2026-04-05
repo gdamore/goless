@@ -1243,45 +1243,54 @@ func (v *Viewer) drawFrame(screen tcell.Screen, title string) {
 
 func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 	style := v.cfg.Chrome.StatusStyle
+	iconOnStyle := v.cfg.Chrome.StatusIconOnStyle
+	iconOffStyle := v.cfg.Chrome.StatusIconOffStyle
 	screen.PutStrStyled(0, y, strings.Repeat(" ", max(v.width, 0)), style)
 
 	leftOverflow, rightOverflow := v.statusOverflow()
 	leftText, rightText := v.statusText()
+	canScrollUp, canScrollDown := v.statusScrollable()
 
-	leftIndicatorReserve := 0
+	rightIcons := make([]statusIcon, 0, 5)
+	rightIcons = append(rightIcons, statusIcon{
+		on:     v.statusModeHint(),
+		off:    " ",
+		active: true,
+	})
+	rightIcons = append(rightIcons, statusIcon{
+		on:     v.text.StatusEOF,
+		off:    v.text.StatusNotEOF,
+		active: v.EOFVisible(),
+	})
+	rightIcons = append(rightIcons, statusIcon{
+		on:     v.text.LeftOverflowOn,
+		off:    v.text.LeftOverflowOff,
+		active: leftOverflow,
+	})
+	rightIcons = append(rightIcons, statusIcon{
+		on:     v.text.TopScrollableOn,
+		off:    v.text.TopScrollableOff,
+		active: canScrollUp,
+	})
+	rightIcons = append(rightIcons, statusIcon{
+		on:     v.text.BottomScrollableOn,
+		off:    v.text.BottomScrollableOff,
+		active: canScrollDown,
+	})
 	if v.cfg.WrapMode == layout.NoWrap {
-		leftIndicatorReserve = stringWidth(v.text.LeftOverflowIndicator)
+		rightIcons = append(rightIcons, statusIcon{
+			on:     v.text.RightOverflowOn,
+			off:    v.text.RightOverflowOff,
+			active: rightOverflow,
+		})
 	}
-	leftIndicatorWidth := 0
-	if leftOverflow {
-		leftIndicatorWidth = stringWidth(v.text.LeftOverflowIndicator)
-		if leftIndicatorWidth > 0 && v.width > 1 {
-			screen.PutStrStyled(1, y, truncateToWidth(v.text.LeftOverflowIndicator, v.width-1), style)
-		}
-	}
-
-	rightIndicatorWidth := 0
-	rightIndicatorStart := v.width - 1
-	if rightOverflow {
-		rightIndicatorWidth = stringWidth(v.text.RightOverflowIndicator)
-		rightIndicatorStart = max(v.width-1-rightIndicatorWidth, 0)
-		if rightIndicatorWidth > 0 && rightIndicatorStart < v.width-1 {
-			screen.PutStrStyled(rightIndicatorStart, y, truncateToWidth(v.text.RightOverflowIndicator, v.width-1-rightIndicatorStart), style)
-		}
-	}
-
-	leftStart := 2 + leftIndicatorReserve
-	rightLimit := v.width - 1
-	if rightOverflow {
-		rightLimit = rightIndicatorStart - 1
-	}
-	if rightLimit < leftStart {
-		rightLimit = leftStart
-	}
-
-	rightTextWidth := min(stringWidth(rightText), max(rightLimit-leftStart, 0))
+	leftStart := 1
+	rightIconsWidth := statusIconsWidth(rightIcons)
+	rightIconsStart := max(v.width-rightIconsWidth, leftStart)
+	rightTextLimit := max(rightIconsStart-1, leftStart)
+	rightTextWidth := min(stringWidth(rightText), max(rightTextLimit-leftStart, 0))
 	rightText = truncateToWidth(rightText, rightTextWidth)
-	rightStart := max(rightLimit-stringWidth(rightText), leftStart)
+	rightStart := max(rightTextLimit-stringWidth(rightText), leftStart)
 
 	leftWidth := max(rightStart-leftStart-1, 0)
 	if leftWidth > 0 {
@@ -1291,9 +1300,12 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 			screen.PutStrStyled(leftStart, y, keyText, v.cfg.Chrome.StatusHelpKeyStyle)
 		}
 	}
-	if rightText != "" && rightStart < rightLimit {
+	if rightText != "" && rightStart < rightIconsStart {
 		screen.PutStrStyled(rightStart, y, rightText, style)
 		v.drawHintKeys(screen, rightStart, y, rightText, v.cfg.Chrome.StatusHelpKeyStyle, "F2:", "F3:")
+	}
+	if rightIconsWidth > 0 && rightIconsStart < v.width {
+		drawStatusIcons(screen, rightIconsStart, y, rightIcons, iconOnStyle, iconOffStyle, style, v.width-rightIconsStart)
 	}
 }
 
@@ -1567,27 +1579,6 @@ func (v *Viewer) statusText() (left, right string) {
 	current := v.logicalRowNumber(rowIndex, ok)
 	column := v.logicalColumnNumber(rowIndex, ok)
 	right = v.text.StatusPosition(current, len(v.sourceLines), column, v.maxContentColumns())
-	if eofHint := v.statusEOFHint(); eofHint != "" {
-		if right != "" {
-			right += "  " + eofHint
-		} else {
-			right = eofHint
-		}
-	}
-	if modeHint := v.statusModeHint(); modeHint != "" {
-		if right != "" {
-			right += "  " + modeHint
-		} else {
-			right = modeHint
-		}
-	}
-	if scrollHint := v.statusScrollHint(); scrollHint != "" {
-		if right != "" {
-			right += "  " + scrollHint
-		} else {
-			right = scrollHint
-		}
-	}
 	if v.text.StatusLine != nil {
 		return v.text.StatusLine(StatusInfo{
 			Search:     v.SearchSnapshot(),
@@ -1614,34 +1605,68 @@ func (v *Viewer) statusModeHint() string {
 	return "⇆"
 }
 
-func (v *Viewer) statusEOFHint() string {
-	width := max(stringWidth(v.text.StatusEOF), 1)
-	if v.EOFVisible() {
-		return v.text.StatusEOF
-	}
-	return strings.Repeat(" ", width)
-}
-
-func (v *Viewer) statusScrollHint() string {
-	canScrollUp, canScrollDown := v.statusScrollable()
-	if !canScrollUp && !canScrollDown && v.maxRowOffset() == 0 {
-		return ""
-	}
-	top := " "
-	bottom := " "
-	if canScrollUp {
-		top = v.text.TopScrollableIndicator
-	}
-	if canScrollDown {
-		bottom = v.text.BottomScrollableIndicator
-	}
-	return top + " " + bottom
-}
-
 func (v *Viewer) statusScrollable() (up, down bool) {
 	v.ensureLayout()
 	maxOffset := v.maxRowOffset()
 	return v.rowOffset > 0, v.rowOffset < maxOffset
+}
+
+type statusIcon struct {
+	on     string
+	off    string
+	active bool
+}
+
+func (i statusIcon) text() string {
+	if i.active {
+		return i.on
+	}
+	return i.off
+}
+
+func (i statusIcon) width() int {
+	return max(stringWidth(i.on), stringWidth(i.off))
+}
+
+func statusIconsWidth(icons []statusIcon) int {
+	if len(icons) == 0 {
+		return 0
+	}
+	width := 1
+	for _, icon := range icons {
+		width += icon.width()
+	}
+	if len(icons) > 1 {
+		width += len(icons) - 1
+	}
+	return width
+}
+
+func drawStatusIcons(screen tcell.Screen, x, y int, icons []statusIcon, onStyle, offStyle, sepStyle tcell.Style, maxWidth int) {
+	used := 0
+	for i, icon := range icons {
+		iconWidth := icon.width()
+		if iconWidth <= 0 || used >= maxWidth {
+			continue
+		}
+		text := truncateToWidth(icon.text(), min(iconWidth, maxWidth-used))
+		iconStyle := offStyle
+		if icon.active {
+			iconStyle = onStyle
+		}
+		screen.PutStrStyled(x+used, y, text, iconStyle)
+		used += iconWidth
+		if i < len(icons)-1 {
+			if used >= maxWidth {
+				return
+			}
+			screen.PutStrStyled(x+used, y, " ", sepStyle)
+			used++
+		}
+	}
+	if used < maxWidth {
+		screen.PutStrStyled(x+used, y, " ", sepStyle)
+	}
 }
 
 func (v *Viewer) statusOverflow() (left, right bool) {

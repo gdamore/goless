@@ -726,6 +726,9 @@ func toInternalText(text Text) iview.Text {
 	if text.StatusEOF == "" {
 		text.StatusEOF = defaults.StatusEOF
 	}
+	if text.StatusNotEOF == "" {
+		text.StatusNotEOF = defaults.StatusNotEOF
+	}
 	if text.SearchEmpty == "" {
 		text.SearchEmpty = defaults.SearchEmpty
 	}
@@ -750,33 +753,58 @@ func toInternalText(text Text) iview.Text {
 	if text.CommandLine == nil {
 		text.CommandLine = defaults.CommandLine
 	}
-	if text.LeftOverflowIndicator == "" {
-		text.LeftOverflowIndicator = defaults.LeftOverflowIndicator
+	if text.LeftOverflowOn == "" {
+		text.LeftOverflowOn = defaults.LeftOverflowOn
 	}
-	if text.RightOverflowIndicator == "" {
-		text.RightOverflowIndicator = defaults.RightOverflowIndicator
+	if text.LeftOverflowOff == "" {
+		text.LeftOverflowOff = defaults.LeftOverflowOff
+	}
+	if text.RightOverflowOn == "" {
+		text.RightOverflowOn = defaults.RightOverflowOn
+	}
+	if text.RightOverflowOff == "" {
+		text.RightOverflowOff = defaults.RightOverflowOff
+	}
+	if text.TopScrollableOn == "" {
+		text.TopScrollableOn = defaults.TopScrollableOn
+	}
+	if text.TopScrollableOff == "" {
+		text.TopScrollableOff = defaults.TopScrollableOff
+	}
+	if text.BottomScrollableOn == "" {
+		text.BottomScrollableOn = defaults.BottomScrollableOn
+	}
+	if text.BottomScrollableOff == "" {
+		text.BottomScrollableOff = defaults.BottomScrollableOff
 	}
 
 	itext := iview.Text{
-		HelpTitle:              text.HelpTitle,
-		HelpClose:              text.HelpClose,
-		HelpBody:               text.HelpBody,
-		StatusSearchInfo:       text.StatusSearchInfo,
-		StatusPosition:         text.StatusPosition,
-		StatusHelpHint:         text.StatusHelpHint,
-		HideStatusHelpHint:     text.HideStatusHelpHint,
-		FollowMode:             text.FollowMode,
-		StatusEOF:              text.StatusEOF,
-		SearchEmpty:            text.SearchEmpty,
-		SearchNotFound:         text.SearchNotFound,
-		SearchMatchCount:       text.SearchMatchCount,
-		SearchNone:             text.SearchNone,
-		CommandUnknown:         text.CommandUnknown,
-		CommandLineStart:       text.CommandLineStart,
-		CommandOutOfRange:      text.CommandOutOfRange,
-		CommandLine:            text.CommandLine,
-		LeftOverflowIndicator:  text.LeftOverflowIndicator,
-		RightOverflowIndicator: text.RightOverflowIndicator,
+		HelpTitle:           text.HelpTitle,
+		HelpClose:           text.HelpClose,
+		HelpBody:            text.HelpBody,
+		StatusSearchInfo:    text.StatusSearchInfo,
+		StatusPosition:      text.StatusPosition,
+		StatusHelpHint:      text.StatusHelpHint,
+		HideStatusHelpHint:  text.HideStatusHelpHint,
+		FollowMode:          text.FollowMode,
+		StatusEOF:           text.StatusEOF,
+		StatusNotEOF:        text.StatusNotEOF,
+		SearchEmpty:         text.SearchEmpty,
+		SearchNotFound:      text.SearchNotFound,
+		SearchMatchCount:    text.SearchMatchCount,
+		SearchNone:          text.SearchNone,
+		CommandUnknown:      text.CommandUnknown,
+		CommandLineStart:    text.CommandLineStart,
+		CommandOutOfRange:   text.CommandOutOfRange,
+		CommandLine:         text.CommandLine,
+		LeftOverflowOn:      text.LeftOverflowOn,
+		LeftOverflowOff:     text.LeftOverflowOff,
+		RightOverflowOn:     text.RightOverflowOn,
+		RightOverflowOff:    text.RightOverflowOff,
+		TopScrollableOn:     text.TopScrollableOn,
+		TopScrollableOff:    text.TopScrollableOff,
+		BottomScrollableOn:  text.BottomScrollableOn,
+		BottomScrollableOff: text.BottomScrollableOff,
 	}
 	if text.StatusLine != nil {
 		itext.StatusLine = func(info iview.StatusInfo) (left, right string) {
@@ -816,6 +844,8 @@ func toInternalChrome(chrome Chrome) iview.Chrome {
 		BorderStyle:        chrome.BorderStyle,
 		TitleStyle:         chrome.TitleStyle,
 		StatusStyle:        chrome.StatusStyle,
+		StatusIconOnStyle:  chrome.StatusIconOnStyle,
+		StatusIconOffStyle: chrome.StatusIconOffStyle,
 		StatusHelpKeyStyle: chrome.StatusHelpKeyStyle,
 		LineNumberStyle:    chrome.LineNumberStyle,
 		HeaderStyle:        chrome.HeaderStyle,

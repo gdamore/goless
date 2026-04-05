@@ -23,6 +23,7 @@ type Text struct {
 	HideStatusHelpHint bool
 	FollowMode         string
 	StatusEOF          string
+	StatusNotEOF       string
 	StatusLine         func(StatusInfo) (left, right string)
 
 	SearchEmpty      string
@@ -35,11 +36,15 @@ type Text struct {
 	CommandOutOfRange func(line int) string
 	CommandLine       func(line int) string
 
-	LeftOverflowIndicator     string
-	RightOverflowIndicator    string
-	TopScrollableIndicator    string
-	BottomScrollableIndicator string
-	PromptLine                func(PromptInfo) string
+	LeftOverflowOn      string
+	LeftOverflowOff     string
+	RightOverflowOn     string
+	RightOverflowOff    string
+	TopScrollableOn     string
+	TopScrollableOff    string
+	BottomScrollableOn  string
+	BottomScrollableOff string
+	PromptLine          func(PromptInfo) string
 }
 
 func (t Text) helpLines() []string {
@@ -76,6 +81,9 @@ func (t Text) withDefaults() Text {
 	if t.StatusEOF == "" {
 		t.StatusEOF = defaults.StatusEOF
 	}
+	if t.StatusNotEOF == "" {
+		t.StatusNotEOF = defaults.StatusNotEOF
+	}
 	if t.SearchEmpty == "" {
 		t.SearchEmpty = defaults.SearchEmpty
 	}
@@ -100,17 +108,29 @@ func (t Text) withDefaults() Text {
 	if t.CommandLine == nil {
 		t.CommandLine = defaults.CommandLine
 	}
-	if t.LeftOverflowIndicator == "" {
-		t.LeftOverflowIndicator = defaults.LeftOverflowIndicator
+	if t.LeftOverflowOn == "" {
+		t.LeftOverflowOn = defaults.LeftOverflowOn
 	}
-	if t.RightOverflowIndicator == "" {
-		t.RightOverflowIndicator = defaults.RightOverflowIndicator
+	if t.LeftOverflowOff == "" {
+		t.LeftOverflowOff = defaults.LeftOverflowOff
 	}
-	if t.TopScrollableIndicator == "" {
-		t.TopScrollableIndicator = defaults.TopScrollableIndicator
+	if t.RightOverflowOn == "" {
+		t.RightOverflowOn = defaults.RightOverflowOn
 	}
-	if t.BottomScrollableIndicator == "" {
-		t.BottomScrollableIndicator = defaults.BottomScrollableIndicator
+	if t.RightOverflowOff == "" {
+		t.RightOverflowOff = defaults.RightOverflowOff
+	}
+	if t.TopScrollableOn == "" {
+		t.TopScrollableOn = defaults.TopScrollableOn
+	}
+	if t.TopScrollableOff == "" {
+		t.TopScrollableOff = defaults.TopScrollableOff
+	}
+	if t.BottomScrollableOn == "" {
+		t.BottomScrollableOn = defaults.BottomScrollableOn
+	}
+	if t.BottomScrollableOff == "" {
+		t.BottomScrollableOff = defaults.BottomScrollableOff
 	}
 
 	return t
@@ -130,6 +150,7 @@ func defaultText() Text {
 		StatusHelpHint: "F1 Help",
 		FollowMode:     "follow",
 		StatusEOF:      "∎",
+		StatusNotEOF:   " ",
 		SearchEmpty:    "empty search",
 		SearchNotFound: func(query string) string {
 			return fmt.Sprintf("%s not found", query)
@@ -148,9 +169,13 @@ func defaultText() Text {
 		CommandLine: func(line int) string {
 			return fmt.Sprintf("line %d", line)
 		},
-		LeftOverflowIndicator:     "◀",
-		RightOverflowIndicator:    "▶",
-		TopScrollableIndicator:    "▲",
-		BottomScrollableIndicator: "▼",
+		LeftOverflowOn:      "◀",
+		LeftOverflowOff:     " ",
+		RightOverflowOn:     "▶",
+		RightOverflowOff:    " ",
+		TopScrollableOn:     "▲",
+		TopScrollableOff:    " ",
+		BottomScrollableOn:  "▼",
+		BottomScrollableOff: " ",
 	}
 }
