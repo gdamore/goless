@@ -141,12 +141,15 @@ var PlainPreset = Preset{
 		},
 	},
 	Chrome: Chrome{
-		TitleAlign:       TitleAlignLeft,
-		StatusStyle:      tcell.StyleDefault.Reverse(true),
-		LineNumberStyle:  tcell.StyleDefault.Dim(true),
-		HeaderStyle:      tcell.StyleDefault.Reverse(true).Dim(true),
-		PromptStyle:      tcell.StyleDefault.Reverse(true),
-		PromptErrorStyle: tcell.StyleDefault.Reverse(true).Bold(true),
+		TitleAlign:         TitleAlignLeft,
+		StatusStyle:        tcell.StyleDefault.Reverse(true),
+		StatusIconOnStyle:  tcell.StyleDefault.Reverse(true).Dim(true),
+		StatusIconOffStyle: tcell.StyleDefault.Reverse(true).Dim(true),
+		StatusHelpKeyStyle: tcell.StyleDefault.Reverse(true).Bold(true),
+		LineNumberStyle:    tcell.StyleDefault.Dim(true),
+		HeaderStyle:        tcell.StyleDefault.Reverse(true).Dim(true),
+		PromptStyle:        tcell.StyleDefault.Reverse(true),
+		PromptErrorStyle:   tcell.StyleDefault.Reverse(true).Bold(true),
 	},
 }
 
