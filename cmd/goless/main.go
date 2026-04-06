@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -47,6 +48,7 @@ type programOptions struct {
 	squeeze           bool
 	tabWidth          int
 	title             string
+	version           bool
 }
 
 type programViewportSnapshot struct {
@@ -67,6 +69,10 @@ func run() error {
 		return err
 	}
 	if opts.showHelp {
+		return nil
+	}
+	if opts.version {
+		fmt.Printf("goless version %s", version())
 		return nil
 	}
 
@@ -282,7 +288,7 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	fs := flag.NewFlagSet("goless", flag.ContinueOnError)
 	fs.SetOutput(output)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-F|-N|-R|-S|-i|-I|-s] [-x n] [-preset dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [+line|+/pattern] [path ...]\n")
+		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-F|-N|-R|-S|-i|-I|-s] [-x n] [-preset dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [+line|+/pattern] [-version] [path ...]\n")
 	}
 
 	fs.BoolVar(&opts.showHelp, "?", false, "show help")
@@ -305,6 +311,7 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	fs.StringVar(&opts.renderName, "render", "hybrid", "render mode: hybrid, literal, presentation")
 	fs.StringVar(&opts.title, "title", "", "frame title")
 	fs.IntVar(&opts.tabWidth, "x", 8, "tab width")
+	fs.BoolVar(&opts.version, "version", false, "display program version and exit")
 
 	var ignoreSmartCase bool
 	var ignoreCase bool
@@ -710,6 +717,13 @@ func (s *programSession) currentFileLabel() string {
 	return fmt.Sprintf("%s (%d/%d)", programInputLabel(s.currentFile()), s.index+1, len(s.files))
 }
 
+func version() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		return info.Main.Version
+	}
+	return "unknown"
+}
+
 func (s *programSession) chrome(base goless.Chrome) goless.Chrome {
 	chrome := base
 	if s.hasFiles() {
@@ -769,6 +783,8 @@ func (s *programSession) commandHandler(reload func() error) func(goless.Command
 			return goless.CommandResult{Handled: true, Quit: true}
 		case "file", "f":
 			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
+		case "version":
+			return goless.CommandResult{Handled: true, Message: version()}
 		case "next", "n":
 			if !s.canNext() {
 				return goless.CommandResult{Handled: true, Message: "already at last file"}
