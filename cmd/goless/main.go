@@ -72,7 +72,7 @@ func run() error {
 		return nil
 	}
 	if opts.version {
-		fmt.Printf("goless version %s", version())
+		fmt.Printf("goless version %s\n", version())
 		return nil
 	}
 
