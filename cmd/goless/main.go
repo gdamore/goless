@@ -522,10 +522,6 @@ func appendFromReader(pager *goless.Pager, r io.Reader, onChunk func()) error {
 	}
 }
 
-func readIntoPager(pager *goless.Pager, r io.Reader, eventQ chan tcell.Event, result chan<- error) {
-	readIntoPagerWithAfter(pager, r, eventQ, result, nil)
-}
-
 func readIntoPagerWithAfter(pager *goless.Pager, r io.Reader, eventQ chan tcell.Event, result chan<- error, after func(error)) {
 	err := appendFromReader(pager, r, func() {
 		eventQ <- tcell.NewEventInterrupt(nil)
