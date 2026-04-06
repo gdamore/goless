@@ -521,6 +521,20 @@ func TestParseProgramFlagsRejectsNonPositiveTabWidth(t *testing.T) {
 	}
 }
 
+func TestParseProgramFlagsVersion(t *testing.T) {
+	var out bytes.Buffer
+	opts, args, err := parseProgramFlags([]string{"-version"}, &out)
+	if err != nil {
+		t.Fatalf("parseProgramFlags(-version) failed: %v", err)
+	}
+	if !opts.version {
+		t.Fatal("parseProgramFlags(-version) did not set version")
+	}
+	if len(args) != 0 {
+		t.Fatalf("len(args) after -version = %d, want 0", len(args))
+	}
+}
+
 func TestParseProgramFlagsHelp(t *testing.T) {
 	var out bytes.Buffer
 	opts, args, err := parseProgramFlags([]string{"--help"}, &out)
@@ -667,6 +681,14 @@ func TestDemoSessionAdditionalCommands(t *testing.T) {
 	}
 	if got, want := result.Message, "one.txt (1/3)"; got != want {
 		t.Fatalf("file command message = %q, want %q", got, want)
+	}
+
+	result = handler(goless.Command{Name: "version"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("version command result = %+v, want handled non-quit", result)
+	}
+	if result.Message == "" {
+		t.Fatalf("version is missing")
 	}
 
 	result = handler(goless.Command{Name: "last"})
