@@ -45,6 +45,7 @@ type programOptions struct {
 	renderName        string
 	searchCaseMode    goless.SearchCaseMode
 	showHelp          bool
+	showLicense       bool
 	squeeze           bool
 	tabWidth          int
 	title             string
@@ -97,10 +98,14 @@ func run() error {
 		return err
 	}
 	if !stdoutIsTerminal() {
+		if opts.showLicense {
+			_, err := io.WriteString(os.Stdout, goless.LicenseText())
+			return err
+		}
 		return passThroughProgramInputs(os.Stdout, os.Stdin, files)
 	}
 
-	if stdinIsTerminal() && (!session.hasFiles() || programInputsUseStdin(files)) {
+	if stdinIsTerminal() && programRequiresInput(opts, files) {
 		return fmt.Errorf("stdin is a terminal; specify a file or pipe input")
 	}
 
@@ -137,16 +142,27 @@ func run() error {
 			opts.searchCaseMode,
 			opts.squeeze,
 			opts.tabWidth,
-			session.commandHandler(func() error {
-				if reloadCurrent == nil {
-					return fmt.Errorf("file reload unavailable")
-				}
-				_, err := reloadCurrent()
-				return err
-			}),
+			session.commandHandler(
+				func() error {
+					if reloadCurrent == nil {
+						return fmt.Errorf("file reload unavailable")
+					}
+					_, err := reloadCurrent()
+					return err
+				},
+				func(title, body string) {
+					if pager != nil {
+						pager.ShowInformation(title, body)
+					}
+				},
+			),
 		)
 	}
-	if session.hasFiles() {
+	if opts.showLicense {
+		pager = buildProgramPager()
+		pager.SetSize(width, height)
+		pager.ShowInformation("Apache License 2.0", goless.LicenseText())
+	} else if session.hasFiles() {
 		reloadCurrent = func() (bool, error) {
 			loaded, snapshot, err := reloadProgramInput(session, inputLoader, &pager, buildProgramPager, width, height, screen.EventQ(), &readResult)
 			if err == nil {
@@ -163,21 +179,23 @@ func run() error {
 		readResult = startProgramRead(pager, os.Stdin, screen.EventQ(), nil)
 	}
 	pager.Draw(screen)
-	quit, err := handleProgramQuitIfOneScreen(quitIfOneScreenArmed, session, func() programViewportSnapshot { return pagerSnapshot }, readResult == nil, reloadCurrent)
-	if err != nil {
-		return err
-	}
-	pager.Draw(screen)
-	if quit {
-		return programExit(screen, quitAtEOFPolicy)
-	}
-	quit, err = handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, readResult == nil, reloadCurrent)
-	if err != nil {
-		return err
-	}
-	pager.Draw(screen)
-	if quit {
-		return programExit(screen, quitAtEOFPolicy)
+	if !opts.showLicense {
+		quit, err := handleProgramQuitIfOneScreen(quitIfOneScreenArmed, session, func() programViewportSnapshot { return pagerSnapshot }, readResult == nil, reloadCurrent)
+		if err != nil {
+			return err
+		}
+		pager.Draw(screen)
+		if quit {
+			return programExit(screen, quitAtEOFPolicy)
+		}
+		quit, err = handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, readResult == nil, reloadCurrent)
+		if err != nil {
+			return err
+		}
+		pager.Draw(screen)
+		if quit {
+			return programExit(screen, quitAtEOFPolicy)
+		}
 	}
 
 	for {
@@ -209,6 +227,7 @@ func run() error {
 			}
 			before := pager.Position()
 			beforeFollowing := pager.Following()
+			wasShowingInformation := pager.ShowingInformation()
 			result := pager.HandleKeyResult(event)
 			if shouldHandleProgramStatusKey(result) && handleProgramStatusKey(pager, event) {
 				pager.Draw(screen)
@@ -217,13 +236,18 @@ func run() error {
 			if result.Quit {
 				return programExit(screen, quitAtEOFPolicy)
 			}
-			quit, err := handleProgramVisibleEOFAction(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, result, readResult == nil, reloadCurrent)
-			if err != nil {
-				return err
-			}
-			pager.Draw(screen)
-			if quit {
+			if programShouldQuitAfterOverlayClose(session, pager, wasShowingInformation, result) {
 				return programExit(screen, quitAtEOFPolicy)
+			}
+			if !opts.showLicense {
+				quit, err := handleProgramVisibleEOFAction(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, result, readResult == nil, reloadCurrent)
+				if err != nil {
+					return err
+				}
+				pager.Draw(screen)
+				if quit {
+					return programExit(screen, quitAtEOFPolicy)
+				}
 			}
 			if quit, err := applyProgramQuitAtEOF(
 				quitAtEOFPolicy,
@@ -288,12 +312,13 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	fs := flag.NewFlagSet("goless", flag.ContinueOnError)
 	fs.SetOutput(output)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-F|-N|-R|-S|-i|-I|-s] [-x n] [-preset dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [+line|+/pattern] [-version] [path ...]\n")
+		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-F|-N|-R|-S|-i|-I|-s] [-x n] [-preset dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [-license] [+line|+/pattern] [-version] [path ...]\n")
 	}
 
 	fs.BoolVar(&opts.showHelp, "?", false, "show help")
 	fs.BoolVar(&opts.showHelp, "help", false, "show help")
 	fs.BoolVar(&opts.showHelp, "h", false, "show help")
+	fs.BoolVar(&opts.showLicense, "license", false, "show the bundled Apache license")
 	fs.BoolVar(&opts.quitAtEOF, "e", false, "quit on the first forward command at EOF")
 	fs.BoolVar(&opts.quitAtEOFFirst, "E", false, "quit when EOF is already visible on screen")
 	fs.BoolVar(&opts.quitIfOneScreen, "F", false, "quit if the entire input fits on one screen")
@@ -336,6 +361,14 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	if opts.tabWidth <= 0 {
 		return programOptions{}, nil, fmt.Errorf("-x must be greater than 0")
 	}
+	if opts.showLicense {
+		if fs.NFlag() > 1 {
+			return programOptions{}, nil, fmt.Errorf("--license must be used alone")
+		}
+		if len(fs.Args()) > 0 {
+			return programOptions{}, nil, fmt.Errorf("--license cannot be combined with files")
+		}
+	}
 	return opts, fs.Args(), nil
 }
 
@@ -347,6 +380,32 @@ func programQuitAtEOFPolicyFromFlags(quitAtEOF, quitAtEOFFirst bool) programQuit
 		return programQuitAtEOFOnForwardEOF
 	}
 	return programQuitAtEOFNever
+}
+
+func programRequiresInput(opts programOptions, files []string) bool {
+	if opts.showLicense {
+		return false
+	}
+	return len(files) == 0 || programInputsUseStdin(files)
+}
+
+func programShouldQuitAfterOverlayClose(session *programSession, pager *goless.Pager, wasShowingInformation bool, result goless.KeyResult) bool {
+	if pager == nil {
+		return false
+	}
+	if result.Context != goless.HelpKeyContext || result.Action != goless.KeyActionToggleHelp {
+		return false
+	}
+	if !wasShowingInformation {
+		return false
+	}
+	if pager.ShowingInformation() {
+		return false
+	}
+	if session != nil && session.hasFiles() {
+		return false
+	}
+	return pager.Len() == 0
 }
 
 func programExit(screen tcell.Screen, policy programQuitAtEOFPolicy) error {
@@ -776,13 +835,18 @@ func (s *programSession) last() bool {
 	return true
 }
 
-func (s *programSession) commandHandler(reload func() error) func(goless.Command) goless.CommandResult {
+func (s *programSession) commandHandler(reload func() error, showInformation func(title, body string)) func(goless.Command) goless.CommandResult {
 	return func(cmd goless.Command) goless.CommandResult {
 		switch cmd.Name {
 		case "q", "Q", "quit":
 			return goless.CommandResult{Handled: true, Quit: true}
 		case "file", "f":
 			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
+		case "license":
+			if showInformation != nil {
+				showInformation("Apache License 2.0", goless.LicenseText())
+			}
+			return goless.CommandResult{Handled: true}
 		case "version":
 			return goless.CommandResult{Handled: true, Message: version()}
 		case "next", "n":

@@ -118,6 +118,38 @@ func TestPagerHandleKeyResultPromptContext(t *testing.T) {
 	}
 }
 
+func TestPagerShowInformation(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(24, 6)
+	pager.ShowInformation("License", "alpha\nbeta")
+
+	if !pager.ShowingInformation() {
+		t.Fatal("ShowingInformation() = false, want true")
+	}
+
+	screen := newPagerMockScreen(t, 24, 6)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if row := pagerRowString(screen, 0, 24); !strings.Contains(row, "License") {
+		t.Fatalf("title row = %q, want it to contain %q", row, "License")
+	}
+	if got, want := strings.TrimRight(pagerRowString(screen, 1, 24), " "), "alpha"; got != want {
+		t.Fatalf("first body row = %q, want %q", got, want)
+	}
+
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyF1, "", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(F1).Handled = false, want true")
+	}
+	if got, want := result.Context, HelpKeyContext; got != want {
+		t.Fatalf("HandleKeyResult(F1).Context = %v, want %v", got, want)
+	}
+	if pager.ShowingInformation() {
+		t.Fatal("ShowingInformation() after F1 = true, want false")
+	}
+}
+
 func TestPagerCaptureKeyReservesBinding(t *testing.T) {
 	pager := New(Config{
 		TabWidth:   4,

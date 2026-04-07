@@ -582,6 +582,128 @@ func TestParseProgramFlagsHelp(t *testing.T) {
 	}
 }
 
+func TestParseProgramFlagsLicense(t *testing.T) {
+	var out bytes.Buffer
+	opts, args, err := parseProgramFlags([]string{"--license"}, &out)
+	if err != nil {
+		t.Fatalf("parseProgramFlags(--license) failed: %v", err)
+	}
+	if !opts.showLicense {
+		t.Fatal("parseProgramFlags(--license) did not set showLicense")
+	}
+	if len(args) != 0 {
+		t.Fatalf("len(args) after --license = %d, want 0", len(args))
+	}
+}
+
+func TestParseProgramFlagsLicenseExclusive(t *testing.T) {
+	var out bytes.Buffer
+	_, _, err := parseProgramFlags([]string{"--license", "-N"}, &out)
+	if err == nil {
+		t.Fatal("parseProgramFlags(--license -N) = nil error, want error")
+	}
+	out.Reset()
+	if _, _, err := parseProgramFlags([]string{"--license", "file.txt"}, &out); err == nil {
+		t.Fatal("parseProgramFlags(--license file.txt) = nil error, want error")
+	}
+}
+
+func TestProgramRequiresInput(t *testing.T) {
+	tests := []struct {
+		name  string
+		opts  programOptions
+		files []string
+		want  bool
+	}{
+		{name: "license without files", opts: programOptions{showLicense: true}, want: false},
+		{name: "license with stdin file", opts: programOptions{showLicense: true}, files: []string{"-"}, want: false},
+		{name: "no files", opts: programOptions{}, want: true},
+		{name: "stdin file", opts: programOptions{}, files: []string{"sample.txt", "-"}, want: true},
+		{name: "real file", opts: programOptions{}, files: []string{"sample.txt"}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := programRequiresInput(tt.opts, tt.files); got != tt.want {
+				t.Fatalf("programRequiresInput(%+v, %v) = %v, want %v", tt.opts, tt.files, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProgramShouldQuitAfterOverlayClose(t *testing.T) {
+	tests := []struct {
+		name          string
+		withFiles     bool
+		content       string
+		result        goless.KeyResult
+		overlay       bool
+		remainOverlay bool
+		want          bool
+	}{
+		{
+			name:          "license only close exits",
+			result:        goless.KeyResult{Handled: true, Context: goless.HelpKeyContext, Action: goless.KeyActionToggleHelp},
+			overlay:       true,
+			remainOverlay: false,
+			want:          true,
+		},
+		{
+			name:          "still showing overlay does not exit",
+			result:        goless.KeyResult{Handled: true, Context: goless.HelpKeyContext, Action: goless.KeyActionToggleHelp},
+			overlay:       true,
+			remainOverlay: true,
+			want:          false,
+		},
+		{
+			name:      "open files do not exit",
+			withFiles: true,
+			result:    goless.KeyResult{Handled: true, Context: goless.HelpKeyContext, Action: goless.KeyActionToggleHelp},
+			want:      false,
+		},
+		{
+			name:    "document content does not exit",
+			content: "alpha\n",
+			result:  goless.KeyResult{Handled: true, Context: goless.HelpKeyContext, Action: goless.KeyActionToggleHelp},
+			want:    false,
+		},
+		{
+			name:   "non-toggle action does not exit",
+			result: goless.KeyResult{Handled: true, Context: goless.HelpKeyContext, Action: goless.KeyActionRefresh},
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var files []string
+			if tt.withFiles {
+				files = []string{"sample.txt"}
+			}
+			session := newProgramSession(files, programStartup{})
+			pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+			pager.SetSize(20, 4)
+			if tt.content != "" {
+				if err := pager.AppendString(tt.content); err != nil {
+					t.Fatalf("AppendString failed: %v", err)
+				}
+				pager.Flush()
+			}
+			if tt.overlay {
+				pager.ShowInformation("License", "Apache License")
+			}
+			wasShowing := pager.ShowingInformation()
+			if tt.overlay && !tt.remainOverlay {
+				pager.HideInformation()
+			}
+
+			if got := programShouldQuitAfterOverlayClose(session, pager, wasShowing, tt.result); got != tt.want {
+				t.Fatalf("programShouldQuitAfterOverlayClose(...) = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNewDemoPagerPropagatesConfig(t *testing.T) {
 	pager := newProgramPager(
 		goless.RenderHybrid,
@@ -613,7 +735,7 @@ func TestDemoSessionCommandHandler(t *testing.T) {
 	handler := session.commandHandler(func() error {
 		reloads++
 		return nil
-	})
+	}, nil)
 
 	if result := handler(goless.Command{Name: "quit"}); !result.Handled || !result.Quit {
 		t.Fatalf("quit command result = %+v, want handled quit", result)
@@ -673,7 +795,7 @@ func TestDemoSessionAdditionalCommands(t *testing.T) {
 	handler := session.commandHandler(func() error {
 		reloads++
 		return nil
-	})
+	}, nil)
 
 	result := handler(goless.Command{Name: "file"})
 	if !result.Handled || result.Quit {
@@ -722,6 +844,38 @@ func TestDemoSessionAdditionalCommands(t *testing.T) {
 	}
 	if got, want := reloads, 2; got != want {
 		t.Fatalf("reload count after x = %d, want %d", got, want)
+	}
+}
+
+func TestDemoSessionLicenseCommandShowsBundledLicense(t *testing.T) {
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
+	var (
+		title string
+		body  string
+	)
+	handler := session.commandHandler(func() error {
+		t.Fatal("reload should not be called for :license")
+		return nil
+	}, func(gotTitle, gotBody string) {
+		title = gotTitle
+		body = gotBody
+	})
+
+	result := handler(goless.Command{Name: "license"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("license command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, ""; got != want {
+		t.Fatalf("license command message = %q, want empty", got)
+	}
+	if got, want := title, "Apache License 2.0"; got != want {
+		t.Fatalf("license title = %q, want %q", got, want)
+	}
+	if !strings.Contains(body, "Apache License") {
+		t.Fatalf("license body missing Apache heading: %q", body)
+	}
+	if !strings.Contains(body, "Version 2.0, January 2004") {
+		t.Fatalf("license body missing version heading: %q", body)
 	}
 }
 
@@ -830,7 +984,7 @@ func TestDemoSessionLabelsExplicitStdin(t *testing.T) {
 	handler := session.commandHandler(func() error {
 		reloads++
 		return nil
-	})
+	}, nil)
 
 	result := handler(goless.Command{Name: "next"})
 	if !result.Handled || result.Quit {
@@ -856,7 +1010,7 @@ func TestDemoSessionCommandHandlerBlocksNavigationWhileStdinReading(t *testing.T
 	session := newProgramSession([]string{"one.txt", "-"}, programStartup{})
 	handler := session.commandHandler(func() error {
 		return fmt.Errorf("stdin still reading")
-	})
+	}, nil)
 
 	result := handler(goless.Command{Name: "next"})
 	if !result.Handled || result.Quit {
@@ -874,7 +1028,7 @@ func TestDemoSessionCommandHandlerReloadFailureRestoresIndex(t *testing.T) {
 	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
 	handler := session.commandHandler(func() error {
 		return fmt.Errorf("reload failed")
-	})
+	}, nil)
 
 	result := handler(goless.Command{Name: "next"})
 	if !result.Handled || result.Quit {
@@ -892,7 +1046,7 @@ func TestDemoSessionCommandHandlerReloadFailureRestoresIndexForLast(t *testing.T
 	session := newProgramSession([]string{"one.txt", "two.txt", "three.txt"}, programStartup{})
 	handler := session.commandHandler(func() error {
 		return fmt.Errorf("reload failed")
-	})
+	}, nil)
 
 	result := handler(goless.Command{Name: "last"})
 	if !result.Handled || result.Quit {

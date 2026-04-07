@@ -11,6 +11,11 @@ const (
 	modeHelp
 )
 
+type informationOverlay struct {
+	title string
+	body  string
+}
+
 type promptKind int
 
 const (
