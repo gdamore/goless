@@ -15,7 +15,10 @@ func (v *Viewer) drawHelp(screen tcell.Screen) {
 	bodyStyle := v.toTCellStyle(ansi.DefaultStyle())
 	if !v.cfg.Chrome.Frame.enabled() && v.width > 0 {
 		titleStyle := tcell.StyleDefault.Reverse(true)
-		title := " " + v.text.HelpTitle + "  " + v.text.HelpClose
+		title := " " + v.informationTitle()
+		if v.text.HelpClose != "" {
+			title += "  " + v.text.HelpClose
+		}
 		screen.PutStrStyled(0, 0, padRightToWidth(title, v.width), titleStyle)
 	}
 
@@ -80,7 +83,7 @@ func (v *Viewer) clampHelpOffset() {
 
 func (v *Viewer) helpLines() []model.Line {
 	doc := model.NewDocumentWithMode(helpDocChunkSize, ansi.RenderPresentation)
-	_ = doc.Append([]byte(v.text.HelpBody))
+	_ = doc.Append([]byte(v.informationBody()))
 	doc.Flush()
 	return doc.Lines()
 }

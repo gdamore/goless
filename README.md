@@ -334,6 +334,7 @@ Program flags:
 - `-S` accepted as a less-compatibility no-op because no-wrap is already the default
 - `-i` for smart-case search behavior
 - `-I` for case-insensitive search behavior
+- `--license` to open the bundled Apache license, or print it when stdout is not a terminal
 - `-x n` to set tab width
 - `-preset dark|light|plain|pretty`
 - `-chrome auto|none|single|rounded`
@@ -364,6 +365,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `:50%` to jump near the middle of the document
 - `:next` / `:prev` to move through a multi-file session
 - `:first`, `:last`, `:x`, and `:file` for file-session control
+- `:license` to show the bundled Apache license in an overlay
 - `:Q` as an additional quit command
 - `=` or `Ctrl-G` to show current file/session status in the standalone program
 - `:set number`, `:set wrap`, `:set list`, and `:set squeeze` plus `no...` and `inv...` forms

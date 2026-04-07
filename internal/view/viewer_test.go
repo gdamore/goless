@@ -2276,6 +2276,65 @@ func TestDrawHelpAppliesANSIStyles(t *testing.T) {
 	}
 }
 
+func TestShowInformationDisplaysCustomOverlay(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(24, 6)
+	v.ShowInformation("License", "alpha\nbeta")
+
+	if !v.ShowingInformation() {
+		t.Fatal("ShowingInformation() = false, want true")
+	}
+
+	_, screen := newMockScreen(t, 24, 6)
+	defer screen.Fini()
+
+	v.Draw(screen)
+
+	if row := screenRowString(screen, 0, 24); !strings.Contains(row, "License") {
+		t.Fatalf("title row = %q, want it to contain %q", row, "License")
+	}
+	if got, want := strings.TrimRight(screenRowString(screen, 1, 24), " "), "alpha"; got != want {
+		t.Fatalf("first body row = %q, want %q", got, want)
+	}
+}
+
+func TestCommandPromptCanOpenInformationOverlay(t *testing.T) {
+	doc := model.NewDocument(4)
+	var v *Viewer
+	v = New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		CommandHandler: func(cmd Command) CommandResult {
+			if cmd.Name != "license" {
+				return CommandResult{}
+			}
+			v.ShowInformation("License", "Apache License")
+			return CommandResult{Handled: true}
+		},
+	})
+	v.SetSize(24, 6)
+	v.beginPrompt(promptCommand)
+	v.prompt.editor.SetText("license")
+
+	result := v.commitPrompt()
+	if !result.Handled || result.Context != KeyContextPrompt {
+		t.Fatalf("commitPrompt() = %+v, want handled prompt result", result)
+	}
+	if got, want := v.mode, modeHelp; got != want {
+		t.Fatalf("mode after :license = %v, want %v", got, want)
+	}
+	if v.prompt != nil {
+		t.Fatal("prompt after :license = non-nil, want nil")
+	}
+	if v.overlay == nil {
+		t.Fatal("overlay after :license = nil, want custom overlay")
+	}
+	if got, want := v.overlay.title, "License"; got != want {
+		t.Fatalf("overlay title = %q, want %q", got, want)
+	}
+}
+
 func TestStatusShowsRightOverflowIndicator(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyz")); err != nil {

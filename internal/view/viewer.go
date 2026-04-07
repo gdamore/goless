@@ -59,6 +59,7 @@ type Viewer struct {
 	rowOffset     int
 	colOffset     int
 	follow        bool
+	overlay       *informationOverlay
 	helpOffset    int
 	helpColOffset int
 }
@@ -271,6 +272,27 @@ func (v *Viewer) SetShowStatus(enabled bool) {
 		return
 	}
 	v.restoreAnchor(anchor)
+}
+
+// ShowInformation replaces the document view with a scrollable information overlay.
+func (v *Viewer) ShowInformation(title, body string) {
+	v.overlay = &informationOverlay{
+		title: title,
+		body:  body,
+	}
+	v.mode = modeHelp
+	v.helpOffset = 0
+	v.helpColOffset = 0
+}
+
+// HideInformation closes the current information overlay if one is visible.
+func (v *Viewer) HideInformation() {
+	v.overlay = nil
+}
+
+// ShowingInformation reports whether an information overlay is visible.
+func (v *Viewer) ShowingInformation() bool {
+	return v.overlay != nil
 }
 
 // SetText updates help text, status text, prompt text, and UI strings.
@@ -1887,7 +1909,7 @@ func toPromptKind(kind promptKind) PromptKind {
 }
 
 func (v *Viewer) helpFrameTitle() string {
-	title := v.text.HelpTitle
+	title := v.informationTitle()
 	if v.text.HelpClose != "" {
 		if title != "" {
 			title += "  "
@@ -2144,6 +2166,11 @@ func (v *Viewer) handlePromptMappedAction(a action) (KeyResult, bool) {
 }
 
 func (v *Viewer) toggleHelp() {
+	if v.overlay != nil {
+		v.overlay = nil
+		v.mode = modeNormal
+		return
+	}
 	if v.mode == modeHelp {
 		v.mode = modeNormal
 		return
@@ -2151,6 +2178,20 @@ func (v *Viewer) toggleHelp() {
 	v.mode = modeHelp
 	v.helpOffset = 0
 	v.helpColOffset = 0
+}
+
+func (v *Viewer) informationTitle() string {
+	if v.overlay != nil {
+		return v.overlay.title
+	}
+	return v.text.HelpTitle
+}
+
+func (v *Viewer) informationBody() string {
+	if v.overlay != nil {
+		return v.overlay.body
+	}
+	return v.text.HelpBody
 }
 
 func (v *Viewer) updateFollowAtBottom() {

@@ -273,7 +273,9 @@ func (v *Viewer) beginPrompt(kind promptKind) {
 }
 
 func (v *Viewer) cancelPrompt() {
-	v.mode = modeNormal
+	if v.mode == modePrompt {
+		v.mode = modeNormal
+	}
 	v.prompt = nil
 }
 

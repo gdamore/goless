@@ -52,3 +52,4 @@
   :set ignorecase         search without case sensitivity
   :set smartcase          search smart-case
   :set searchmode=[3mmode[0m    set match mode (sub|word|regex)
+  :license                show the bundled Apache license

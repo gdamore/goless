@@ -279,6 +279,21 @@ func (p *Pager) SetChrome(chrome Chrome) {
 	p.Configure(WithChrome(chrome))
 }
 
+// ShowInformation replaces the document view with a scrollable information overlay.
+func (p *Pager) ShowInformation(title, body string) {
+	p.viewer.ShowInformation(title, body)
+}
+
+// HideInformation closes the current information overlay if one is visible.
+func (p *Pager) HideInformation() {
+	p.viewer.HideInformation()
+}
+
+// ShowingInformation reports whether an information overlay is visible.
+func (p *Pager) ShowingInformation() bool {
+	return p.viewer.ShowingInformation()
+}
+
 // HandleKey applies a key event and reports whether the caller should exit.
 func (p *Pager) HandleKey(ev *tcell.EventKey) bool {
 	return p.HandleKeyResult(ev).Quit
