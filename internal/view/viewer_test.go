@@ -348,6 +348,109 @@ func TestLessKeyMapHelpRefreshAliases(t *testing.T) {
 	}
 }
 
+func TestViewerHandleMouseScrollsDocument(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	result := v.HandleMouseResult(mouseWheel(tcell.WheelDown))
+	if !result.Handled || result.Action != KeyActionScrollDown || result.Context != KeyContextNormal {
+		t.Fatalf("HandleMouseResult(WheelDown) = %+v, want handled scroll down in normal context", result)
+	}
+	if got, want := v.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row after WheelDown = %d, want %d", got, want)
+	}
+
+	result = v.HandleMouseResult(mouseWheel(tcell.WheelUp))
+	if !result.Handled || result.Action != KeyActionScrollUp || result.Context != KeyContextNormal {
+		t.Fatalf("HandleMouseResult(WheelUp) = %+v, want handled scroll up in normal context", result)
+	}
+	if got, want := v.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row after WheelUp = %d, want %d", got, want)
+	}
+}
+
+func TestViewerHandleMouseScrollsHorizontally(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyz\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(8, 2)
+
+	result := v.HandleMouseResult(mouseWheel(tcell.WheelRight))
+	if !result.Handled || result.Action != KeyActionScrollRight || result.Context != KeyContextNormal {
+		t.Fatalf("HandleMouseResult(WheelRight) = %+v, want handled scroll right in normal context", result)
+	}
+	if got, want := v.colOffset, v.horizontalScrollStep(); got != want {
+		t.Fatalf("colOffset after WheelRight = %d, want %d", got, want)
+	}
+
+	result = v.HandleMouseResult(mouseWheel(tcell.WheelLeft))
+	if !result.Handled || result.Action != KeyActionScrollLeft || result.Context != KeyContextNormal {
+		t.Fatalf("HandleMouseResult(WheelLeft) = %+v, want handled scroll left in normal context", result)
+	}
+	if got, want := v.colOffset, 0; got != want {
+		t.Fatalf("colOffset after WheelLeft = %d, want %d", got, want)
+	}
+}
+
+func TestViewerHandleMouseScrollsHelpOverlay(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Text: Text{
+			HelpBody: "0123456789abcdef\none\ntwo\nthree\nfour\n",
+		},
+	})
+	v.SetSize(8, 3)
+	v.mode = modeHelp
+
+	result := v.HandleMouseResult(mouseWheel(tcell.WheelDown))
+	if !result.Handled || result.Action != KeyActionScrollDown || result.Context != KeyContextHelp {
+		t.Fatalf("HandleMouseResult(WheelDown) = %+v, want handled scroll down in help context", result)
+	}
+	if got, want := v.helpOffset, 1; got != want {
+		t.Fatalf("helpOffset after WheelDown = %d, want %d", got, want)
+	}
+
+	result = v.HandleMouseResult(mouseWheel(tcell.WheelRight))
+	if !result.Handled || result.Action != KeyActionScrollRight || result.Context != KeyContextHelp {
+		t.Fatalf("HandleMouseResult(WheelRight) = %+v, want handled scroll right in help context", result)
+	}
+	if got, want := v.helpColOffset, v.horizontalScrollStep(); got != want {
+		t.Fatalf("helpColOffset after WheelRight = %d, want %d", got, want)
+	}
+}
+
+func TestViewerHandleMousePromptContextIsUnhandled(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.HandleKey(keyRune("/"))
+
+	result := v.HandleMouseResult(mouseWheel(tcell.WheelDown))
+	if result.Handled {
+		t.Fatalf("HandleMouseResult(WheelDown).Handled = true, want false in prompt")
+	}
+	if got, want := result.Context, KeyContextPrompt; got != want {
+		t.Fatalf("HandleMouseResult(WheelDown).Context = %v, want %v", got, want)
+	}
+	if got, want := v.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row after WheelDown in prompt = %d, want %d", got, want)
+	}
+}
+
 func TestViewerRuntimeSettersUpdateConfigAndState(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("a\tb\n")); err != nil {
@@ -3867,6 +3970,10 @@ func keyKey(k tcell.Key) *tcell.EventKey {
 
 func keyKeyMod(k tcell.Key, mod tcell.ModMask) *tcell.EventKey {
 	return tcell.NewEventKey(k, "", mod)
+}
+
+func mouseWheel(button tcell.ButtonMask) *tcell.EventMouse {
+	return tcell.NewEventMouse(0, 0, button, tcell.ModNone)
 }
 
 func cellRune(screen tcell.Screen, x, y int) rune {

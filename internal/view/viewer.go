@@ -491,6 +491,11 @@ func (v *Viewer) HandleKey(ev *tcell.EventKey) bool {
 	return v.HandleKeyResult(ev).Quit
 }
 
+// HandleMouse applies a mouse event and reports whether it was handled.
+func (v *Viewer) HandleMouse(ev *tcell.EventMouse) bool {
+	return v.HandleMouseResult(ev).Handled
+}
+
 // HandleKeyResult applies a key event and reports whether it was handled and whether the viewer should exit.
 func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 	if v.mode == modeHelp {
@@ -564,6 +569,32 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 	}
 
 	return KeyResult{Handled: true, Action: KeyAction(a), Context: KeyContextNormal}
+}
+
+// HandleMouseResult applies a mouse event and reports whether it was handled.
+func (v *Viewer) HandleMouseResult(ev *tcell.EventMouse) MouseResult {
+	if v.mode == modeHelp {
+		return v.handleHelpMouse(ev)
+	}
+	if v.mode == modePrompt {
+		return MouseResult{Context: KeyContextPrompt}
+	}
+
+	a := wheelAction(ev.Buttons())
+	switch a {
+	case actionScrollUp:
+		v.ScrollUp(1)
+	case actionScrollDown:
+		v.ScrollDown(1)
+	case actionScrollLeft:
+		v.ScrollLeft(v.horizontalScrollStep())
+	case actionScrollRight:
+		v.ScrollRight(v.horizontalScrollStep())
+	default:
+		return MouseResult{Context: KeyContextNormal}
+	}
+
+	return MouseResult{Handled: true, Action: KeyAction(a), Context: KeyContextNormal}
 }
 
 // ToggleWrap switches between horizontal scrolling and soft wrap modes.
@@ -1924,6 +1955,21 @@ func (v *Viewer) helpPageStep() int {
 	return max(bodyHeight, 1)
 }
 
+func wheelAction(buttons tcell.ButtonMask) action {
+	switch {
+	case buttons&tcell.WheelUp != 0:
+		return actionScrollUp
+	case buttons&tcell.WheelDown != 0:
+		return actionScrollDown
+	case buttons&tcell.WheelLeft != 0:
+		return actionScrollLeft
+	case buttons&tcell.WheelRight != 0:
+		return actionScrollRight
+	default:
+		return actionNone
+	}
+}
+
 func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 	a := v.keys.helpAction(ev)
 	switch a {
@@ -1972,6 +2018,24 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 	}
 	v.clampHelpOffset()
 	return KeyResult{Handled: true, Action: KeyAction(a), Context: KeyContextHelp}
+}
+
+func (v *Viewer) handleHelpMouse(ev *tcell.EventMouse) MouseResult {
+	a := wheelAction(ev.Buttons())
+	switch a {
+	case actionScrollUp:
+		v.helpOffset--
+	case actionScrollDown:
+		v.helpOffset++
+	case actionScrollLeft:
+		v.helpColOffset -= v.horizontalScrollStep()
+	case actionScrollRight:
+		v.helpColOffset += v.horizontalScrollStep()
+	default:
+		return MouseResult{Context: KeyContextHelp}
+	}
+	v.clampHelpOffset()
+	return MouseResult{Handled: true, Action: KeyAction(a), Context: KeyContextHelp}
 }
 
 func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
