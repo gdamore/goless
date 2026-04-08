@@ -100,3 +100,10 @@ const (
 	actionCycleSearchCase
 	actionCycleSearchMode
 )
+
+// MouseResult summarizes how the viewer handled a mouse event.
+type MouseResult struct {
+	Handled bool
+	Action  KeyAction
+	Context KeyContext
+}

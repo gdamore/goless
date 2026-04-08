@@ -118,6 +118,62 @@ func TestPagerHandleKeyResultPromptContext(t *testing.T) {
 	}
 }
 
+func TestPagerHandleMouse(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("one\ntwo\nthree\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if !pager.HandleMouse(tcell.NewEventMouse(0, 0, tcell.WheelDown, tcell.ModNone)) {
+		t.Fatal("HandleMouse(WheelDown) = false, want true")
+	}
+	if got, want := pager.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row after WheelDown = %d, want %d", got, want)
+	}
+}
+
+func TestPagerHandleMouseResult(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(8, 2)
+	if err := pager.AppendString("abcdefghijklmnopqrstuvwxyz\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	result := pager.HandleMouseResult(tcell.NewEventMouse(0, 0, tcell.WheelRight, tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleMouseResult(WheelRight).Handled = false, want true")
+	}
+	if got, want := result.Action, KeyActionScrollRight; got != want {
+		t.Fatalf("HandleMouseResult(WheelRight).Action = %v, want %v", got, want)
+	}
+	if got, want := result.Context, NormalKeyContext; got != want {
+		t.Fatalf("HandleMouseResult(WheelRight).Context = %v, want %v", got, want)
+	}
+	if got := pager.Position().Column; got <= 1 {
+		t.Fatalf("Position().Column after WheelRight = %d, want > 1", got)
+	}
+}
+
+func TestPagerHandleMouseResultHelpContext(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 4)
+	pager.ShowInformation("Help", "one\ntwo\nthree\nfour\nfive\n")
+
+	result := pager.HandleMouseResult(tcell.NewEventMouse(0, 0, tcell.WheelDown, tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleMouseResult(WheelDown).Handled = false, want true")
+	}
+	if got, want := result.Action, KeyActionScrollDown; got != want {
+		t.Fatalf("HandleMouseResult(WheelDown).Action = %v, want %v", got, want)
+	}
+	if got, want := result.Context, HelpKeyContext; got != want {
+		t.Fatalf("HandleMouseResult(WheelDown).Context = %v, want %v", got, want)
+	}
+}
+
 func TestPagerShowInformation(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(24, 6)

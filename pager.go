@@ -64,6 +64,13 @@ type KeyResult struct {
 	Context KeyContext
 }
 
+// MouseResult summarizes how the pager handled a mouse event.
+type MouseResult struct {
+	Handled bool
+	Action  KeyAction
+	Context KeyContext
+}
+
 // Command describes a ':' command entered through the built-in prompt.
 type Command struct {
 	Raw  string
@@ -299,6 +306,12 @@ func (p *Pager) HandleKey(ev *tcell.EventKey) bool {
 	return p.HandleKeyResult(ev).Quit
 }
 
+// HandleMouse applies a mouse event and reports whether it was handled.
+// Callers must enable mouse reporting on their tcell screen to receive wheel events.
+func (p *Pager) HandleMouse(ev *tcell.EventMouse) bool {
+	return p.HandleMouseResult(ev).Handled
+}
+
 // HandleKeyResult applies a key event and reports whether it was handled and whether the caller should exit.
 func (p *Pager) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 	if p.captureKey != nil && p.captureKey(ev) {
@@ -308,6 +321,17 @@ func (p *Pager) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 	return KeyResult{
 		Handled: result.Handled,
 		Quit:    result.Quit,
+		Action:  KeyAction(result.Action),
+		Context: KeyContext(result.Context),
+	}
+}
+
+// HandleMouseResult applies a mouse event and reports whether it was handled.
+// Callers must enable mouse reporting on their tcell screen to receive wheel events.
+func (p *Pager) HandleMouseResult(ev *tcell.EventMouse) MouseResult {
+	result := p.viewer.HandleMouseResult(ev)
+	return MouseResult{
+		Handled: result.Handled,
 		Action:  KeyAction(result.Action),
 		Context: KeyContext(result.Context),
 	}

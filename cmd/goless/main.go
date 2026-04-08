@@ -117,6 +117,7 @@ func run() error {
 		return err
 	}
 	defer screen.Fini()
+	screen.EnableMouse()
 
 	width, height := screen.Size()
 	if width <= 0 || height <= 0 {
@@ -262,6 +263,42 @@ func run() error {
 				return err
 			} else if quit {
 				return programExit(screen, quitAtEOFPolicy)
+			}
+			if readResult != nil {
+				quitIfOneScreenArmed = updateProgramQuitIfOneScreenArm(quitIfOneScreenArmed, pager)
+			}
+		case *tcell.EventMouse:
+			before := pager.Position()
+			beforeFollowing := pager.Following()
+			result := pager.HandleMouseResult(event)
+			if !opts.showLicense {
+				keyResult := goless.KeyResult{
+					Handled: result.Handled,
+					Action:  result.Action,
+					Context: result.Context,
+				}
+				quit, err := handleProgramVisibleEOFAction(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, keyResult, readResult == nil, reloadCurrent)
+				if err != nil {
+					return err
+				}
+				pager.Draw(screen)
+				if quit {
+					return programExit(screen, quitAtEOFPolicy)
+				}
+				if quit, err := applyProgramQuitAtEOF(
+					quitAtEOFPolicy,
+					session,
+					keyResult,
+					readResult == nil,
+					beforeFollowing,
+					before,
+					pager.Position(),
+					reloadCurrent,
+				); err != nil {
+					return err
+				} else if quit {
+					return programExit(screen, quitAtEOFPolicy)
+				}
 			}
 			if readResult != nil {
 				quitIfOneScreenArmed = updateProgramQuitIfOneScreenArm(quitIfOneScreenArmed, pager)

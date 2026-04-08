@@ -149,6 +149,7 @@ func main() {
 		return
 	}
 	defer screen.Fini()
+	screen.EnableMouse()
 
 	pager.Draw(screen)
 	_ = pager.SearchForward("world")
@@ -165,7 +166,8 @@ The normal embedding model is:
    finalized.
 4. Size with `SetSize`.
 5. Render with `Draw`.
-6. Drive interaction through `HandleKey` or direct method calls.
+6. If you want wheel input, call `screen.EnableMouse()`.
+7. Drive interaction through `HandleKey`, `HandleMouse`, or direct method calls.
 
 ## Public API Shape
 
@@ -175,7 +177,7 @@ The current exported `Pager` API is controller-oriented.
 - Runtime reconfiguration: `Configure(opts ...RuntimeOption)`
 - Content loading: `Append`, `AppendString`, `ReadFrom`, `Flush`, `Len`
 - Rendering: `SetSize`, `Draw`, `Refresh`
-- Key-driven integration: `HandleKey`
+- Input integration: `HandleKey`, `HandleMouse`
 - Navigation: `ScrollUp`, `ScrollDown`, `ScrollLeft`, `ScrollRight`, `HalfPageUp`,
   `HalfPageDown`, `PageUp`, `PageDown`, `GoTop`, `GoBottom`, `GoPercent`, `JumpToLine`
 - Mode control: `ToggleWrap`, `SetWrapMode`, `WrapMode`, `Follow`, `Following`

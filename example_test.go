@@ -36,6 +36,7 @@ func ExampleNew() {
 		return
 	}
 	defer screen.Fini()
+	screen.EnableMouse()
 
 	pager.Draw(screen)
 	_ = pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "x", tcell.ModNone))

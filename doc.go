@@ -14,7 +14,8 @@
 //   - append content with Append, AppendString, or ReadFrom
 //   - size it with SetSize
 //   - render it with Draw
-//   - feed input through HandleKey, HandleKeyResult, or direct navigation/search methods
+//   - enable mouse reporting on the host tcell.Screen when wheel input is desired
+//   - feed input through HandleKey, HandleKeyResult, HandleMouse, HandleMouseResult, or direct navigation/search methods
 //   - reconfigure runtime-safe behavior with Configure and RuntimeOption values
 //   - inspect visible search state with SearchState when host chrome needs it
 //
