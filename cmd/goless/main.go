@@ -57,6 +57,13 @@ type programViewportSnapshot struct {
 	following  bool
 }
 
+type programInputResult struct {
+	handled bool
+	quit    bool
+	action  goless.KeyAction
+	context goless.KeyContext
+}
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -229,39 +236,37 @@ func run() error {
 			before := pager.Position()
 			beforeFollowing := pager.Following()
 			wasShowingInformation := pager.ShowingInformation()
-			result := pager.HandleKeyResult(event)
-			if shouldHandleProgramStatusKey(result) && handleProgramStatusKey(pager, event) {
+			keyResult := pager.HandleKeyResult(event)
+			if shouldHandleProgramStatusKey(keyResult) && handleProgramStatusKey(pager, event) {
 				pager.Draw(screen)
 				break
 			}
-			if result.Quit {
+			if keyResult.Quit {
 				return programExit(screen, quitAtEOFPolicy)
 			}
-			if programShouldQuitAfterOverlayClose(session, pager, wasShowingInformation, result) {
+			if programShouldQuitAfterOverlayClose(session, pager, wasShowingInformation, keyResult) {
 				return programExit(screen, quitAtEOFPolicy)
 			}
-			if !opts.showLicense {
-				quit, err := handleProgramVisibleEOFAction(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, result, readResult == nil, reloadCurrent)
-				if err != nil {
-					return err
-				}
-				pager.Draw(screen)
-				if quit {
-					return programExit(screen, quitAtEOFPolicy)
-				}
-			}
-			if quit, err := applyProgramQuitAtEOF(
+			quit, err := handleProgramPostInput(
 				quitAtEOFPolicy,
+				opts.showLicense,
 				session,
-				result,
+				pager,
+				programInputResult{
+					handled: keyResult.Handled,
+					quit:    keyResult.Quit,
+					action:  keyResult.Action,
+					context: keyResult.Context,
+				},
 				readResult == nil,
 				beforeFollowing,
 				before,
-				pager.Position(),
 				reloadCurrent,
-			); err != nil {
+			)
+			if err != nil {
 				return err
-			} else if quit {
+			}
+			if quit {
 				return programExit(screen, quitAtEOFPolicy)
 			}
 			if readResult != nil {
@@ -270,35 +275,27 @@ func run() error {
 		case *tcell.EventMouse:
 			before := pager.Position()
 			beforeFollowing := pager.Following()
-			result := pager.HandleMouseResult(event)
-			if !opts.showLicense {
-				keyResult := goless.KeyResult{
-					Handled: result.Handled,
-					Action:  result.Action,
-					Context: result.Context,
-				}
-				quit, err := handleProgramVisibleEOFAction(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, keyResult, readResult == nil, reloadCurrent)
-				if err != nil {
-					return err
-				}
-				pager.Draw(screen)
-				if quit {
-					return programExit(screen, quitAtEOFPolicy)
-				}
-				if quit, err := applyProgramQuitAtEOF(
-					quitAtEOFPolicy,
-					session,
-					keyResult,
-					readResult == nil,
-					beforeFollowing,
-					before,
-					pager.Position(),
-					reloadCurrent,
-				); err != nil {
-					return err
-				} else if quit {
-					return programExit(screen, quitAtEOFPolicy)
-				}
+			mouseResult := pager.HandleMouseResult(event)
+			quit, err := handleProgramPostInput(
+				quitAtEOFPolicy,
+				opts.showLicense,
+				session,
+				pager,
+				programInputResult{
+					handled: mouseResult.Handled,
+					action:  mouseResult.Action,
+					context: mouseResult.Context,
+				},
+				readResult == nil,
+				beforeFollowing,
+				before,
+				reloadCurrent,
+			)
+			if err != nil {
+				return err
+			}
+			if quit {
+				return programExit(screen, quitAtEOFPolicy)
 			}
 			if readResult != nil {
 				quitIfOneScreenArmed = updateProgramQuitIfOneScreenArm(quitIfOneScreenArmed, pager)
@@ -472,6 +469,39 @@ func newProgramScreen(policy programQuitAtEOFPolicy) (tcell.Screen, error) {
 		return tcell.NewTerminfoScreen(tcell.OptAltScreen(false))
 	}
 	return tcell.NewScreen()
+}
+
+func handleProgramPostInput(
+	policy programQuitAtEOFPolicy,
+	showLicense bool,
+	session *programSession,
+	pager *goless.Pager,
+	result programInputResult,
+	inputComplete bool,
+	following bool,
+	before goless.Position,
+	reload func() (bool, error),
+) (bool, error) {
+	if pager == nil {
+		return false, nil
+	}
+	keyResult := result.keyResult()
+	if !showLicense {
+		quit, err := handleProgramVisibleEOFAction(policy, session, func() *goless.Pager { return pager }, keyResult, inputComplete, reload)
+		if err != nil || quit {
+			return quit, err
+		}
+	}
+	return applyProgramQuitAtEOF(policy, session, keyResult, inputComplete, following, before, pager.Position(), reload)
+}
+
+func (r programInputResult) keyResult() goless.KeyResult {
+	return goless.KeyResult{
+		Handled: r.handled,
+		Quit:    r.quit,
+		Action:  r.action,
+		Context: r.context,
+	}
 }
 
 func applyProgramQuitAtEOF(
