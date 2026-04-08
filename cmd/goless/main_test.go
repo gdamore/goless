@@ -473,6 +473,160 @@ func TestHandleDemoVisibleEOFActionRequiresForwardNavigation(t *testing.T) {
 	}
 }
 
+func TestHandleProgramPostInputVisibleEOFFromMouseScroll(t *testing.T) {
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 5)
+	if err := pager.AppendString("one\ntwo\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	quit, err := handleProgramPostInput(
+		programQuitAtEOFWhenVisible,
+		false,
+		session,
+		pager,
+		programInputResult{
+			handled: true,
+			action:  goless.KeyActionScrollDown,
+			context: goless.NormalKeyContext,
+		},
+		true,
+		false,
+		pager.Position(),
+		func() (bool, error) { return true, nil },
+	)
+	if err != nil {
+		t.Fatalf("handleProgramPostInput returned error: %v", err)
+	}
+	if !quit {
+		t.Fatal("handleProgramPostInput(...) = false, want true")
+	}
+}
+
+func TestHandleProgramPostInputQuitAtEOFUsesStationaryForwardAction(t *testing.T) {
+	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 5)
+	if err := pager.AppendString("one\ntwo\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	reloads := 0
+	quit, err := handleProgramPostInput(
+		programQuitAtEOFOnForwardEOF,
+		false,
+		session,
+		pager,
+		programInputResult{
+			handled: true,
+			action:  goless.KeyActionScrollDown,
+			context: goless.NormalKeyContext,
+		},
+		true,
+		false,
+		pager.Position(),
+		func() (bool, error) {
+			reloads++
+			return true, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("handleProgramPostInput returned error: %v", err)
+	}
+	if quit {
+		t.Fatal("handleProgramPostInput(...) = true, want false")
+	}
+	if got, want := reloads, 1; got != want {
+		t.Fatalf("reload count = %d, want %d", got, want)
+	}
+	if got, want := session.currentFile(), "two.txt"; got != want {
+		t.Fatalf("currentFile() = %q, want %q", got, want)
+	}
+}
+
+func TestHandleProgramPostInputIgnoresNonNormalContexts(t *testing.T) {
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 5)
+	if err := pager.AppendString("one\ntwo\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	for _, tt := range []struct {
+		name    string
+		context goless.KeyContext
+	}{
+		{name: "help", context: goless.HelpKeyContext},
+		{name: "prompt", context: goless.PromptKeyContext},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			quit, err := handleProgramPostInput(
+				programQuitAtEOFWhenVisible,
+				false,
+				session,
+				pager,
+				programInputResult{
+					handled: true,
+					action:  goless.KeyActionScrollDown,
+					context: tt.context,
+				},
+				true,
+				false,
+				pager.Position(),
+				func() (bool, error) {
+					t.Fatal("reload should not be called outside normal context")
+					return false, nil
+				},
+			)
+			if err != nil {
+				t.Fatalf("handleProgramPostInput returned error: %v", err)
+			}
+			if quit {
+				t.Fatal("handleProgramPostInput(...) = true, want false")
+			}
+		})
+	}
+}
+
+func TestHandleProgramPostInputSkipsEOFPoliciesForLicenseView(t *testing.T) {
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 5)
+	if err := pager.AppendString("one\ntwo\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	quit, err := handleProgramPostInput(
+		programQuitAtEOFWhenVisible,
+		true,
+		session,
+		pager,
+		programInputResult{
+			handled: true,
+			action:  goless.KeyActionScrollDown,
+			context: goless.NormalKeyContext,
+		},
+		true,
+		false,
+		pager.Position(),
+		func() (bool, error) {
+			t.Fatal("reload should not be called for license view")
+			return false, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("handleProgramPostInput returned error: %v", err)
+	}
+	if quit {
+		t.Fatal("handleProgramPostInput(...) = true, want false")
+	}
+}
+
 func TestParseProgramFlagsCompatibilityAliases(t *testing.T) {
 	var out bytes.Buffer
 	opts, args, err := parseProgramFlags([]string{"-F", "-S", "-N", "-s", "-x", "4", "-I", "sample.txt"}, &out)
