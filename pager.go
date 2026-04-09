@@ -675,6 +675,8 @@ func toInternalKeyAction(a KeyAction) iview.KeyAction {
 		return iview.KeyActionToggleHelp
 	case KeyActionFollow:
 		return iview.KeyActionFollow
+	case KeyActionStopFollow:
+		return iview.KeyActionStopFollow
 	case KeyActionCycleSearchCase:
 		return iview.KeyActionCycleSearchCase
 	case KeyActionCycleSearchMode:
