@@ -75,9 +75,11 @@ type programFileFollower struct {
 }
 
 var (
-	programScreenFactory        = newProgramScreen
-	programStdinIsTerminalFunc  = stdinIsTerminal
-	programStdoutIsTerminalFunc = stdoutIsTerminal
+	programScreenFactory            = newProgramScreen
+	programStdinIsTerminalFunc      = stdinIsTerminal
+	programStdoutIsTerminalFunc     = stdoutIsTerminal
+	programDefaultScreenFactory     = tcell.NewScreen
+	programTerminfoScreenFactory    = tcell.NewTerminfoScreen
 )
 
 func main() {
@@ -533,9 +535,9 @@ func clearProgramStatusLine(screen tcell.Screen) {
 
 func newProgramScreen(policy programQuitAtEOFPolicy) (tcell.Screen, error) {
 	if policy == programQuitAtEOFWhenVisible {
-		return tcell.NewTerminfoScreen(tcell.OptAltScreen(false))
+		return programTerminfoScreenFactory(tcell.OptAltScreen(false))
 	}
-	return tcell.NewScreen()
+	return programDefaultScreenFactory()
 }
 
 func handleProgramPostInput(

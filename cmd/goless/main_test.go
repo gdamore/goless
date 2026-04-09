@@ -20,6 +20,17 @@ import (
 	"github.com/gdamore/tcell/v3/vt"
 )
 
+const (
+	testInputAlphaBeta         = "alpha\nbeta\n"
+	testInputOneTwo            = "one\ntwo\n"
+	testInputOneTwoThree       = "one\ntwo\nthree\n"
+	testInputOneTwoThreeFour   = "one\ntwo\nthree\nfour\n"
+	testInputOneToFive         = "one\ntwo\nthree\nfour\nfive\n"
+	testInputTallTenLines      = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n"
+	testSampleFileName         = "sample.txt"
+	testStdinFixtureFileName   = "stdin.txt"
+)
+
 func runProgramForTest(t *testing.T, args []string, stdin string) (string, error) {
 	t.Helper()
 	return runProgramForTestWithOptions(t, args, programRunTestOptions{stdin: stdin})
@@ -35,10 +46,7 @@ type programRunTestOptions struct {
 func runProgramForTestWithOptions(t *testing.T, args []string, opts programRunTestOptions) (string, error) {
 	t.Helper()
 
-	stdinPath := filepath.Join(t.TempDir(), "stdin.txt")
-	if err := os.WriteFile(stdinPath, []byte(opts.stdin), 0o644); err != nil {
-		t.Fatalf("WriteFile(stdin) failed: %v", err)
-	}
+	stdinPath := writeTempFile(t, t.TempDir(), testStdinFixtureFileName, opts.stdin)
 	stdinFile, err := os.Open(stdinPath)
 	if err != nil {
 		t.Fatalf("Open(stdin) failed: %v", err)
@@ -105,6 +113,30 @@ func newMockProgramScreen(t *testing.T, width, height int) (vt.MockTerm, tcell.S
 		t.Fatalf("NewTerminfoScreenFromTty failed: %v", err)
 	}
 	return term, screen
+}
+
+func newTestPager(t *testing.T, width, height int, content string) *goless.Pager {
+	t.Helper()
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(width, height)
+	if content != "" {
+		if err := pager.AppendString(content); err != nil {
+			t.Fatalf("AppendString failed: %v", err)
+		}
+		pager.Flush()
+	}
+	return pager
+}
+
+func writeTempFile(t *testing.T, dir, name, body string) string {
+	t.Helper()
+
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("WriteFile(%s) failed: %v", name, err)
+	}
+	return path
 }
 
 func boolPtr(v bool) *bool {
@@ -327,6 +359,53 @@ func TestProgramExitClearsStatusLine(t *testing.T) {
 	}
 }
 
+func TestNewProgramScreen(t *testing.T) {
+	oldDefaultFactory := programDefaultScreenFactory
+	oldTerminfoFactory := programTerminfoScreenFactory
+	defer func() {
+		programDefaultScreenFactory = oldDefaultFactory
+		programTerminfoScreenFactory = oldTerminfoFactory
+	}()
+
+	t.Run("visible eof uses terminfo without alt screen", func(t *testing.T) {
+		programDefaultScreenFactory = func() (tcell.Screen, error) {
+			t.Fatal("default screen factory should not be called")
+			return nil, nil
+		}
+		programTerminfoScreenFactory = func(opts ...tcell.TerminfoScreenOption) (tcell.Screen, error) {
+			if got, want := len(opts), 1; got != want {
+				t.Fatalf("len(opts) = %d, want %d", got, want)
+			}
+			opt, ok := opts[0].(tcell.OptAltScreen)
+			if !ok {
+				t.Fatalf("opts[0] type = %T, want tcell.OptAltScreen", opts[0])
+			}
+			if bool(opt) {
+				t.Fatal("OptAltScreen = true, want false")
+			}
+			return nil, nil
+		}
+
+		if _, err := newProgramScreen(programQuitAtEOFWhenVisible); err != nil {
+			t.Fatalf("newProgramScreen(visible) failed: %v", err)
+		}
+	})
+
+	t.Run("other policies use default screen", func(t *testing.T) {
+		programTerminfoScreenFactory = func(opts ...tcell.TerminfoScreenOption) (tcell.Screen, error) {
+			t.Fatal("terminfo screen factory should not be called")
+			return nil, nil
+		}
+		programDefaultScreenFactory = func() (tcell.Screen, error) {
+			return nil, nil
+		}
+
+		if _, err := newProgramScreen(programQuitAtEOFNever); err != nil {
+			t.Fatalf("newProgramScreen(never) failed: %v", err)
+		}
+	})
+}
+
 func TestHandleProgramQuitIfOneScreenQuitsAtLastFile(t *testing.T) {
 	session := newProgramSession([]string{"one.txt"}, programStartup{})
 	snapshot := programViewportSnapshot{eofVisible: true}
@@ -440,12 +519,7 @@ func TestApplyDemoQuitAtEOFAdvancesToNextFile(t *testing.T) {
 
 func TestHandleDemoVisibleEOFQuitsAtLastFile(t *testing.T) {
 	session := newProgramSession([]string{"one.txt"}, programStartup{})
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 5)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 5, testInputOneTwo)
 
 	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() (bool, error) { return true, nil })
 	if err != nil {
@@ -458,22 +532,12 @@ func TestHandleDemoVisibleEOFQuitsAtLastFile(t *testing.T) {
 
 func TestHandleDemoVisibleEOFAdvancesPastShortFile(t *testing.T) {
 	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 5)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 5, testInputOneTwo)
 
 	reloads := 0
 	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() (bool, error) {
 		reloads++
-		pager = goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-		pager.SetSize(20, 5)
-		if err := pager.AppendString("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n"); err != nil {
-			return false, err
-		}
-		pager.Flush()
+		pager = newTestPager(t, 20, 5, testInputTallTenLines)
 		return true, nil
 	})
 	if err != nil {
@@ -492,18 +556,12 @@ func TestHandleDemoVisibleEOFAdvancesPastShortFile(t *testing.T) {
 
 func TestHandleDemoVisibleEOFWaitsForExplicitStdin(t *testing.T) {
 	session := newProgramSession([]string{"one.txt", "-"}, programStartup{})
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 5)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 5, testInputOneTwo)
 
 	reloads := 0
 	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() (bool, error) {
 		reloads++
-		pager = goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-		pager.SetSize(20, 5)
+		pager = newTestPager(t, 20, 5, "")
 		return false, nil
 	})
 	if err != nil {
@@ -522,12 +580,7 @@ func TestHandleDemoVisibleEOFWaitsForExplicitStdin(t *testing.T) {
 
 func TestHandleDemoVisibleEOFIgnoredWhenNotVisible(t *testing.T) {
 	session := newProgramSession([]string{"one.txt"}, programStartup{})
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 3)
-	if err := pager.AppendString("one\ntwo\nthree\nfour\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 3, testInputOneTwoThreeFour)
 
 	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() (bool, error) { return true, nil })
 	if err != nil {
@@ -540,12 +593,7 @@ func TestHandleDemoVisibleEOFIgnoredWhenNotVisible(t *testing.T) {
 
 func TestHandleDemoVisibleEOFIgnoredInFollowMode(t *testing.T) {
 	session := newProgramSession([]string{"one.txt"}, programStartup{})
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 5)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 5, testInputOneTwo)
 	pager.Follow()
 
 	quit, err := handleProgramVisibleEOF(programQuitAtEOFWhenVisible, session, func() *goless.Pager { return pager }, true, func() (bool, error) { return true, nil })
@@ -620,12 +668,7 @@ func TestApplyDemoQuitAtEOFIgnoredOutsideNormalCompletedNavigation(t *testing.T)
 
 func TestHandleDemoVisibleEOFActionRequiresForwardNavigation(t *testing.T) {
 	session := newProgramSession([]string{"one.txt"}, programStartup{})
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 5)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 5, testInputOneTwo)
 
 	quit, err := handleProgramVisibleEOFAction(
 		programQuitAtEOFWhenVisible,
@@ -645,12 +688,7 @@ func TestHandleDemoVisibleEOFActionRequiresForwardNavigation(t *testing.T) {
 
 func TestHandleProgramPostInputVisibleEOFFromMouseScroll(t *testing.T) {
 	session := newProgramSession([]string{"one.txt"}, programStartup{})
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 5)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 5, testInputOneTwo)
 
 	quit, err := handleProgramPostInput(
 		programQuitAtEOFWhenVisible,
@@ -677,12 +715,7 @@ func TestHandleProgramPostInputVisibleEOFFromMouseScroll(t *testing.T) {
 
 func TestHandleProgramPostInputQuitAtEOFUsesStationaryForwardAction(t *testing.T) {
 	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 5)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 5, testInputOneTwo)
 
 	reloads := 0
 	quit, err := handleProgramPostInput(
@@ -719,12 +752,7 @@ func TestHandleProgramPostInputQuitAtEOFUsesStationaryForwardAction(t *testing.T
 
 func TestHandleProgramPostInputIgnoresNonNormalContexts(t *testing.T) {
 	session := newProgramSession([]string{"one.txt"}, programStartup{})
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 5)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 5, testInputOneTwo)
 
 	for _, tt := range []struct {
 		name    string
@@ -764,12 +792,7 @@ func TestHandleProgramPostInputIgnoresNonNormalContexts(t *testing.T) {
 
 func TestHandleProgramPostInputSkipsEOFPoliciesForLicenseView(t *testing.T) {
 	session := newProgramSession([]string{"one.txt"}, programStartup{})
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 5)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 5, testInputOneTwo)
 
 	quit, err := handleProgramPostInput(
 		programQuitAtEOFWhenVisible,
@@ -982,10 +1005,7 @@ func TestRunRejectsUnknownPreset(t *testing.T) {
 
 func TestRunPassesThroughFilesToPipe(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "sample.txt")
-	if err := os.WriteFile(path, []byte("one\ntwo\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(sample) failed: %v", err)
-	}
+	path := writeTempFile(t, dir, testSampleFileName, testInputOneTwo)
 
 	output, err := runProgramForTest(t, []string{path}, "")
 	if err != nil {
@@ -1011,10 +1031,7 @@ func TestRunRejectsTerminalStdinWithoutInput(t *testing.T) {
 
 func TestRunInteractiveFileQuitsOnQ(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "sample.txt")
-	if err := os.WriteFile(path, []byte("one\ntwo\nthree\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(sample) failed: %v", err)
-	}
+	path := writeTempFile(t, dir, testSampleFileName, testInputOneTwoThree)
 
 	term, screen := newMockProgramScreen(t, 80, 24)
 	output, err := runProgramForTestWithOptions(t, []string{path}, programRunTestOptions{
@@ -1062,10 +1079,7 @@ func TestParseProgramFlagsLicenseExclusive(t *testing.T) {
 }
 
 func TestProgramStandardStreamsUseNonTerminalFiles(t *testing.T) {
-	stdinPath := filepath.Join(t.TempDir(), "stdin.txt")
-	if err := os.WriteFile(stdinPath, []byte("alpha\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(stdin) failed: %v", err)
-	}
+	stdinPath := writeTempFile(t, t.TempDir(), testStdinFixtureFileName, "alpha\n")
 	stdinFile, err := os.Open(stdinPath)
 	if err != nil {
 		t.Fatalf("Open(stdin) failed: %v", err)
@@ -1402,7 +1416,7 @@ func TestHandleProgramStatusKey(t *testing.T) {
 		},
 	})
 	pager.SetSize(20, 2)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
+	if err := pager.AppendString(testInputOneTwo); err != nil {
 		t.Fatalf("AppendString failed: %v", err)
 	}
 	pager.Flush()
@@ -1448,7 +1462,7 @@ func TestHandleProgramReloadKey(t *testing.T) {
 		},
 	})
 	pager.SetSize(20, 2)
-	if err := pager.AppendString("one\ntwo\n"); err != nil {
+	if err := pager.AppendString(testInputOneTwo); err != nil {
 		t.Fatalf("AppendString failed: %v", err)
 	}
 	pager.Flush()
@@ -1516,12 +1530,7 @@ func TestShouldHandleProgramStatusKey(t *testing.T) {
 }
 
 func TestUpdateProgramQuitIfOneScreenArm(t *testing.T) {
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 3)
-	if err := pager.AppendString("one\ntwo\nthree\nfour\nfive\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 3, testInputOneToFive)
 
 	if got := updateProgramQuitIfOneScreenArm(true, pager); !got {
 		t.Fatal("updateProgramQuitIfOneScreenArm(true, origin pager) = false, want true")
@@ -1535,12 +1544,7 @@ func TestUpdateProgramQuitIfOneScreenArm(t *testing.T) {
 		t.Fatal("updateProgramQuitIfOneScreenArm(false, scrolled pager) = true, want false")
 	}
 
-	pager = goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 3)
-	if err := pager.AppendString("one\ntwo\nthree\nfour\nfive\n"); err != nil {
-		t.Fatalf("AppendString(second pager) failed: %v", err)
-	}
-	pager.Flush()
+	pager = newTestPager(t, 20, 3, testInputOneToFive)
 	pager.Follow()
 	if got := updateProgramQuitIfOneScreenArm(true, pager); got {
 		t.Fatal("updateProgramQuitIfOneScreenArm(true, following pager) = true, want false")
@@ -1855,7 +1859,7 @@ func TestProgramInputsUseStdin(t *testing.T) {
 func TestApplyStartupCommand(t *testing.T) {
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
-	if err := pager.AppendString("one\ntwo\nthree\nfour\n"); err != nil {
+	if err := pager.AppendString(testInputOneTwoThreeFour); err != nil {
 		t.Fatalf("AppendString failed: %v", err)
 	}
 	pager.Flush()
@@ -1865,12 +1869,7 @@ func TestApplyStartupCommand(t *testing.T) {
 		t.Fatalf("Position().Row = %d, want %d", got, want)
 	}
 
-	pager = goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 2)
-	if err := pager.AppendString("alpha\nbeta\ngamma\nbeta\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager = newTestPager(t, 20, 2, "alpha\nbeta\ngamma\nbeta\n")
 
 	applyStartupCommand(pager, programStartup{query: "beta"})
 	state := pager.SearchState()
@@ -1887,24 +1886,18 @@ func TestApplyStartupCommand(t *testing.T) {
 
 func TestPassThroughProgramInputsFromStdin(t *testing.T) {
 	var out bytes.Buffer
-	if err := passThroughProgramInputs(&out, bytes.NewBufferString("alpha\nbeta\n"), nil); err != nil {
+	if err := passThroughProgramInputs(&out, bytes.NewBufferString(testInputAlphaBeta), nil); err != nil {
 		t.Fatalf("passThroughProgramInputs(stdin) failed: %v", err)
 	}
-	if got, want := out.String(), "alpha\nbeta\n"; got != want {
+	if got, want := out.String(), testInputAlphaBeta; got != want {
 		t.Fatalf("output = %q, want %q", got, want)
 	}
 }
 
 func TestPassThroughProgramInputsFromFiles(t *testing.T) {
 	dir := t.TempDir()
-	first := filepath.Join(dir, "first.txt")
-	second := filepath.Join(dir, "second.txt")
-	if err := os.WriteFile(first, []byte("first\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(first) failed: %v", err)
-	}
-	if err := os.WriteFile(second, []byte("second\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(second) failed: %v", err)
-	}
+	first := writeTempFile(t, dir, "first.txt", "first\n")
+	second := writeTempFile(t, dir, "second.txt", "second\n")
 
 	var out bytes.Buffer
 	if err := passThroughProgramInputs(&out, bytes.NewBufferString("ignored\n"), []string{first, second}); err != nil {
@@ -1917,14 +1910,8 @@ func TestPassThroughProgramInputsFromFiles(t *testing.T) {
 
 func TestPassThroughProgramInputsFromMixedSources(t *testing.T) {
 	dir := t.TempDir()
-	first := filepath.Join(dir, "first.txt")
-	second := filepath.Join(dir, "second.txt")
-	if err := os.WriteFile(first, []byte("first\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(first) failed: %v", err)
-	}
-	if err := os.WriteFile(second, []byte("second\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(second) failed: %v", err)
-	}
+	first := writeTempFile(t, dir, "first.txt", "first\n")
+	second := writeTempFile(t, dir, "second.txt", "second\n")
 
 	var out bytes.Buffer
 	if err := passThroughProgramInputs(&out, bytes.NewBufferString("stdin\n"), []string{first, "-", second}); err != nil {
@@ -1944,7 +1931,7 @@ func TestPassThroughProgramInputsReportsOpenError(t *testing.T) {
 }
 
 func TestProgramInputLoaderCachesExplicitStdin(t *testing.T) {
-	loader := newProgramInputLoader(bytes.NewBufferString("alpha\nbeta\n"))
+	loader := newProgramInputLoader(bytes.NewBufferString(testInputAlphaBeta))
 
 	first, err := loader.open("-")
 	if err != nil {
@@ -1970,10 +1957,10 @@ func TestProgramInputLoaderCachesExplicitStdin(t *testing.T) {
 		t.Fatalf("Close(second) failed: %v", err)
 	}
 
-	if got, want := string(firstData), "alpha\nbeta\n"; got != want {
+	if got, want := string(firstData), testInputAlphaBeta; got != want {
 		t.Fatalf("first stdin read = %q, want %q", got, want)
 	}
-	if got, want := string(secondData), "alpha\nbeta\n"; got != want {
+	if got, want := string(secondData), testInputAlphaBeta; got != want {
 		t.Fatalf("second stdin read = %q, want %q", got, want)
 	}
 }
@@ -1989,7 +1976,7 @@ func TestProgramInputLoaderRejectsUnavailableExplicitStdin(t *testing.T) {
 }
 
 func TestProgramInputLoaderStreamsAndCachesExplicitStdin(t *testing.T) {
-	loader := newProgramInputLoader(bytes.NewBufferString("alpha\nbeta\n"))
+	loader := newProgramInputLoader(bytes.NewBufferString(testInputAlphaBeta))
 	if !loader.canStream("-") {
 		t.Fatal("loader.canStream(-) = false, want true")
 	}
@@ -2008,7 +1995,7 @@ func TestProgramInputLoaderStreamsAndCachesExplicitStdin(t *testing.T) {
 	}
 	finish(nil, data)
 
-	if got, want := string(data), "alpha\nbeta\n"; got != want {
+	if got, want := string(data), testInputAlphaBeta; got != want {
 		t.Fatalf("stream data = %q, want %q", got, want)
 	}
 
@@ -2023,7 +2010,7 @@ func TestProgramInputLoaderStreamsAndCachesExplicitStdin(t *testing.T) {
 	if err := cached.Close(); err != nil {
 		t.Fatalf("Close(cached) failed: %v", err)
 	}
-	if got, want := string(cachedData), "alpha\nbeta\n"; got != want {
+	if got, want := string(cachedData), testInputAlphaBeta; got != want {
 		t.Fatalf("cached data = %q, want %q", got, want)
 	}
 }
@@ -2058,7 +2045,7 @@ func TestReadIntoPagerWithAfterRunsHook(t *testing.T) {
 	result := make(chan error, 1)
 	done := make(chan error, 1)
 
-	go readIntoPagerWithAfter(pager, bytes.NewBufferString("alpha\nbeta\n"), events, result, func(err error) {
+	go readIntoPagerWithAfter(pager, bytes.NewBufferString(testInputAlphaBeta), events, result, func(err error) {
 		done <- err
 	})
 
@@ -2090,7 +2077,7 @@ func TestStartProgramReadReturnsResultChannel(t *testing.T) {
 	pager.SetSize(20, 3)
 	events := make(chan tcell.Event, 8)
 
-	result := startProgramRead(pager, bytes.NewBufferString("alpha\nbeta\n"), events, nil)
+	result := startProgramRead(pager, bytes.NewBufferString(testInputAlphaBeta), events, nil)
 	select {
 	case err := <-result:
 		if err != nil {
@@ -2103,10 +2090,7 @@ func TestStartProgramReadReturnsResultChannel(t *testing.T) {
 
 func TestLoadProgramInputFromFile(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "sample.txt")
-	if err := os.WriteFile(path, []byte("one\ntwo\nthree\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(sample) failed: %v", err)
-	}
+	path := writeTempFile(t, dir, testSampleFileName, testInputOneTwoThree)
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
@@ -2123,7 +2107,7 @@ func TestLoadProgramInputFromFile(t *testing.T) {
 }
 
 func TestLoadProgramInputFromCachedStdin(t *testing.T) {
-	loader := newProgramInputLoader(bytes.NewBufferString("alpha\nbeta\n"))
+	loader := newProgramInputLoader(bytes.NewBufferString(testInputAlphaBeta))
 	reader, finish, err := loader.startStdinStream()
 	if err != nil {
 		t.Fatalf("loader.startStdinStream() failed: %v", err)
@@ -2147,10 +2131,7 @@ func TestLoadProgramInputFromCachedStdin(t *testing.T) {
 
 func TestReloadProgramInputInPlacePreservesViewport(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "sample.txt")
-	if err := os.WriteFile(path, []byte("one\ntwo\nthree\nfour\n0123456789abcdef\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(sample) failed: %v", err)
-	}
+	path := writeTempFile(t, dir, testSampleFileName, "one\ntwo\nthree\nfour\n0123456789abcdef\n")
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(8, 4)
@@ -2178,7 +2159,7 @@ func TestReloadProgramInputInPlacePreservesViewport(t *testing.T) {
 }
 
 func TestReloadProgramInputInPlaceUsesCachedStdin(t *testing.T) {
-	loader := newProgramInputLoader(bytes.NewBufferString("alpha\nbeta\n"))
+	loader := newProgramInputLoader(bytes.NewBufferString(testInputAlphaBeta))
 	reader, finish, err := loader.startStdinStream()
 	if err != nil {
 		t.Fatalf("loader.startStdinStream() failed: %v", err)
@@ -2199,41 +2180,31 @@ func TestReloadProgramInputInPlaceUsesCachedStdin(t *testing.T) {
 	if err := reloadProgramInputInPlace(pager, loader, "-"); err != nil {
 		t.Fatalf("reloadProgramInputInPlace(stdin) failed: %v", err)
 	}
-	if got, want := pager.Len(), int64(len("alpha\nbeta\n")); got != want {
+	if got, want := pager.Len(), int64(len(testInputAlphaBeta)); got != want {
 		t.Fatalf("Len after stdin in-place reload = %d, want %d", got, want)
 	}
 }
 
 func TestReloadProgramInputInPlaceErrorLeavesPagerUnchanged(t *testing.T) {
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 2)
-	if err := pager.AppendString("alpha\nbeta\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 2, testInputAlphaBeta)
 
 	err := reloadProgramInputInPlace(pager, nil, filepath.Join(t.TempDir(), "missing.txt"))
 	if err == nil {
 		t.Fatal("reloadProgramInputInPlace(missing file) = nil error, want error")
 	}
-	if got, want := pager.Len(), int64(len("alpha\nbeta\n")); got != want {
+	if got, want := pager.Len(), int64(len(testInputAlphaBeta)); got != want {
 		t.Fatalf("Len after failed in-place reload = %d, want %d", got, want)
 	}
 }
 
 func TestReloadProgramInputInPlaceUnavailableLoaderLeavesPagerUnchanged(t *testing.T) {
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 2)
-	if err := pager.AppendString("alpha\nbeta\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
+	pager := newTestPager(t, 20, 2, testInputAlphaBeta)
 
 	err := reloadProgramInputInPlace(pager, newProgramInputLoader(nil), "-")
 	if err == nil {
 		t.Fatal("reloadProgramInputInPlace(unavailable stdin) = nil error, want error")
 	}
-	if got, want := pager.Len(), int64(len("alpha\nbeta\n")); got != want {
+	if got, want := pager.Len(), int64(len(testInputAlphaBeta)); got != want {
 		t.Fatalf("Len after unavailable stdin reload = %d, want %d", got, want)
 	}
 }
@@ -2252,7 +2223,7 @@ func TestRunProgramCommandRejectsNilPagerAndEmptyCommand(t *testing.T) {
 
 func TestReloadProgramInputStreamsExplicitStdin(t *testing.T) {
 	session := newProgramSession([]string{"-"}, programStartup{})
-	loader := newProgramInputLoader(bytes.NewBufferString("alpha\nbeta\n"))
+	loader := newProgramInputLoader(bytes.NewBufferString(testInputAlphaBeta))
 	events := make(chan tcell.Event, 8)
 	var pager *goless.Pager
 	var readResult chan error
@@ -2312,7 +2283,7 @@ func TestReloadProgramInputBlocksWhileReading(t *testing.T) {
 
 func TestReloadProgramInputLoadsCachedStdinSynchronously(t *testing.T) {
 	session := newProgramSession([]string{"-"}, programStartup{query: "beta"})
-	loader := newProgramInputLoader(bytes.NewBufferString("alpha\nbeta\n"))
+	loader := newProgramInputLoader(bytes.NewBufferString(testInputAlphaBeta))
 	reader, finish, err := loader.startStdinStream()
 	if err != nil {
 		t.Fatalf("loader.startStdinStream() failed: %v", err)
@@ -2349,10 +2320,7 @@ func TestReloadProgramInputLoadsCachedStdinSynchronously(t *testing.T) {
 
 func TestSyncProgramFileFollowAppendsNewBytes(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "sample.txt")
-	if err := os.WriteFile(path, []byte("one\ntwo\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(sample) failed: %v", err)
-	}
+	path := writeTempFile(t, dir, testSampleFileName, testInputOneTwo)
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
@@ -2380,7 +2348,7 @@ func TestSyncProgramFileFollowAppendsNewBytes(t *testing.T) {
 	if !changed {
 		t.Fatal("syncProgramFileFollow(...) = unchanged, want changed")
 	}
-	if got, want := pager.Len(), int64(len("one\ntwo\nthree\n")); got != want {
+	if got, want := pager.Len(), int64(len(testInputOneTwoThree)); got != want {
 		t.Fatalf("Len after append = %d, want %d", got, want)
 	}
 	if !pager.SearchForward("three") {
@@ -2393,10 +2361,7 @@ func TestSyncProgramFileFollowAppendsNewBytes(t *testing.T) {
 
 func TestSyncProgramFileFollowReloadsTruncatedFile(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "sample.txt")
-	if err := os.WriteFile(path, []byte("one\ntwo\nthree\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(sample) failed: %v", err)
-	}
+	path := writeTempFile(t, dir, testSampleFileName, testInputOneTwoThree)
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
@@ -2429,10 +2394,7 @@ func TestSyncProgramFileFollowReloadsTruncatedFile(t *testing.T) {
 
 func TestSyncProgramFileFollowReloadsReplacedFileWithSameSize(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "sample.txt")
-	if err := os.WriteFile(path, []byte("one\ntwo\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(sample) failed: %v", err)
-	}
+	path := writeTempFile(t, dir, testSampleFileName, testInputOneTwo)
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
@@ -2470,10 +2432,7 @@ func TestSyncProgramFileFollowReloadsReplacedFileWithSameSize(t *testing.T) {
 
 func TestSyncProgramFileFollowReloadsReplacedFileWithLargerSize(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "sample.txt")
-	if err := os.WriteFile(path, []byte("one\ntwo\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(sample) failed: %v", err)
-	}
+	path := writeTempFile(t, dir, testSampleFileName, testInputOneTwo)
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
@@ -2514,10 +2473,7 @@ func TestSyncProgramFileFollowReloadsReplacedFileWithLargerSize(t *testing.T) {
 
 func TestStartProgramFileFollowPollsForAppends(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "sample.txt")
-	if err := os.WriteFile(path, []byte("one\ntwo\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(sample) failed: %v", err)
-	}
+	path := writeTempFile(t, dir, testSampleFileName, testInputOneTwo)
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
@@ -2560,10 +2516,7 @@ func TestStartProgramFileFollowPollsForAppends(t *testing.T) {
 
 func TestStartProgramFileFollowReloadsImmediateReplacement(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "sample.txt")
-	if err := os.WriteFile(path, []byte("one\ntwo\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile(sample) failed: %v", err)
-	}
+	path := writeTempFile(t, dir, testSampleFileName, testInputOneTwo)
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
