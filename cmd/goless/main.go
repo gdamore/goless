@@ -766,7 +766,12 @@ func startProgramFileFollow(pager *goless.Pager, path string, info os.FileInfo, 
 				if err != nil || !changed {
 					continue
 				}
-				eventQ <- tcell.NewEventInterrupt(nil)
+				select {
+				case eventQ <- tcell.NewEventInterrupt(nil):
+				case <-follower.stop:
+					return
+				default:
+				}
 			}
 		}
 	}()

@@ -2523,6 +2523,59 @@ func TestStartProgramFileFollowPollsForAppends(t *testing.T) {
 	}
 }
 
+func TestStartProgramFileFollowStopDoesNotBlockOnFullEventQueue(t *testing.T) {
+	dir := t.TempDir()
+	path := writeTempFile(t, dir, testSampleFileName, testInputOneTwo)
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	if _, _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
+		t.Fatalf("loadProgramInput(file) failed: %v", err)
+	}
+
+	events := make(chan tcell.Event, 1)
+	events <- tcell.NewEventInterrupt(nil)
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat(sample) failed: %v", err)
+	}
+	follower := startProgramFileFollow(pager, path, info, events, 10*time.Millisecond)
+
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatalf("OpenFile(sample) failed: %v", err)
+	}
+	if _, err := file.WriteString("three\n"); err != nil {
+		file.Close()
+		t.Fatalf("WriteString(append) failed: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("Close(append file) failed: %v", err)
+	}
+
+	deadline := time.After(2 * time.Second)
+	for !pager.SearchForward("three") {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for file follow append with full event queue")
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		follower.Stop()
+		close(stopped)
+	}()
+
+	select {
+	case <-stopped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for file follower Stop with full event queue")
+	}
+}
+
 func TestStartProgramFileFollowReloadsImmediateReplacement(t *testing.T) {
 	dir := t.TempDir()
 	path := writeTempFile(t, dir, testSampleFileName, testInputOneTwo)
