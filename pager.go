@@ -105,6 +105,8 @@ type Pager struct {
 	doc        *model.Document
 	viewer     *iview.Viewer
 	captureKey func(*tcell.EventKey) bool
+	chunkSize  int
+	renderMode ansi.RenderMode
 }
 
 // New constructs a Pager with the supplied options.
@@ -123,10 +125,13 @@ func New(opts ...Option) *Pager {
 }
 
 func newPagerFromConfig(cfg Config) *Pager {
-	doc := model.NewDocumentWithMode(defaultChunkSize, toInternalRenderMode(cfg.RenderMode))
+	renderMode := toInternalRenderMode(cfg.RenderMode)
+	doc := model.NewDocumentWithMode(defaultChunkSize, renderMode)
 	return &Pager{
 		doc:        doc,
 		captureKey: cfg.CaptureKey,
+		chunkSize:  defaultChunkSize,
+		renderMode: renderMode,
 		viewer: iview.New(doc, iview.Config{
 			TabWidth:          cfg.TabWidth,
 			WrapMode:          toInternalWrapMode(cfg.WrapMode),
@@ -187,6 +192,32 @@ func (p *Pager) ReadFrom(r io.Reader) (int64, error) {
 		}
 		if err == io.EOF {
 			p.viewer.Refresh()
+			return total, nil
+		}
+		if err != nil {
+			return total, err
+		}
+	}
+}
+
+// ReloadFrom replaces the current document with data read from r and refreshes
+// the derived layout. The current viewport offsets, size, and chrome are
+// preserved when possible and clamped against the new content when necessary.
+func (p *Pager) ReloadFrom(r io.Reader) (int64, error) {
+	doc := model.NewDocumentWithMode(p.chunkSize, p.renderMode)
+	buf := make([]byte, p.chunkSize)
+	var total int64
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			total += int64(n)
+			if appendErr := doc.Append(buf[:n]); appendErr != nil {
+				return total, appendErr
+			}
+		}
+		if err == io.EOF {
+			p.doc = doc
+			p.viewer.SetDocument(doc)
 			return total, nil
 		}
 		if err != nil {

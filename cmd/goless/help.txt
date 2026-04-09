@@ -1,7 +1,8 @@
 [1;4mGeneral[0m
   h F1                help
-  q Q Esc             quit
+ q Q Esc             quit
   r ^L                repaint
+  R                   reload current file/input
   F4                  cycle themes
 
 [1;4mNavigation[0m
@@ -52,4 +53,5 @@
   :set ignorecase         search without case sensitivity
   :set smartcase          search smart-case
   :set searchmode=[3mmode[0m    set match mode (sub|word|regex)
+  :reload                 reload current file/input
   :license                show the bundled Apache license

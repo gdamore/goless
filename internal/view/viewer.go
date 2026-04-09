@@ -274,6 +274,20 @@ func (v *Viewer) SetShowStatus(enabled bool) {
 	v.restoreAnchor(anchor)
 }
 
+// SetDocument swaps the backing document while preserving the current viewer
+// configuration and viewport offsets when possible.
+func (v *Viewer) SetDocument(doc *model.Document) {
+	if doc == nil {
+		return
+	}
+	v.doc = doc
+	v.relayout()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+	}
+}
+
 // ShowInformation replaces the document view with a scrollable information overlay.
 func (v *Viewer) ShowInformation(title, body string) {
 	v.overlay = &informationOverlay{

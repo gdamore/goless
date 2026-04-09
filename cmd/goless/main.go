@@ -136,7 +136,8 @@ func run() error {
 		pager             *goless.Pager
 		pagerSnapshot     programViewportSnapshot
 		readResult        chan error
-		reloadCurrent     func() (bool, error)
+		loadCurrent       func() (bool, error)
+		reloadDisplayed   func() error
 		buildProgramPager func() *goless.Pager
 	)
 	buildProgramPager = func() *goless.Pager {
@@ -152,12 +153,13 @@ func run() error {
 			opts.tabWidth,
 			session.commandHandler(
 				func() error {
-					if reloadCurrent == nil {
+					if loadCurrent == nil {
 						return fmt.Errorf("file reload unavailable")
 					}
-					_, err := reloadCurrent()
+					_, err := loadCurrent()
 					return err
 				},
+				reloadDisplayed,
 				func(title, body string) {
 					if pager != nil {
 						pager.ShowInformation(title, body)
@@ -171,14 +173,23 @@ func run() error {
 		pager.SetSize(width, height)
 		pager.ShowInformation("Apache License 2.0", goless.LicenseText())
 	} else if session.hasFiles() {
-		reloadCurrent = func() (bool, error) {
+		loadCurrent = func() (bool, error) {
 			loaded, snapshot, err := reloadProgramInput(session, inputLoader, &pager, buildProgramPager, width, height, screen.EventQ(), &readResult)
 			if err == nil {
 				pagerSnapshot = snapshot
 			}
 			return loaded, err
 		}
-		if _, err := reloadCurrent(); err != nil {
+		reloadDisplayed = func() error {
+			if pager == nil {
+				return fmt.Errorf("file reload unavailable")
+			}
+			if readResult != nil {
+				return fmt.Errorf("stdin still reading")
+			}
+			return reloadProgramInputInPlace(pager, inputLoader, session.currentFile())
+		}
+		if _, err := loadCurrent(); err != nil {
 			return err
 		}
 	} else {
@@ -188,7 +199,7 @@ func run() error {
 	}
 	pager.Draw(screen)
 	if !opts.showLicense {
-		quit, err := handleProgramQuitIfOneScreen(quitIfOneScreenArmed, session, func() programViewportSnapshot { return pagerSnapshot }, readResult == nil, reloadCurrent)
+		quit, err := handleProgramQuitIfOneScreen(quitIfOneScreenArmed, session, func() programViewportSnapshot { return pagerSnapshot }, readResult == nil, loadCurrent)
 		if err != nil {
 			return err
 		}
@@ -196,7 +207,7 @@ func run() error {
 		if quit {
 			return programExit(screen, quitAtEOFPolicy)
 		}
-		quit, err = handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, readResult == nil, reloadCurrent)
+		quit, err = handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, readResult == nil, loadCurrent)
 		if err != nil {
 			return err
 		}
@@ -237,6 +248,10 @@ func run() error {
 			beforeFollowing := pager.Following()
 			wasShowingInformation := pager.ShowingInformation()
 			keyResult := pager.HandleKeyResult(event)
+			if shouldHandleProgramReloadKey(keyResult) && handleProgramReloadKey(pager, event) {
+				pager.Draw(screen)
+				break
+			}
 			if shouldHandleProgramStatusKey(keyResult) && handleProgramStatusKey(pager, event) {
 				pager.Draw(screen)
 				break
@@ -261,7 +276,7 @@ func run() error {
 				readResult == nil,
 				beforeFollowing,
 				before,
-				reloadCurrent,
+				loadCurrent,
 			)
 			if err != nil {
 				return err
@@ -289,7 +304,7 @@ func run() error {
 				readResult == nil,
 				beforeFollowing,
 				before,
-				reloadCurrent,
+				loadCurrent,
 			)
 			if err != nil {
 				return err
@@ -310,7 +325,7 @@ func run() error {
 					pagerSnapshot = snapshotProgramPager(pager)
 					applyStartupCommand(pager, startup)
 					readResult = nil
-					quit, err := handleProgramQuitIfOneScreen(quitIfOneScreenArmed, session, func() programViewportSnapshot { return pagerSnapshot }, true, reloadCurrent)
+					quit, err := handleProgramQuitIfOneScreen(quitIfOneScreenArmed, session, func() programViewportSnapshot { return pagerSnapshot }, true, loadCurrent)
 					if err != nil {
 						return err
 					}
@@ -318,7 +333,7 @@ func run() error {
 					if quit {
 						return programExit(screen, quitAtEOFPolicy)
 					}
-					quit, err = handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, true, reloadCurrent)
+					quit, err = handleProgramVisibleEOF(quitAtEOFPolicy, session, func() *goless.Pager { return pager }, true, loadCurrent)
 					if err != nil {
 						return err
 					}
@@ -902,7 +917,7 @@ func (s *programSession) last() bool {
 	return true
 }
 
-func (s *programSession) commandHandler(reload func() error, showInformation func(title, body string)) func(goless.Command) goless.CommandResult {
+func (s *programSession) commandHandler(load func() error, reload func() error, showInformation func(title, body string)) func(goless.Command) goless.CommandResult {
 	return func(cmd goless.Command) goless.CommandResult {
 		switch cmd.Name {
 		case "q", "Q", "quit":
@@ -916,13 +931,24 @@ func (s *programSession) commandHandler(reload func() error, showInformation fun
 			return goless.CommandResult{Handled: true}
 		case "version":
 			return goless.CommandResult{Handled: true, Message: version()}
+		case "reload":
+			if reload == nil {
+				return goless.CommandResult{Handled: true, Message: "file reload unavailable"}
+			}
+			if err := reload(); err != nil {
+				return goless.CommandResult{Handled: true, Message: err.Error()}
+			}
+			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
 		case "next", "n":
 			if !s.canNext() {
 				return goless.CommandResult{Handled: true, Message: "already at last file"}
 			}
+			if load == nil {
+				return goless.CommandResult{Handled: true, Message: "file reload unavailable"}
+			}
 			index := s.index
 			s.next()
-			if err := reload(); err != nil {
+			if err := load(); err != nil {
 				s.index = index
 				return goless.CommandResult{Handled: true, Message: err.Error()}
 			}
@@ -931,9 +957,12 @@ func (s *programSession) commandHandler(reload func() error, showInformation fun
 			if !s.canPrev() {
 				return goless.CommandResult{Handled: true, Message: "already at first file"}
 			}
+			if load == nil {
+				return goless.CommandResult{Handled: true, Message: "file reload unavailable"}
+			}
 			index := s.index
 			s.prev()
-			if err := reload(); err != nil {
+			if err := load(); err != nil {
 				s.index = index
 				return goless.CommandResult{Handled: true, Message: err.Error()}
 			}
@@ -942,9 +971,12 @@ func (s *programSession) commandHandler(reload func() error, showInformation fun
 			if !s.hasFiles() || s.index == 0 {
 				return goless.CommandResult{Handled: true, Message: "already at first file"}
 			}
+			if load == nil {
+				return goless.CommandResult{Handled: true, Message: "file reload unavailable"}
+			}
 			index := s.index
 			s.first()
-			if err := reload(); err != nil {
+			if err := load(); err != nil {
 				s.index = index
 				return goless.CommandResult{Handled: true, Message: err.Error()}
 			}
@@ -953,9 +985,12 @@ func (s *programSession) commandHandler(reload func() error, showInformation fun
 			if !s.hasFiles() || s.index == len(s.files)-1 {
 				return goless.CommandResult{Handled: true, Message: "already at last file"}
 			}
+			if load == nil {
+				return goless.CommandResult{Handled: true, Message: "file reload unavailable"}
+			}
 			index := s.index
 			s.last()
-			if err := reload(); err != nil {
+			if err := load(); err != nil {
 				s.index = index
 				return goless.CommandResult{Handled: true, Message: err.Error()}
 			}
@@ -974,21 +1009,37 @@ func handleProgramStatusKey(pager *goless.Pager, ev *tcell.EventKey) bool {
 		return false
 	}
 
-	for _, step := range []*tcell.EventKey{
-		tcell.NewEventKey(tcell.KeyRune, ":", tcell.ModNone),
-		tcell.NewEventKey(tcell.KeyRune, "f", tcell.ModNone),
-		tcell.NewEventKey(tcell.KeyRune, "i", tcell.ModNone),
-		tcell.NewEventKey(tcell.KeyRune, "l", tcell.ModNone),
-		tcell.NewEventKey(tcell.KeyRune, "e", tcell.ModNone),
-		tcell.NewEventKey(tcell.KeyEnter, "", tcell.ModNone),
-	} {
-		pager.HandleKeyResult(step)
-	}
-	return true
+	return runProgramCommand(pager, "file")
 }
 
 func shouldHandleProgramStatusKey(result goless.KeyResult) bool {
 	return !result.Handled && result.Context == goless.NormalKeyContext
+}
+
+func handleProgramReloadKey(pager *goless.Pager, ev *tcell.EventKey) bool {
+	if pager == nil || ev == nil {
+		return false
+	}
+	if ev.Key() != tcell.KeyRune || ev.Str() != "R" || ev.Modifiers() != tcell.ModNone {
+		return false
+	}
+	return runProgramCommand(pager, "reload")
+}
+
+func shouldHandleProgramReloadKey(result goless.KeyResult) bool {
+	return !result.Handled && result.Context == goless.NormalKeyContext
+}
+
+func runProgramCommand(pager *goless.Pager, command string) bool {
+	if pager == nil || command == "" {
+		return false
+	}
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, ":", tcell.ModNone))
+	for _, r := range command {
+		pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, string(r), tcell.ModNone))
+	}
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyEnter, "", tcell.ModNone))
+	return true
 }
 
 func snapshotProgramPager(pager *goless.Pager) programViewportSnapshot {
@@ -1106,6 +1157,29 @@ func loadProgramInput(pager *goless.Pager, loader *programInputLoader, path stri
 	snapshot := snapshotProgramPager(pager)
 	applyStartupCommand(pager, startup)
 	return snapshot, nil
+}
+
+func reloadProgramInputInPlace(pager *goless.Pager, loader *programInputLoader, path string) error {
+	var (
+		file io.ReadCloser
+		err  error
+	)
+	if loader != nil {
+		file, err = loader.open(path)
+	} else if isProgramStdinInput(path) {
+		file = io.NopCloser(os.Stdin)
+	} else {
+		file, err = os.Open(path)
+	}
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if _, err := pager.ReloadFrom(file); err != nil {
+		return err
+	}
+	pager.Flush()
+	return nil
 }
 
 func stdinIsTerminal() bool {

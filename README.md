@@ -161,7 +161,7 @@ func main() {
 The normal embedding model is:
 
 1. Construct a `Pager` with `goless.New`.
-2. Feed content with `Append`, `AppendString`, or `ReadFrom`.
+2. Feed content with `Append`, `AppendString`, `ReadFrom`, or replace existing content with `ReloadFrom`.
 3. Call `Flush` when input is complete or when you want incomplete parser state
    finalized.
 4. Size with `SetSize`.
@@ -175,7 +175,7 @@ The current exported `Pager` API is controller-oriented.
 
 - Construction: `New(opts ...Option)`
 - Runtime reconfiguration: `Configure(opts ...RuntimeOption)`
-- Content loading: `Append`, `AppendString`, `ReadFrom`, `Flush`, `Len`
+- Content loading: `Append`, `AppendString`, `ReadFrom`, `ReloadFrom`, `Flush`, `Len`
 - Rendering: `SetSize`, `Draw`, `Refresh`
 - Input integration: `HandleKey`, `HandleMouse`
 - Navigation: `ScrollUp`, `ScrollDown`, `ScrollLeft`, `ScrollRight`, `HalfPageUp`,
@@ -367,6 +367,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `:50%` to jump near the middle of the document
 - `:next` / `:prev` to move through a multi-file session
 - `:first`, `:last`, `:x`, and `:file` for file-session control
+- `R` or `:reload` to reload the current file/input while keeping the current viewport when possible
 - `:license` to show the bundled Apache license in an overlay
 - `:Q` as an additional quit command
 - `=` or `Ctrl-G` to show current file/session status in the standalone program

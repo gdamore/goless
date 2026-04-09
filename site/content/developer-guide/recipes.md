@@ -40,9 +40,26 @@ pager.Configure(
 )
 ```
 
+### How do I reload content while preserving pager state?
+
+```go
+func reloadFile(pager *goless.Pager, path string) error {
+    file, err := os.Open(path)
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+
+    if _, err := pager.ReloadFrom(file); err != nil {
+        return err
+    }
+    pager.Flush()
+    return nil
+}
+```
+
 ## Future Recipe Backlog
 
 - embed inside a split-pane terminal UI
 - implement a custom help overlay or prompt text
-- reload content while preserving pager sizing and chrome
 - enable trusted links in one view but not another
