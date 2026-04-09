@@ -521,6 +521,10 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 	if v.mode == modePrompt {
 		return v.handlePromptKey(ev)
 	}
+	if v.follow && ev.Key() == tcell.KeyCtrlC {
+		v.StopFollow()
+		return KeyResult{Handled: true, Action: KeyActionStopFollow, Context: KeyContextNormal}
+	}
 
 	a := v.keys.normalAction(ev)
 	switch a {
@@ -577,6 +581,8 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 		v.toggleHelp()
 	case actionFollow:
 		v.Follow()
+	case actionStopFollow:
+		v.StopFollow()
 	case actionCycleSearchCase:
 		v.CycleSearchCaseMode()
 	case actionCycleSearchMode:
@@ -771,6 +777,11 @@ func (v *Viewer) GoPercent(percent int) bool {
 func (v *Viewer) Follow() {
 	v.GoBottom()
 	v.follow = true
+}
+
+// StopFollow disables follow mode while leaving the current viewport in place.
+func (v *Viewer) StopFollow() {
+	v.follow = false
 }
 
 // Following reports whether follow mode is active.

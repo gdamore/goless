@@ -180,7 +180,7 @@ The current exported `Pager` API is controller-oriented.
 - Input integration: `HandleKey`, `HandleMouse`
 - Navigation: `ScrollUp`, `ScrollDown`, `ScrollLeft`, `ScrollRight`, `HalfPageUp`,
   `HalfPageDown`, `PageUp`, `PageDown`, `GoTop`, `GoBottom`, `GoPercent`, `JumpToLine`
-- Mode control: `ToggleWrap`, `SetWrapMode`, `WrapMode`, `Follow`, `Following`
+- Mode control: `ToggleWrap`, `SetWrapMode`, `WrapMode`, `Follow`, `StopFollow`, `Following`
 - Search: `SearchForward`, `SearchBackward`, `SearchNext`, `SearchPrev`,
   `SearchForwardWithCase`, `SearchBackwardWithCase`, `SetSearchCaseMode`,
   `SearchCaseMode`, `SetSearchMode`, `SearchMode`, `CycleSearchCaseMode`,
@@ -376,6 +376,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `:set ignorecase`, `:set noignorecase`, `:set smartcase`, and `:set nosmartcase`
 - `:set searchcase=smart|case|nocase` and `:set searchmode=sub|word|regex`
 - `F` to enable follow mode
+- `Ctrl-X` or `Ctrl-C` to stop following without quitting
 - `h` or `F1` to toggle help
 
 ## Hardening and Performance

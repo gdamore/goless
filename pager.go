@@ -453,6 +453,11 @@ func (p *Pager) Follow() {
 	p.viewer.Follow()
 }
 
+// StopFollow disables follow mode while leaving the viewport where it is.
+func (p *Pager) StopFollow() {
+	p.viewer.StopFollow()
+}
+
 // Following reports whether follow mode is active.
 func (p *Pager) Following() bool {
 	return p.viewer.Following()

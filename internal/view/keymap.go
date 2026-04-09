@@ -61,6 +61,7 @@ const (
 	KeyActionRefresh              = actionRefresh
 	KeyActionToggleHelp           = actionToggleHelp
 	KeyActionFollow               = actionFollow
+	KeyActionStopFollow           = actionStopFollow
 	KeyActionCycleSearchCase      = actionCycleSearchCase
 	KeyActionCycleSearchMode      = actionCycleSearchMode
 )
@@ -165,6 +166,7 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyRune, rune: "N", action: actionSearchPrev},
 			{key: tcell.KeyRune, rune: "r", action: actionRefresh},
 			{key: tcell.KeyRune, rune: "F", action: actionFollow},
+			{key: tcell.KeyRune, rune: "x", mod: tcell.ModCtrl, action: actionStopFollow},
 		},
 		help: []keyBinding{
 			{key: tcell.KeyEscape, action: actionToggleHelp},

@@ -2012,3 +2012,123 @@ func TestReloadProgramInputLoadsCachedStdinSynchronously(t *testing.T) {
 		t.Fatalf("SearchState().Query = %q, want %q", got, want)
 	}
 }
+
+func TestSyncProgramFileFollowAppendsNewBytes(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	if err := os.WriteFile(path, []byte("one\ntwo\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(sample) failed: %v", err)
+	}
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	if _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
+		t.Fatalf("loadProgramInput(file) failed: %v", err)
+	}
+
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatalf("OpenFile(sample) failed: %v", err)
+	}
+	if _, err := file.WriteString("three\n"); err != nil {
+		file.Close()
+		t.Fatalf("WriteString(append) failed: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("Close(append file) failed: %v", err)
+	}
+
+	changed, err := syncProgramFileFollow(pager, path)
+	if err != nil {
+		t.Fatalf("syncProgramFileFollow failed: %v", err)
+	}
+	if !changed {
+		t.Fatal("syncProgramFileFollow(...) = unchanged, want changed")
+	}
+	if got, want := pager.Len(), int64(len("one\ntwo\nthree\n")); got != want {
+		t.Fatalf("Len after append = %d, want %d", got, want)
+	}
+	if !pager.SearchForward("three") {
+		t.Fatal("SearchForward(three) = false, want true after append")
+	}
+	if got, want := pager.Position().Rows, 3; got != want {
+		t.Fatalf("Position().Rows after append = %d, want %d", got, want)
+	}
+}
+
+func TestSyncProgramFileFollowReloadsTruncatedFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	if err := os.WriteFile(path, []byte("one\ntwo\nthree\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(sample) failed: %v", err)
+	}
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	if _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
+		t.Fatalf("loadProgramInput(file) failed: %v", err)
+	}
+
+	if err := os.WriteFile(path, []byte("fresh\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(truncated) failed: %v", err)
+	}
+
+	changed, err := syncProgramFileFollow(pager, path)
+	if err != nil {
+		t.Fatalf("syncProgramFileFollow failed: %v", err)
+	}
+	if !changed {
+		t.Fatal("syncProgramFileFollow(...) = unchanged, want changed")
+	}
+	if got, want := pager.Len(), int64(len("fresh\n")); got != want {
+		t.Fatalf("Len after truncate = %d, want %d", got, want)
+	}
+	if !pager.SearchForward("fresh") {
+		t.Fatal("SearchForward(fresh) = false, want true after truncate reload")
+	}
+	if pager.SearchForward("three") {
+		t.Fatal("SearchForward(three) = true, want false after truncate reload")
+	}
+}
+
+func TestStartProgramFileFollowPollsForAppends(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	if err := os.WriteFile(path, []byte("one\ntwo\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(sample) failed: %v", err)
+	}
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	if _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
+		t.Fatalf("loadProgramInput(file) failed: %v", err)
+	}
+
+	events := make(chan tcell.Event, 8)
+	follower := startProgramFileFollow(pager, path, events, 10*time.Millisecond)
+	t.Cleanup(follower.Stop)
+
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatalf("OpenFile(sample) failed: %v", err)
+	}
+	if _, err := file.WriteString("three\n"); err != nil {
+		file.Close()
+		t.Fatalf("WriteString(append) failed: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("Close(append file) failed: %v", err)
+	}
+
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for file follow update")
+		case <-events:
+			if pager.SearchForward("three") {
+				return
+			}
+		}
+	}
+}
