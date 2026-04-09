@@ -2226,6 +2226,70 @@ func TestCtrlCStopsFollowModeWithoutQuitting(t *testing.T) {
 	}
 }
 
+func TestCtrlCStopsFollowModeFromPromptContext(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.Follow()
+	v.HandleKey(keyRune("/"))
+
+	result := v.HandleKeyResult(tcell.NewEventKey(tcell.KeyCtrlC, "", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(^C in prompt).Handled = false, want true")
+	}
+	if result.Quit {
+		t.Fatal("HandleKeyResult(^C in prompt).Quit = true, want false")
+	}
+	if got, want := result.Action, KeyActionStopFollow; got != want {
+		t.Fatalf("HandleKeyResult(^C in prompt).Action = %v, want %v", got, want)
+	}
+	if got, want := result.Context, KeyContextPrompt; got != want {
+		t.Fatalf("HandleKeyResult(^C in prompt).Context = %v, want %v", got, want)
+	}
+	if v.Following() {
+		t.Fatal("follow mode after ^C in prompt = true, want false")
+	}
+	if got, want := v.mode, modePrompt; got != want {
+		t.Fatalf("mode after ^C in prompt = %v, want %v", got, want)
+	}
+}
+
+func TestCtrlCStopsFollowModeFromHelpContext(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.Follow()
+	v.toggleHelp()
+
+	result := v.HandleKeyResult(tcell.NewEventKey(tcell.KeyCtrlC, "", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(^C in help).Handled = false, want true")
+	}
+	if result.Quit {
+		t.Fatal("HandleKeyResult(^C in help).Quit = true, want false")
+	}
+	if got, want := result.Action, KeyActionStopFollow; got != want {
+		t.Fatalf("HandleKeyResult(^C in help).Action = %v, want %v", got, want)
+	}
+	if got, want := result.Context, KeyContextHelp; got != want {
+		t.Fatalf("HandleKeyResult(^C in help).Context = %v, want %v", got, want)
+	}
+	if v.Following() {
+		t.Fatal("follow mode after ^C in help = true, want false")
+	}
+	if got, want := v.mode, modeHelp; got != want {
+		t.Fatalf("mode after ^C in help = %v, want %v", got, want)
+	}
+}
+
 func TestRefreshWithoutFollowKeepsViewportWhenAppended(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
