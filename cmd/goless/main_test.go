@@ -57,6 +57,15 @@ func runProgramForTestWithOptions(t *testing.T, args []string, opts programRunTe
 	if err != nil {
 		t.Fatalf("Pipe(stdout) failed: %v", err)
 	}
+	type stdoutResult struct {
+		data []byte
+		err  error
+	}
+	stdoutDone := make(chan stdoutResult, 1)
+	go func() {
+		data, err := io.ReadAll(stdoutReader)
+		stdoutDone <- stdoutResult{data: data, err: err}
+	}()
 
 	oldArgs := os.Args
 	oldStdin := os.Stdin
@@ -94,14 +103,14 @@ func runProgramForTestWithOptions(t *testing.T, args []string, opts programRunTe
 	if err := stdoutWriter.Close(); err != nil {
 		t.Fatalf("Close(stdout writer) failed: %v", err)
 	}
-	output, err := io.ReadAll(stdoutReader)
-	if err != nil {
-		t.Fatalf("ReadAll(stdout) failed: %v", err)
+	readResult := <-stdoutDone
+	if readResult.err != nil {
+		t.Fatalf("ReadAll(stdout) failed: %v", readResult.err)
 	}
 	if err := stdoutReader.Close(); err != nil {
 		t.Fatalf("Close(stdout reader) failed: %v", err)
 	}
-	return string(output), runErr
+	return string(readResult.data), runErr
 }
 
 func newMockProgramScreen(t *testing.T, width, height int) (vt.MockTerm, tcell.Screen) {
