@@ -2176,6 +2176,56 @@ func TestScrollUpExitsFollowMode(t *testing.T) {
 	}
 }
 
+func TestCtrlXStopsFollowMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.Follow()
+
+	result := v.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "x", tcell.ModCtrl))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(^X).Handled = false, want true")
+	}
+	if result.Quit {
+		t.Fatal("HandleKeyResult(^X).Quit = true, want false")
+	}
+	if got, want := result.Action, KeyActionStopFollow; got != want {
+		t.Fatalf("HandleKeyResult(^X).Action = %v, want %v", got, want)
+	}
+	if v.Following() {
+		t.Fatal("follow mode after ^X = true, want false")
+	}
+}
+
+func TestCtrlCStopsFollowModeWithoutQuitting(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.Follow()
+
+	result := v.HandleKeyResult(tcell.NewEventKey(tcell.KeyCtrlC, "", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(^C).Handled = false, want true")
+	}
+	if result.Quit {
+		t.Fatal("HandleKeyResult(^C).Quit = true, want false")
+	}
+	if got, want := result.Action, KeyActionStopFollow; got != want {
+		t.Fatalf("HandleKeyResult(^C).Action = %v, want %v", got, want)
+	}
+	if v.Following() {
+		t.Fatal("follow mode after ^C = true, want false")
+	}
+}
+
 func TestRefreshWithoutFollowKeepsViewportWhenAppended(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {

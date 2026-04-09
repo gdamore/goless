@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gdamore/goless"
 	"github.com/gdamore/tcell/v3"
@@ -30,6 +31,7 @@ const (
 )
 
 const programStdinInput = "-"
+const programFileFollowInterval = 250 * time.Millisecond
 
 type programOptions struct {
 	chromeName        string
@@ -62,6 +64,13 @@ type programInputResult struct {
 	quit    bool
 	action  goless.KeyAction
 	context goless.KeyContext
+}
+
+type programFileFollower struct {
+	path  string
+	pager *goless.Pager
+	stop  chan struct{}
+	done  chan struct{}
 }
 
 func main() {
@@ -139,7 +148,31 @@ func run() error {
 		loadCurrent       func() (bool, error)
 		reloadDisplayed   func() error
 		buildProgramPager func() *goless.Pager
+		fileFollower      *programFileFollower
 	)
+	stopProgramFileFollower := func() {
+		if fileFollower == nil {
+			return
+		}
+		fileFollower.Stop()
+		fileFollower = nil
+	}
+	updateProgramFileFollower := func() {
+		path := ""
+		if session != nil && session.hasFiles() {
+			path = session.currentFile()
+		}
+		shouldFollow := pager != nil && readResult == nil && path != "" && !isProgramStdinInput(path) && pager.Following()
+		if fileFollower != nil {
+			if !shouldFollow || fileFollower.path != path || fileFollower.pager != pager {
+				stopProgramFileFollower()
+			}
+		}
+		if shouldFollow && fileFollower == nil {
+			fileFollower = startProgramFileFollow(pager, path, screen.EventQ(), programFileFollowInterval)
+		}
+	}
+	defer stopProgramFileFollower()
 	buildProgramPager = func() *goless.Pager {
 		return newProgramPager(
 			renderMode,
@@ -174,9 +207,11 @@ func run() error {
 		pager.ShowInformation("Apache License 2.0", goless.LicenseText())
 	} else if session.hasFiles() {
 		loadCurrent = func() (bool, error) {
+			stopProgramFileFollower()
 			loaded, snapshot, err := reloadProgramInput(session, inputLoader, &pager, buildProgramPager, width, height, screen.EventQ(), &readResult)
 			if err == nil {
 				pagerSnapshot = snapshot
+				updateProgramFileFollower()
 			}
 			return loaded, err
 		}
@@ -187,7 +222,12 @@ func run() error {
 			if readResult != nil {
 				return fmt.Errorf("stdin still reading")
 			}
-			return reloadProgramInputInPlace(pager, inputLoader, session.currentFile())
+			stopProgramFileFollower()
+			err := reloadProgramInputInPlace(pager, inputLoader, session.currentFile())
+			if err == nil {
+				updateProgramFileFollower()
+			}
+			return err
 		}
 		if _, err := loadCurrent(); err != nil {
 			return err
@@ -197,6 +237,7 @@ func run() error {
 		pager.SetSize(width, height)
 		readResult = startProgramRead(pager, os.Stdin, screen.EventQ(), nil)
 	}
+	updateProgramFileFollower()
 	pager.Draw(screen)
 	if !opts.showLicense {
 		quit, err := handleProgramQuitIfOneScreen(quitIfOneScreenArmed, session, func() programViewportSnapshot { return pagerSnapshot }, readResult == nil, loadCurrent)
@@ -345,6 +386,7 @@ func run() error {
 				}
 			}
 		}
+		updateProgramFileFollower()
 		pager.Draw(screen)
 	}
 }
@@ -686,6 +728,78 @@ func startProgramRead(target *goless.Pager, reader io.Reader, eventQ chan tcell.
 	result := make(chan error, 1)
 	go readIntoPagerWithAfter(target, reader, eventQ, result, after)
 	return result
+}
+
+func startProgramFileFollow(pager *goless.Pager, path string, eventQ chan tcell.Event, interval time.Duration) *programFileFollower {
+	if interval <= 0 {
+		interval = programFileFollowInterval
+	}
+	follower := &programFileFollower{
+		path:  path,
+		pager: pager,
+		stop:  make(chan struct{}),
+		done:  make(chan struct{}),
+	}
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		defer close(follower.done)
+		for {
+			select {
+			case <-follower.stop:
+				return
+			case <-ticker.C:
+				changed, err := syncProgramFileFollow(follower.pager, follower.path)
+				if err != nil || !changed {
+					continue
+				}
+				eventQ <- tcell.NewEventInterrupt(nil)
+			}
+		}
+	}()
+	return follower
+}
+
+func (f *programFileFollower) Stop() {
+	if f == nil {
+		return
+	}
+	close(f.stop)
+	<-f.done
+}
+
+func syncProgramFileFollow(pager *goless.Pager, path string) (bool, error) {
+	if pager == nil || path == "" || isProgramStdinInput(path) {
+		return false, nil
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+	size := info.Size()
+	current := pager.Len()
+	switch {
+	case size == current:
+		return false, nil
+	case size < current:
+		if err := reloadProgramInputInPlace(pager, nil, path); err != nil {
+			return false, err
+		}
+		return true, nil
+	default:
+		file, err := os.Open(path)
+		if err != nil {
+			return false, err
+		}
+		defer file.Close()
+		if _, err := file.Seek(current, io.SeekStart); err != nil {
+			return false, err
+		}
+		if _, err := pager.ReadFrom(file); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
 }
 
 func passThroughProgramInputs(dst io.Writer, stdin io.Reader, files []string) error {

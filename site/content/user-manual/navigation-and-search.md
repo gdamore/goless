@@ -14,6 +14,7 @@ The built-in less-like key group already gives the future user manual a strong o
 - `g` and `G` to jump to the top or bottom
 - `W` to toggle wrap mode
 - `F` to enable follow mode
+- `Ctrl-X` or `Ctrl-C` to stop following without quitting
 
 ## Search
 

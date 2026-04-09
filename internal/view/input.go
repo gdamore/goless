@@ -97,6 +97,7 @@ const (
 	actionRefresh
 	actionToggleHelp
 	actionFollow
+	actionStopFollow
 	actionCycleSearchCase
 	actionCycleSearchMode
 )

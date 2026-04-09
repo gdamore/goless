@@ -85,6 +85,8 @@ const (
 	KeyActionToggleHelp
 	// KeyActionFollow enables follow mode.
 	KeyActionFollow
+	// KeyActionStopFollow stops follow mode without quitting the pager.
+	KeyActionStopFollow
 	// KeyActionCycleSearchCase cycles smart, case-sensitive, and case-insensitive search behavior.
 	KeyActionCycleSearchCase
 	// KeyActionCycleSearchMode cycles substring, whole-word, and regex search behavior.

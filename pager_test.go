@@ -225,6 +225,66 @@ func TestPagerHandleKeyResult(t *testing.T) {
 	}
 }
 
+func TestPagerStopFollow(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 4)
+	if err := pager.AppendString("hello\nworld\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.Follow()
+
+	pager.StopFollow()
+
+	if pager.Following() {
+		t.Fatal("Following() after StopFollow = true, want false")
+	}
+}
+
+func TestPagerHandleKeyResultCtrlXStopsFollow(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 4)
+	if err := pager.AppendString("hello\nworld\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.Follow()
+
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "x", tcell.ModCtrl))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(^X).Handled = false, want true")
+	}
+	if result.Quit {
+		t.Fatal("HandleKeyResult(^X).Quit = true, want false")
+	}
+	if got, want := result.Action, KeyActionStopFollow; got != want {
+		t.Fatalf("HandleKeyResult(^X).Action = %v, want %v", got, want)
+	}
+	if pager.Following() {
+		t.Fatal("Following() after ^X = true, want false")
+	}
+}
+
+func TestPagerHandleKeyResultCtrlCStillQuitsWhenNotFollowing(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(20, 4)
+	if err := pager.AppendString("hello\nworld\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyCtrlC, "", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(^C).Handled = false, want true")
+	}
+	if !result.Quit {
+		t.Fatal("HandleKeyResult(^C).Quit = false, want true")
+	}
+	if got, want := result.Action, KeyActionQuit; got != want {
+		t.Fatalf("HandleKeyResult(^C).Action = %v, want %v", got, want)
+	}
+}
+
 func TestPagerHandleKeyResultPromptContext(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 4)
