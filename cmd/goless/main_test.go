@@ -1131,6 +1131,33 @@ func TestHandleProgramReloadKey(t *testing.T) {
 	if handleProgramReloadKey(pager, tcell.NewEventKey(tcell.KeyRune, "R", tcell.ModAlt)) {
 		t.Fatal("handleProgramReloadKey(Alt-R) = true, want false")
 	}
+	if handleProgramReloadKey(nil, tcell.NewEventKey(tcell.KeyRune, "R", tcell.ModNone)) {
+		t.Fatal("handleProgramReloadKey(nil pager) = true, want false")
+	}
+	if handleProgramReloadKey(pager, tcell.NewEventKey(tcell.KeyRune, "x", tcell.ModNone)) {
+		t.Fatal("handleProgramReloadKey(x) = true, want false")
+	}
+}
+
+func TestShouldHandleProgramReloadKey(t *testing.T) {
+	tests := []struct {
+		name   string
+		result goless.KeyResult
+		want   bool
+	}{
+		{name: "normal-unhandled", result: goless.KeyResult{}, want: true},
+		{name: "normal-handled", result: goless.KeyResult{Handled: true, Context: goless.NormalKeyContext}, want: false},
+		{name: "prompt-unhandled", result: goless.KeyResult{Context: goless.PromptKeyContext}, want: false},
+		{name: "help-unhandled", result: goless.KeyResult{Context: goless.HelpKeyContext}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldHandleProgramReloadKey(tt.result); got != tt.want {
+				t.Fatalf("shouldHandleProgramReloadKey(%+v) = %v, want %v", tt.result, got, tt.want)
+			}
+		})
+	}
 }
 
 func TestShouldHandleProgramStatusKey(t *testing.T) {
@@ -1273,6 +1300,143 @@ func TestDemoSessionCommandHandlerReloadFailureRestoresIndexForLast(t *testing.T
 	}
 	if got, want := session.currentFile(), "one.txt"; got != want {
 		t.Fatalf("current file after failed last reload = %q, want %q", got, want)
+	}
+}
+
+func TestDemoSessionCommandHandlerReloadUsesReloadHook(t *testing.T) {
+	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
+	loads := 0
+	reloads := 0
+	handler := session.commandHandler(func() error {
+		loads++
+		return nil
+	}, func() error {
+		reloads++
+		return nil
+	}, nil)
+
+	result := handler(goless.Command{Name: "reload"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("reload command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "one.txt (1/2)"; got != want {
+		t.Fatalf("reload command message = %q, want %q", got, want)
+	}
+	if got, want := loads, 0; got != want {
+		t.Fatalf("load count after reload = %d, want %d", got, want)
+	}
+	if got, want := reloads, 1; got != want {
+		t.Fatalf("reload count after reload = %d, want %d", got, want)
+	}
+	if got, want := session.currentFile(), "one.txt"; got != want {
+		t.Fatalf("current file after reload = %q, want %q", got, want)
+	}
+}
+
+func TestDemoSessionCommandHandlerReloadUnavailable(t *testing.T) {
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
+	handler := session.commandHandler(func() error {
+		t.Fatal("load should not be called when reload is unavailable")
+		return nil
+	}, nil, nil)
+
+	result := handler(goless.Command{Name: "reload"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("reload unavailable result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "file reload unavailable"; got != want {
+		t.Fatalf("reload unavailable message = %q, want %q", got, want)
+	}
+}
+
+func TestDemoSessionCommandHandlerNextUnavailable(t *testing.T) {
+	session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
+	handler := session.commandHandler(nil, func() error {
+		t.Fatal("reload should not be called when load is unavailable")
+		return nil
+	}, nil)
+
+	result := handler(goless.Command{Name: "next"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("next unavailable result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "file reload unavailable"; got != want {
+		t.Fatalf("next unavailable message = %q, want %q", got, want)
+	}
+	if got, want := session.currentFile(), "one.txt"; got != want {
+		t.Fatalf("current file after unavailable next = %q, want %q", got, want)
+	}
+}
+
+func TestDemoSessionCommandHandlerNavigationUnavailable(t *testing.T) {
+	tests := []struct {
+		name     string
+		prepare  func(*programSession)
+		command  string
+		wantFile string
+	}{
+		{
+			name: "prev unavailable",
+			prepare: func(session *programSession) {
+				session.last()
+			},
+			command:  "prev",
+			wantFile: "two.txt",
+		},
+		{
+			name: "first unavailable",
+			prepare: func(session *programSession) {
+				session.last()
+			},
+			command:  "first",
+			wantFile: "two.txt",
+		},
+		{
+			name:     "last unavailable",
+			prepare:  func(session *programSession) {},
+			command:  "last",
+			wantFile: "one.txt",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			session := newProgramSession([]string{"one.txt", "two.txt"}, programStartup{})
+			tt.prepare(session)
+			handler := session.commandHandler(nil, func() error {
+				t.Fatal("reload should not be called when load is unavailable")
+				return nil
+			}, nil)
+
+			result := handler(goless.Command{Name: tt.command})
+			if !result.Handled || result.Quit {
+				t.Fatalf("%s result = %+v, want handled non-quit", tt.command, result)
+			}
+			if got, want := result.Message, "file reload unavailable"; got != want {
+				t.Fatalf("%s unavailable message = %q, want %q", tt.command, got, want)
+			}
+			if got, want := session.currentFile(), tt.wantFile; got != want {
+				t.Fatalf("current file after unavailable %s = %q, want %q", tt.command, got, want)
+			}
+		})
+	}
+}
+
+func TestDemoSessionCommandHandlerReloadFailureReturnsMessage(t *testing.T) {
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
+	handler := session.commandHandler(func() error {
+		t.Fatal("load should not be called for reload failure")
+		return nil
+	}, func() error {
+		return fmt.Errorf("reload failed")
+	}, nil)
+
+	result := handler(goless.Command{Name: "reload"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("reload failure result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "reload failed"; got != want {
+		t.Fatalf("reload failure message = %q, want %q", got, want)
 	}
 }
 
@@ -1676,6 +1840,79 @@ func TestReloadProgramInputInPlacePreservesViewport(t *testing.T) {
 	}
 	if got, want := after.Column, before.Column; got != want {
 		t.Fatalf("Position().Column after in-place reload = %d, want %d", got, want)
+	}
+}
+
+func TestReloadProgramInputInPlaceUsesCachedStdin(t *testing.T) {
+	loader := newProgramInputLoader(bytes.NewBufferString("alpha\nbeta\n"))
+	reader, finish, err := loader.startStdinStream()
+	if err != nil {
+		t.Fatalf("loader.startStdinStream() failed: %v", err)
+	}
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll(stream) failed: %v", err)
+	}
+	finish(nil, data)
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if _, err := loadProgramInput(pager, loader, "-", programStartup{}); err != nil {
+		t.Fatalf("loadProgramInput(stdin) failed: %v", err)
+	}
+	pager.ScrollDown(1)
+
+	if err := reloadProgramInputInPlace(pager, loader, "-"); err != nil {
+		t.Fatalf("reloadProgramInputInPlace(stdin) failed: %v", err)
+	}
+	if got, want := pager.Len(), int64(len("alpha\nbeta\n")); got != want {
+		t.Fatalf("Len after stdin in-place reload = %d, want %d", got, want)
+	}
+}
+
+func TestReloadProgramInputInPlaceErrorLeavesPagerUnchanged(t *testing.T) {
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	err := reloadProgramInputInPlace(pager, nil, filepath.Join(t.TempDir(), "missing.txt"))
+	if err == nil {
+		t.Fatal("reloadProgramInputInPlace(missing file) = nil error, want error")
+	}
+	if got, want := pager.Len(), int64(len("alpha\nbeta\n")); got != want {
+		t.Fatalf("Len after failed in-place reload = %d, want %d", got, want)
+	}
+}
+
+func TestReloadProgramInputInPlaceUnavailableLoaderLeavesPagerUnchanged(t *testing.T) {
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("alpha\nbeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	err := reloadProgramInputInPlace(pager, newProgramInputLoader(nil), "-")
+	if err == nil {
+		t.Fatal("reloadProgramInputInPlace(unavailable stdin) = nil error, want error")
+	}
+	if got, want := pager.Len(), int64(len("alpha\nbeta\n")); got != want {
+		t.Fatalf("Len after unavailable stdin reload = %d, want %d", got, want)
+	}
+}
+
+func TestRunProgramCommandRejectsNilPagerAndEmptyCommand(t *testing.T) {
+	if runProgramCommand(nil, "reload") {
+		t.Fatal("runProgramCommand(nil, reload) = true, want false")
+	}
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 2)
+	if runProgramCommand(pager, "") {
+		t.Fatal("runProgramCommand(pager, empty) = true, want false")
 	}
 }
 

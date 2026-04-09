@@ -282,6 +282,9 @@ func (v *Viewer) SetDocument(doc *model.Document) {
 	}
 	v.doc = doc
 	v.relayout()
+	if v.cfg.WrapMode == layout.NoWrap {
+		v.relayout()
+	}
 	if v.follow {
 		v.rowOffset = v.maxRowOffset()
 		v.clampOffsets()
