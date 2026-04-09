@@ -515,15 +515,22 @@ func (v *Viewer) HandleMouse(ev *tcell.EventMouse) bool {
 
 // HandleKeyResult applies a key event and reports whether it was handled and whether the viewer should exit.
 func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
+	if v.follow && ev.Key() == tcell.KeyCtrlC {
+		ctx := KeyContextNormal
+		switch v.mode {
+		case modeHelp:
+			ctx = KeyContextHelp
+		case modePrompt:
+			ctx = KeyContextPrompt
+		}
+		v.StopFollow()
+		return KeyResult{Handled: true, Action: KeyActionStopFollow, Context: ctx}
+	}
 	if v.mode == modeHelp {
 		return v.handleHelpKey(ev)
 	}
 	if v.mode == modePrompt {
 		return v.handlePromptKey(ev)
-	}
-	if v.follow && ev.Key() == tcell.KeyCtrlC {
-		v.StopFollow()
-		return KeyResult{Handled: true, Action: KeyActionStopFollow, Context: KeyContextNormal}
 	}
 
 	a := v.keys.normalAction(ev)
