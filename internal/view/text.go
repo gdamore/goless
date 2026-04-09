@@ -140,7 +140,7 @@ func defaultText() Text {
 			return fmt.Sprintf("row %d/%d  col %d/%d", current, total, column, columns)
 		},
 		StatusHelpHint: "F1 Help",
-		FollowMode:     "follow",
+		FollowMode:     "Waiting for more... Ctrl-C cancel",
 		StatusEOF:      "∎",
 		StatusNotEOF:   " ",
 		SearchEmpty:    "empty search",

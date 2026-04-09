@@ -2882,6 +2882,23 @@ func TestStatusTextSuppressesHelpHintWhenMessagePresent(t *testing.T) {
 	}
 }
 
+func TestStatusTextShowsFollowWaitingMessage(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(40, 2)
+	v.relayout()
+	v.Follow()
+
+	leftText, _ := v.statusText()
+	if got, want := leftText, "Waiting for more... Ctrl-C cancel"; got != want {
+		t.Fatalf("left status text = %q, want %q", got, want)
+	}
+}
+
 func TestStatusTextDoesNotDuplicateModeMessage(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alpha\n")); err != nil {
@@ -3181,6 +3198,59 @@ func TestStatusHelpHintKeyUsesConfiguredStyle(t *testing.T) {
 	_, gotRestStyle, _ := screen.Get(pos+3, 1)
 	if got, want := gotRestStyle.GetForeground(), statusStyle.GetForeground(); got != want {
 		t.Fatalf("help hint rest fg = %v, want %v", got, want)
+	}
+}
+
+func TestFollowStatusCancelKeyUsesHighlightedStyle(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	keyStyle := tcell.StyleDefault.Foreground(color.PaletteColor(10)).Background(color.PaletteColor(4)).Bold(true)
+	statusStyle := tcell.StyleDefault.Foreground(color.PaletteColor(15)).Background(color.PaletteColor(2))
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		Text: Text{
+			StatusPosition: func(current, total, column, columns int) string {
+				return ""
+			},
+		},
+		Chrome: Chrome{
+			StatusStyle:        statusStyle,
+			StatusHelpKeyStyle: keyStyle,
+		},
+	})
+	v.SetSize(48, 2)
+	v.relayout()
+	v.Follow()
+
+	_, screen := newMockScreen(t, 48, 2)
+	defer screen.Fini()
+	v.drawStatus(screen, 1)
+
+	row := screenRowString(screen, 1, 48)
+	pos := strings.Index(row, "Ctrl-C")
+	if pos < 0 {
+		t.Fatalf("status row = %q, want follow cancel hint", row)
+	}
+
+	_, gotKeyStyle, _ := screen.Get(pos, 1)
+	if got, want := gotKeyStyle.GetForeground(), keyStyle.GetForeground(); got != want {
+		t.Fatalf("follow cancel key fg = %v, want %v", got, want)
+	}
+	if got, want := gotKeyStyle.GetBackground(), keyStyle.GetBackground(); got != want {
+		t.Fatalf("follow cancel key bg = %v, want %v", got, want)
+	}
+	if !gotKeyStyle.HasBold() {
+		t.Fatal("follow cancel key style lost bold attribute")
+	}
+
+	_, gotRestStyle, _ := screen.Get(pos+7, 1)
+	if got, want := gotRestStyle.GetForeground(), statusStyle.GetForeground(); got != want {
+		t.Fatalf("follow cancel suffix fg = %v, want %v", got, want)
 	}
 }
 

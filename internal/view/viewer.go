@@ -1391,6 +1391,9 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 		if keyText, ok := v.statusHelpHintKey(leftText, leftRendered); ok {
 			screen.PutStrStyled(leftStart, y, keyText, v.cfg.Chrome.StatusHelpKeyStyle)
 		}
+		if v.follow {
+			v.drawHintKeys(screen, leftStart, y, leftRendered, v.cfg.Chrome.StatusHelpKeyStyle, "Ctrl-C", "^C")
+		}
 	}
 	if rightText != "" && rightStart < rightIconsStart {
 		screen.PutStrStyled(rightStart, y, rightText, style)
