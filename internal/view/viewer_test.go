@@ -2201,6 +2201,112 @@ func TestRefreshWithoutFollowKeepsViewportWhenAppended(t *testing.T) {
 	}
 }
 
+func TestSetDocumentPreservesViewportWhenPossible(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\n0123456789abcdef\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	doc.Flush()
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(8, 3)
+	v.ScrollDown(2)
+	v.ScrollRight(4)
+	before := v.Position()
+
+	replacement := model.NewDocument(4)
+	if err := replacement.Append([]byte("uno\ndos\ntres\ncuatro\nABCDEFGHIJKLMNOP\n")); err != nil {
+		t.Fatalf("Append replacement failed: %v", err)
+	}
+	replacement.Flush()
+
+	v.SetDocument(replacement)
+	after := v.Position()
+
+	if got, want := after.Row, before.Row; got != want {
+		t.Fatalf("Position().Row after SetDocument = %d, want %d", got, want)
+	}
+	if got, want := after.Column, before.Column; got != want {
+		t.Fatalf("Position().Column after SetDocument = %d, want %d", got, want)
+	}
+}
+
+func TestSetDocumentClampsViewportWhenReplacementShrinks(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\n0123456789abcdef\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	doc.Flush()
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(8, 3)
+	v.ScrollDown(10)
+	v.ScrollRight(10)
+
+	replacement := model.NewDocument(4)
+	if err := replacement.Append([]byte("short\nx\n")); err != nil {
+		t.Fatalf("Append replacement failed: %v", err)
+	}
+	replacement.Flush()
+
+	v.SetDocument(replacement)
+	pos := v.Position()
+
+	if got, want := pos.Row, 1; got != want {
+		t.Fatalf("Position().Row after shrinking SetDocument = %d, want %d", got, want)
+	}
+	if got, want := pos.Column, 1; got != want {
+		t.Fatalf("Position().Column after shrinking SetDocument = %d, want %d", got, want)
+	}
+}
+
+func TestSetDocumentNilLeavesViewerUnchanged(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	doc.Flush()
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.ScrollDown(1)
+	before := v.Position()
+
+	v.SetDocument(nil)
+	after := v.Position()
+
+	if got, want := after, before; got != want {
+		t.Fatalf("Position() after SetDocument(nil) = %+v, want %+v", got, want)
+	}
+}
+
+func TestSetDocumentFollowModeRepinsToBottom(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	doc.Flush()
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+	v.Follow()
+
+	replacement := model.NewDocument(4)
+	if err := replacement.Append([]byte("one\ntwo\nthree\nfour\n")); err != nil {
+		t.Fatalf("Append replacement failed: %v", err)
+	}
+	replacement.Flush()
+
+	v.SetDocument(replacement)
+
+	if !v.Following() {
+		t.Fatal("follow mode after SetDocument = false, want true")
+	}
+	if got, want := v.rowOffset, v.maxRowOffset(); got != want {
+		t.Fatalf("row offset after follow SetDocument = %d, want %d", got, want)
+	}
+}
+
 func TestScrollDownToBottomDoesNotEnableFollowMode(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
