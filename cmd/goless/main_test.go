@@ -2038,7 +2038,8 @@ func TestSyncProgramFileFollowAppendsNewBytes(t *testing.T) {
 		t.Fatalf("Close(append file) failed: %v", err)
 	}
 
-	changed, err := syncProgramFileFollow(pager, path)
+	var previous os.FileInfo
+	changed, err := syncProgramFileFollow(pager, path, &previous)
 	if err != nil {
 		t.Fatalf("syncProgramFileFollow failed: %v", err)
 	}
@@ -2073,7 +2074,8 @@ func TestSyncProgramFileFollowReloadsTruncatedFile(t *testing.T) {
 		t.Fatalf("WriteFile(truncated) failed: %v", err)
 	}
 
-	changed, err := syncProgramFileFollow(pager, path)
+	var previous os.FileInfo
+	changed, err := syncProgramFileFollow(pager, path, &previous)
 	if err != nil {
 		t.Fatalf("syncProgramFileFollow failed: %v", err)
 	}
@@ -2088,6 +2090,99 @@ func TestSyncProgramFileFollowReloadsTruncatedFile(t *testing.T) {
 	}
 	if pager.SearchForward("three") {
 		t.Fatal("SearchForward(three) = true, want false after truncate reload")
+	}
+}
+
+func TestSyncProgramFileFollowReloadsReplacedFileWithSameSize(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	if err := os.WriteFile(path, []byte("one\ntwo\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(sample) failed: %v", err)
+	}
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	if _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
+		t.Fatalf("loadProgramInput(file) failed: %v", err)
+	}
+
+	initialInfo, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat(sample) failed: %v", err)
+	}
+	var previous os.FileInfo = initialInfo
+
+	replacement := filepath.Join(dir, "replacement.txt")
+	if err := os.WriteFile(replacement, []byte("uno\ndos\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(replacement) failed: %v", err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("Remove(sample) failed: %v", err)
+	}
+	if err := os.Rename(replacement, path); err != nil {
+		t.Fatalf("Rename(replacement) failed: %v", err)
+	}
+
+	changed, err := syncProgramFileFollow(pager, path, &previous)
+	if err != nil {
+		t.Fatalf("syncProgramFileFollow failed: %v", err)
+	}
+	if !changed {
+		t.Fatal("syncProgramFileFollow(...) = unchanged, want changed after replacement")
+	}
+	if !pager.SearchForward("uno") {
+		t.Fatal("SearchForward(uno) = false, want true after replacement reload")
+	}
+	if pager.SearchForward("one") {
+		t.Fatal("SearchForward(one) = true, want false after replacement reload")
+	}
+}
+
+func TestSyncProgramFileFollowReloadsReplacedFileWithLargerSize(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	if err := os.WriteFile(path, []byte("one\ntwo\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(sample) failed: %v", err)
+	}
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	if _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
+		t.Fatalf("loadProgramInput(file) failed: %v", err)
+	}
+
+	initialInfo, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat(sample) failed: %v", err)
+	}
+	var previous os.FileInfo = initialInfo
+
+	replacement := filepath.Join(dir, "replacement.txt")
+	if err := os.WriteFile(replacement, []byte("alpha\nbeta\nthree\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(replacement) failed: %v", err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("Remove(sample) failed: %v", err)
+	}
+	if err := os.Rename(replacement, path); err != nil {
+		t.Fatalf("Rename(replacement) failed: %v", err)
+	}
+
+	changed, err := syncProgramFileFollow(pager, path, &previous)
+	if err != nil {
+		t.Fatalf("syncProgramFileFollow failed: %v", err)
+	}
+	if !changed {
+		t.Fatal("syncProgramFileFollow(...) = unchanged, want changed after larger replacement")
+	}
+	if !pager.SearchForward("alpha") {
+		t.Fatal("SearchForward(alpha) = false, want true after replacement reload")
+	}
+	if !pager.SearchForward("three") {
+		t.Fatal("SearchForward(three) = false, want true after replacement reload")
+	}
+	if pager.SearchForward("one") {
+		t.Fatal("SearchForward(one) = true, want false after replacement reload")
 	}
 }
 

@@ -69,6 +69,7 @@ type programInputResult struct {
 type programFileFollower struct {
 	path  string
 	pager *goless.Pager
+	info  os.FileInfo
 	stop  chan struct{}
 	done  chan struct{}
 }
@@ -749,7 +750,7 @@ func startProgramFileFollow(pager *goless.Pager, path string, eventQ chan tcell.
 			case <-follower.stop:
 				return
 			case <-ticker.C:
-				changed, err := syncProgramFileFollow(follower.pager, follower.path)
+				changed, err := syncProgramFileFollow(follower.pager, follower.path, &follower.info)
 				if err != nil || !changed {
 					continue
 				}
@@ -768,7 +769,7 @@ func (f *programFileFollower) Stop() {
 	<-f.done
 }
 
-func syncProgramFileFollow(pager *goless.Pager, path string) (bool, error) {
+func syncProgramFileFollow(pager *goless.Pager, path string, previous *os.FileInfo) (bool, error) {
 	if pager == nil || path == "" || isProgramStdinInput(path) {
 		return false, nil
 	}
@@ -776,14 +777,27 @@ func syncProgramFileFollow(pager *goless.Pager, path string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if previous != nil && *previous != nil && !os.SameFile(*previous, info) {
+		if err := reloadProgramInputInPlace(pager, nil, path); err != nil {
+			return false, err
+		}
+		*previous = info
+		return true, nil
+	}
 	size := info.Size()
 	current := pager.Len()
 	switch {
 	case size == current:
+		if previous != nil {
+			*previous = info
+		}
 		return false, nil
 	case size < current:
 		if err := reloadProgramInputInPlace(pager, nil, path); err != nil {
 			return false, err
+		}
+		if previous != nil {
+			*previous = info
 		}
 		return true, nil
 	default:
@@ -797,6 +811,9 @@ func syncProgramFileFollow(pager *goless.Pager, path string) (bool, error) {
 		}
 		if _, err := pager.ReadFrom(file); err != nil {
 			return false, err
+		}
+		if previous != nil {
+			*previous = info
 		}
 		return true, nil
 	}

@@ -265,6 +265,41 @@ func TestPagerHandleKeyResultCtrlXStopsFollow(t *testing.T) {
 	}
 }
 
+func TestPagerCustomBindingCanStopFollow(t *testing.T) {
+	pager := New(Config{
+		KeyGroup: EmptyKeyGroup,
+		KeyBindings: []KeyBinding{
+			{
+				KeyStroke: KeyStroke{Context: NormalKeyContext, Key: tcell.KeyRune, Rune: "x"},
+				Action:    KeyActionStopFollow,
+			},
+		},
+		TabWidth:   4,
+		WrapMode:   NoWrap,
+		ShowStatus: true,
+	})
+	pager.SetSize(20, 4)
+	if err := pager.AppendString("hello\nworld\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.Follow()
+
+	result := pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "x", tcell.ModNone))
+	if !result.Handled {
+		t.Fatal("HandleKeyResult(x).Handled = false, want true for stop-follow binding")
+	}
+	if result.Quit {
+		t.Fatal("HandleKeyResult(x).Quit = true, want false")
+	}
+	if got, want := result.Action, KeyActionStopFollow; got != want {
+		t.Fatalf("HandleKeyResult(x).Action = %v, want %v", got, want)
+	}
+	if pager.Following() {
+		t.Fatal("Following() after custom stop-follow binding = true, want false")
+	}
+}
+
 func TestPagerHandleKeyResultCtrlCStillQuitsWhenNotFollowing(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	pager.SetSize(20, 4)
