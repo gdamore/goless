@@ -74,6 +74,12 @@ type programFileFollower struct {
 	done  chan struct{}
 }
 
+var (
+	programScreenFactory        = newProgramScreen
+	programStdinIsTerminalFunc  = stdinIsTerminal
+	programStdoutIsTerminalFunc = stdoutIsTerminal
+)
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -114,7 +120,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	if !stdoutIsTerminal() {
+	if !programStdoutIsTerminalFunc() {
 		if opts.showLicense {
 			_, err := io.WriteString(os.Stdout, goless.LicenseText())
 			return err
@@ -122,11 +128,11 @@ func run() error {
 		return passThroughProgramInputs(os.Stdout, os.Stdin, files)
 	}
 
-	if stdinIsTerminal() && programRequiresInput(opts, files) {
+	if programStdinIsTerminalFunc() && programRequiresInput(opts, files) {
 		return fmt.Errorf("stdin is a terminal; specify a file or pipe input")
 	}
 
-	screen, err := newProgramScreen(quitAtEOFPolicy)
+	screen, err := programScreenFactory(quitAtEOFPolicy)
 	if err != nil {
 		return err
 	}

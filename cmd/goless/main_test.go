@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -16,7 +17,99 @@ import (
 	"github.com/gdamore/goless"
 	"github.com/gdamore/tcell/v3"
 	"github.com/gdamore/tcell/v3/color"
+	"github.com/gdamore/tcell/v3/vt"
 )
+
+func runProgramForTest(t *testing.T, args []string, stdin string) (string, error) {
+	t.Helper()
+	return runProgramForTestWithOptions(t, args, programRunTestOptions{stdin: stdin})
+}
+
+type programRunTestOptions struct {
+	stdin          string
+	stdinTerminal  *bool
+	stdoutTerminal *bool
+	screenFactory  func(programQuitAtEOFPolicy) (tcell.Screen, error)
+}
+
+func runProgramForTestWithOptions(t *testing.T, args []string, opts programRunTestOptions) (string, error) {
+	t.Helper()
+
+	stdinPath := filepath.Join(t.TempDir(), "stdin.txt")
+	if err := os.WriteFile(stdinPath, []byte(opts.stdin), 0o644); err != nil {
+		t.Fatalf("WriteFile(stdin) failed: %v", err)
+	}
+	stdinFile, err := os.Open(stdinPath)
+	if err != nil {
+		t.Fatalf("Open(stdin) failed: %v", err)
+	}
+	defer stdinFile.Close()
+
+	stdoutReader, stdoutWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe(stdout) failed: %v", err)
+	}
+
+	oldArgs := os.Args
+	oldStdin := os.Stdin
+	oldStdout := os.Stdout
+	oldFlagOutput := flag.CommandLine.Output()
+	oldScreenFactory := programScreenFactory
+	oldStdinIsTerminal := programStdinIsTerminalFunc
+	oldStdoutIsTerminal := programStdoutIsTerminalFunc
+	os.Args = append([]string{"goless"}, args...)
+	os.Stdin = stdinFile
+	os.Stdout = stdoutWriter
+	flag.CommandLine.SetOutput(stdoutWriter)
+	if opts.screenFactory != nil {
+		programScreenFactory = opts.screenFactory
+	}
+	if opts.stdinTerminal != nil {
+		value := *opts.stdinTerminal
+		programStdinIsTerminalFunc = func() bool { return value }
+	}
+	if opts.stdoutTerminal != nil {
+		value := *opts.stdoutTerminal
+		programStdoutIsTerminalFunc = func() bool { return value }
+	}
+
+	runErr := run()
+
+	flag.CommandLine.SetOutput(oldFlagOutput)
+	os.Args = oldArgs
+	os.Stdin = oldStdin
+	os.Stdout = oldStdout
+	programScreenFactory = oldScreenFactory
+	programStdinIsTerminalFunc = oldStdinIsTerminal
+	programStdoutIsTerminalFunc = oldStdoutIsTerminal
+
+	if err := stdoutWriter.Close(); err != nil {
+		t.Fatalf("Close(stdout writer) failed: %v", err)
+	}
+	output, err := io.ReadAll(stdoutReader)
+	if err != nil {
+		t.Fatalf("ReadAll(stdout) failed: %v", err)
+	}
+	if err := stdoutReader.Close(); err != nil {
+		t.Fatalf("Close(stdout reader) failed: %v", err)
+	}
+	return string(output), runErr
+}
+
+func newMockProgramScreen(t *testing.T, width, height int) (vt.MockTerm, tcell.Screen) {
+	t.Helper()
+
+	term := vt.NewMockTerm(vt.MockOptSize{X: vt.Col(width), Y: vt.Row(height)})
+	screen, err := tcell.NewTerminfoScreenFromTty(term)
+	if err != nil {
+		t.Fatalf("NewTerminfoScreenFromTty failed: %v", err)
+	}
+	return term, screen
+}
+
+func boolPtr(v bool) *bool {
+	return &v
+}
 
 func TestDemoPreset(t *testing.T) {
 	preset, err := programPreset("dark")
@@ -29,6 +122,46 @@ func TestDemoPreset(t *testing.T) {
 
 	if _, err := programPreset("bogus"); err == nil {
 		t.Fatal("programPreset(bogus) = nil error, want error")
+	}
+}
+
+func TestProgramPresetDefaultPretty(t *testing.T) {
+	preset, err := programPreset("pretty")
+	if err != nil {
+		t.Fatalf("programPreset(pretty) failed: %v", err)
+	}
+	if got, want := preset.Theme.DefaultBG, goless.PrettyPreset.Theme.DefaultBG; got != want {
+		t.Fatalf("programPreset(pretty).Theme.DefaultBG = %v, want %v", got, want)
+	}
+}
+
+func TestProgramRenderMode(t *testing.T) {
+	tests := []struct {
+		name    string
+		want    goless.RenderMode
+		wantErr bool
+	}{
+		{name: "literal", want: goless.RenderLiteral},
+		{name: "presentation", want: goless.RenderPresentation},
+		{name: "hybrid", want: goless.RenderHybrid},
+		{name: "", want: goless.RenderHybrid},
+		{name: "bogus", want: goless.RenderHybrid, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := programRenderMode(tt.name)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("programRenderMode(%q) = nil error, want error", tt.name)
+				}
+			} else if err != nil {
+				t.Fatalf("programRenderMode(%q) failed: %v", tt.name, err)
+			}
+			if got != tt.want {
+				t.Fatalf("programRenderMode(%q) = %v, want %v", tt.name, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -154,6 +287,43 @@ func TestDemoQuitAtEOFPolicyFromFlags(t *testing.T) {
 				t.Fatalf("programQuitAtEOFPolicyFromFlags(%v, %v) = %v, want %v", tt.quitAtEOF, tt.quitAtEOFFirst, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestProgramExitWithoutScreen(t *testing.T) {
+	if err := programExit(nil, programQuitAtEOFNever); err != nil {
+		t.Fatalf("programExit(nil, never) failed: %v", err)
+	}
+	if err := programExit(nil, programQuitAtEOFWhenVisible); err != nil {
+		t.Fatalf("programExit(nil, visible) failed: %v", err)
+	}
+}
+
+func TestProgramExitClearsStatusLine(t *testing.T) {
+	_, screen := newMockProgramScreen(t, 8, 3)
+	if err := screen.Init(); err != nil {
+		t.Fatalf("screen.Init() failed: %v", err)
+	}
+	defer screen.Fini()
+
+	for x, r := range "content!" {
+		screen.SetContent(x, 1, r, nil, tcell.StyleDefault)
+		screen.SetContent(x, 2, r, nil, tcell.StyleDefault)
+	}
+	screen.Show()
+
+	if err := programExit(screen, programQuitAtEOFWhenVisible); err != nil {
+		t.Fatalf("programExit(screen, visible) failed: %v", err)
+	}
+
+	for x := 0; x < 8; x++ {
+		got, _, _ := screen.Get(x, 2)
+		if got != " " {
+			t.Fatalf("bottom row cell %d = %q, want blank", x, got)
+		}
+	}
+	if got, _, _ := screen.Get(0, 1); got != "c" {
+		t.Fatalf("row above status line = %q, want preserved content", got)
 	}
 }
 
@@ -689,6 +859,16 @@ func TestParseProgramFlagsVersion(t *testing.T) {
 	}
 }
 
+func TestRunVersion(t *testing.T) {
+	output, err := runProgramForTest(t, []string{"--version"}, "")
+	if err != nil {
+		t.Fatalf("run(--version) failed: %v", err)
+	}
+	if !strings.HasPrefix(output, "goless version ") {
+		t.Fatalf("run(--version) output = %q, want version prefix", output)
+	}
+}
+
 func TestParseProgramFlagsHelp(t *testing.T) {
 	var out bytes.Buffer
 	opts, args, err := parseProgramFlags([]string{"--help"}, &out)
@@ -736,6 +916,16 @@ func TestParseProgramFlagsHelp(t *testing.T) {
 	}
 }
 
+func TestRunHelp(t *testing.T) {
+	output, err := runProgramForTest(t, []string{"--help"}, "")
+	if err != nil {
+		t.Fatalf("run(--help) failed: %v", err)
+	}
+	if !strings.Contains(output, "usage: goless") {
+		t.Fatalf("run(--help) output = %q, want usage text", output)
+	}
+}
+
 func TestParseProgramFlagsLicense(t *testing.T) {
 	var out bytes.Buffer
 	opts, args, err := parseProgramFlags([]string{"--license"}, &out)
@@ -750,6 +940,115 @@ func TestParseProgramFlagsLicense(t *testing.T) {
 	}
 }
 
+func TestRunLicenseToPipe(t *testing.T) {
+	output, err := runProgramForTest(t, []string{"--license"}, "")
+	if err != nil {
+		t.Fatalf("run(--license) failed: %v", err)
+	}
+	if !strings.Contains(output, "Apache License") {
+		t.Fatalf("run(--license) output missing license heading: %q", output)
+	}
+}
+
+func TestRunPassesThroughStdinToPipe(t *testing.T) {
+	output, err := runProgramForTest(t, nil, "alpha\nbeta\n")
+	if err != nil {
+		t.Fatalf("run(stdin passthrough) failed: %v", err)
+	}
+	if got, want := output, "alpha\nbeta\n"; got != want {
+		t.Fatalf("run(stdin passthrough) output = %q, want %q", got, want)
+	}
+}
+
+func TestRunRejectsUnknownRenderMode(t *testing.T) {
+	_, err := runProgramForTest(t, []string{"--render", "bogus"}, "")
+	if err == nil {
+		t.Fatal("run(--render bogus) = nil error, want error")
+	}
+	if got := err.Error(); !strings.Contains(got, "unknown render mode") {
+		t.Fatalf("run(--render bogus) error = %q, want unknown render mode", got)
+	}
+}
+
+func TestRunRejectsUnknownPreset(t *testing.T) {
+	_, err := runProgramForTest(t, []string{"--preset", "bogus"}, "")
+	if err == nil {
+		t.Fatal("run(--preset bogus) = nil error, want error")
+	}
+	if got := err.Error(); !strings.Contains(got, "unknown preset") {
+		t.Fatalf("run(--preset bogus) error = %q, want unknown preset", got)
+	}
+}
+
+func TestRunPassesThroughFilesToPipe(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	if err := os.WriteFile(path, []byte("one\ntwo\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(sample) failed: %v", err)
+	}
+
+	output, err := runProgramForTest(t, []string{path}, "")
+	if err != nil {
+		t.Fatalf("run(file passthrough) failed: %v", err)
+	}
+	if got, want := output, "one\ntwo\n"; got != want {
+		t.Fatalf("run(file passthrough) output = %q, want %q", got, want)
+	}
+}
+
+func TestRunRejectsTerminalStdinWithoutInput(t *testing.T) {
+	_, err := runProgramForTestWithOptions(t, nil, programRunTestOptions{
+		stdinTerminal:  boolPtr(true),
+		stdoutTerminal: boolPtr(true),
+	})
+	if err == nil {
+		t.Fatal("run(no args, terminal stdin) = nil error, want error")
+	}
+	if got, want := err.Error(), "stdin is a terminal; specify a file or pipe input"; got != want {
+		t.Fatalf("run(no args, terminal stdin) error = %q, want %q", got, want)
+	}
+}
+
+func TestRunInteractiveFileQuitsOnQ(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	if err := os.WriteFile(path, []byte("one\ntwo\nthree\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(sample) failed: %v", err)
+	}
+
+	term, screen := newMockProgramScreen(t, 80, 24)
+	output, err := runProgramForTestWithOptions(t, []string{path}, programRunTestOptions{
+		stdoutTerminal: boolPtr(true),
+		stdinTerminal:  boolPtr(false),
+		screenFactory: func(programQuitAtEOFPolicy) (tcell.Screen, error) {
+			go func() {
+				deadline := time.Now().Add(2 * time.Second)
+				for time.Now().Before(deadline) {
+					if w, h := screen.Size(); w > 0 && h > 0 {
+						term.KeyTap(vt.KeyQ)
+						return
+					}
+					time.Sleep(5 * time.Millisecond)
+				}
+			}()
+			return screen, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("run(interactive file) failed: %v", err)
+	}
+	if output != "" {
+		t.Fatalf("run(interactive file) output = %q, want empty", output)
+	}
+}
+
+func TestRunPassThroughReportsOpenError(t *testing.T) {
+	_, err := runProgramForTest(t, []string{filepath.Join(t.TempDir(), "missing.txt")}, "")
+	if err == nil {
+		t.Fatal("run(missing file) = nil error, want error")
+	}
+}
+
 func TestParseProgramFlagsLicenseExclusive(t *testing.T) {
 	var out bytes.Buffer
 	_, _, err := parseProgramFlags([]string{"--license", "-N"}, &out)
@@ -759,6 +1058,41 @@ func TestParseProgramFlagsLicenseExclusive(t *testing.T) {
 	out.Reset()
 	if _, _, err := parseProgramFlags([]string{"--license", "file.txt"}, &out); err == nil {
 		t.Fatal("parseProgramFlags(--license file.txt) = nil error, want error")
+	}
+}
+
+func TestProgramStandardStreamsUseNonTerminalFiles(t *testing.T) {
+	stdinPath := filepath.Join(t.TempDir(), "stdin.txt")
+	if err := os.WriteFile(stdinPath, []byte("alpha\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(stdin) failed: %v", err)
+	}
+	stdinFile, err := os.Open(stdinPath)
+	if err != nil {
+		t.Fatalf("Open(stdin) failed: %v", err)
+	}
+	defer stdinFile.Close()
+
+	stdoutReader, stdoutWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe(stdout) failed: %v", err)
+	}
+	defer stdoutReader.Close()
+	defer stdoutWriter.Close()
+
+	oldStdin := os.Stdin
+	oldStdout := os.Stdout
+	defer func() {
+		os.Stdin = oldStdin
+		os.Stdout = oldStdout
+	}()
+
+	os.Stdin = stdinFile
+	os.Stdout = stdoutWriter
+	if stdinIsTerminal() {
+		t.Fatal("stdinIsTerminal() = true for regular file, want false")
+	}
+	if stdoutIsTerminal() {
+		t.Fatal("stdoutIsTerminal() = true for pipe, want false")
 	}
 }
 
