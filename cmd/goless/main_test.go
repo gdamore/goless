@@ -1776,7 +1776,7 @@ func TestLoadProgramInputFromFile(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
-	snapshot, err := loadProgramInput(pager, nil, path, programStartup{line: 3})
+	snapshot, _, err := loadProgramInput(pager, nil, path, programStartup{line: 3})
 	if err != nil {
 		t.Fatalf("loadProgramInput(file) failed: %v", err)
 	}
@@ -1802,7 +1802,7 @@ func TestLoadProgramInputFromCachedStdin(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
-	if _, err := loadProgramInput(pager, loader, "-", programStartup{query: "beta"}); err != nil {
+	if _, _, err := loadProgramInput(pager, loader, "-", programStartup{query: "beta"}); err != nil {
 		t.Fatalf("loadProgramInput(stdin) failed: %v", err)
 	}
 	state := pager.SearchState()
@@ -1820,7 +1820,7 @@ func TestReloadProgramInputInPlacePreservesViewport(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(8, 4)
-	if _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
+	if _, _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
 		t.Fatalf("loadProgramInput(file) failed: %v", err)
 	}
 	pager.ScrollDown(2)
@@ -1857,7 +1857,7 @@ func TestReloadProgramInputInPlaceUsesCachedStdin(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 2)
-	if _, err := loadProgramInput(pager, loader, "-", programStartup{}); err != nil {
+	if _, _, err := loadProgramInput(pager, loader, "-", programStartup{}); err != nil {
 		t.Fatalf("loadProgramInput(stdin) failed: %v", err)
 	}
 	pager.ScrollDown(1)
@@ -1929,7 +1929,7 @@ func TestReloadProgramInputStreamsExplicitStdin(t *testing.T) {
 		return next
 	}
 
-	loaded, _, err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, events, &readResult)
+	loaded, _, _, err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, events, &readResult)
 	if err != nil {
 		t.Fatalf("reloadProgramInput(stream) failed: %v", err)
 	}
@@ -1962,7 +1962,7 @@ func TestReloadProgramInputBlocksWhileReading(t *testing.T) {
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	readResult := make(chan error, 1)
 
-	loaded, _, err := reloadProgramInput(session, loader, &pager, func() *goless.Pager {
+	loaded, _, _, err := reloadProgramInput(session, loader, &pager, func() *goless.Pager {
 		return goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	}, 20, 3, make(chan tcell.Event, 1), &readResult)
 	if err == nil {
@@ -1995,7 +1995,7 @@ func TestReloadProgramInputLoadsCachedStdinSynchronously(t *testing.T) {
 		return goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	}
 
-	loaded, _, err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, make(chan tcell.Event, 1), &readResult)
+	loaded, _, _, err := reloadProgramInput(session, loader, &pager, buildPager, 20, 3, make(chan tcell.Event, 1), &readResult)
 	if err != nil {
 		t.Fatalf("reloadProgramInput(cached) failed: %v", err)
 	}
@@ -2022,7 +2022,7 @@ func TestSyncProgramFileFollowAppendsNewBytes(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
-	if _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
+	if _, _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
 		t.Fatalf("loadProgramInput(file) failed: %v", err)
 	}
 
@@ -2066,7 +2066,7 @@ func TestSyncProgramFileFollowReloadsTruncatedFile(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
-	if _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
+	if _, _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
 		t.Fatalf("loadProgramInput(file) failed: %v", err)
 	}
 
@@ -2102,7 +2102,7 @@ func TestSyncProgramFileFollowReloadsReplacedFileWithSameSize(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
-	if _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
+	if _, _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
 		t.Fatalf("loadProgramInput(file) failed: %v", err)
 	}
 
@@ -2147,7 +2147,7 @@ func TestSyncProgramFileFollowReloadsReplacedFileWithLargerSize(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
-	if _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
+	if _, _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
 		t.Fatalf("loadProgramInput(file) failed: %v", err)
 	}
 
@@ -2195,12 +2195,16 @@ func TestStartProgramFileFollowPollsForAppends(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
-	if _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
+	if _, _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
 		t.Fatalf("loadProgramInput(file) failed: %v", err)
 	}
 
 	events := make(chan tcell.Event, 8)
-	follower := startProgramFileFollow(pager, path, events, 10*time.Millisecond)
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("Stat(sample) failed: %v", err)
+	}
+	follower := startProgramFileFollow(pager, path, info, events, 10*time.Millisecond)
 	t.Cleanup(follower.Stop)
 
 	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
@@ -2222,6 +2226,51 @@ func TestStartProgramFileFollowPollsForAppends(t *testing.T) {
 			t.Fatal("timed out waiting for file follow update")
 		case <-events:
 			if pager.SearchForward("three") {
+				return
+			}
+		}
+	}
+}
+
+func TestStartProgramFileFollowReloadsImmediateReplacement(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.txt")
+	if err := os.WriteFile(path, []byte("one\ntwo\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(sample) failed: %v", err)
+	}
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	_, info, err := loadProgramInput(pager, nil, path, programStartup{})
+	if err != nil {
+		t.Fatalf("loadProgramInput(file) failed: %v", err)
+	}
+
+	events := make(chan tcell.Event, 8)
+	follower := startProgramFileFollow(pager, path, info, events, 10*time.Millisecond)
+	t.Cleanup(follower.Stop)
+
+	replacement := filepath.Join(dir, "replacement.txt")
+	if err := os.WriteFile(replacement, []byte("uno\ndos\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(replacement) failed: %v", err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("Remove(sample) failed: %v", err)
+	}
+	if err := os.Rename(replacement, path); err != nil {
+		t.Fatalf("Rename(replacement) failed: %v", err)
+	}
+
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for file follow replacement update")
+		case <-events:
+			if pager.SearchForward("uno") {
+				if pager.SearchForward("one") {
+					t.Fatal("SearchForward(one) = true, want false after replacement reload")
+				}
 				return
 			}
 		}

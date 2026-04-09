@@ -150,6 +150,7 @@ func run() error {
 		reloadDisplayed   func() error
 		buildProgramPager func() *goless.Pager
 		fileFollower      *programFileFollower
+		currentFileInfo   os.FileInfo
 	)
 	stopProgramFileFollower := func() {
 		if fileFollower == nil {
@@ -170,7 +171,7 @@ func run() error {
 			}
 		}
 		if shouldFollow && fileFollower == nil {
-			fileFollower = startProgramFileFollow(pager, path, screen.EventQ(), programFileFollowInterval)
+			fileFollower = startProgramFileFollow(pager, path, currentFileInfo, screen.EventQ(), programFileFollowInterval)
 		}
 	}
 	defer stopProgramFileFollower()
@@ -209,9 +210,10 @@ func run() error {
 	} else if session.hasFiles() {
 		loadCurrent = func() (bool, error) {
 			stopProgramFileFollower()
-			loaded, snapshot, err := reloadProgramInput(session, inputLoader, &pager, buildProgramPager, width, height, screen.EventQ(), &readResult)
+			loaded, snapshot, info, err := reloadProgramInput(session, inputLoader, &pager, buildProgramPager, width, height, screen.EventQ(), &readResult)
 			if err == nil {
 				pagerSnapshot = snapshot
+				currentFileInfo = info
 				updateProgramFileFollower()
 			}
 			return loaded, err
@@ -224,8 +226,9 @@ func run() error {
 				return fmt.Errorf("stdin still reading")
 			}
 			stopProgramFileFollower()
-			err := reloadProgramInputInPlace(pager, inputLoader, session.currentFile())
+			info, err := reloadProgramInputInPlaceWithInfo(pager, inputLoader, session.currentFile())
 			if err == nil {
+				currentFileInfo = info
 				updateProgramFileFollower()
 			}
 			return err
@@ -731,13 +734,14 @@ func startProgramRead(target *goless.Pager, reader io.Reader, eventQ chan tcell.
 	return result
 }
 
-func startProgramFileFollow(pager *goless.Pager, path string, eventQ chan tcell.Event, interval time.Duration) *programFileFollower {
+func startProgramFileFollow(pager *goless.Pager, path string, info os.FileInfo, eventQ chan tcell.Event, interval time.Duration) *programFileFollower {
 	if interval <= 0 {
 		interval = programFileFollowInterval
 	}
 	follower := &programFileFollower{
 		path:  path,
 		pager: pager,
+		info:  info,
 		stop:  make(chan struct{}),
 		done:  make(chan struct{}),
 	}
@@ -921,9 +925,9 @@ func reloadProgramInput(
 	width, height int,
 	eventQ chan tcell.Event,
 	readResult *chan error,
-) (bool, programViewportSnapshot, error) {
+) (bool, programViewportSnapshot, os.FileInfo, error) {
 	if readResult != nil && *readResult != nil {
-		return false, programViewportSnapshot{}, fmt.Errorf("stdin still reading")
+		return false, programViewportSnapshot{}, nil, fmt.Errorf("stdin still reading")
 	}
 	nextPager := buildPager()
 	nextPager.SetSize(width, height)
@@ -931,7 +935,7 @@ func reloadProgramInput(
 	if loader != nil && loader.canStream(currentPath) {
 		reader, finish, err := loader.startStdinStream()
 		if err != nil {
-			return false, programViewportSnapshot{}, err
+			return false, programViewportSnapshot{}, nil, err
 		}
 		var cache bytes.Buffer
 		*pager = nextPager
@@ -940,17 +944,17 @@ func reloadProgramInput(
 				finish(err, cache.Bytes())
 			})
 		}
-		return false, programViewportSnapshot{}, nil
+		return false, programViewportSnapshot{}, nil, nil
 	}
-	snapshot, err := loadProgramInput(nextPager, loader, currentPath, session.startup)
+	snapshot, info, err := loadProgramInput(nextPager, loader, currentPath, session.startup)
 	if err != nil {
-		return false, programViewportSnapshot{}, err
+		return false, programViewportSnapshot{}, nil, err
 	}
 	*pager = nextPager
 	if readResult != nil {
 		*readResult = nil
 	}
-	return true, snapshot, nil
+	return true, snapshot, info, nil
 }
 
 type programStartup struct {
@@ -1265,7 +1269,7 @@ func applyStartupCommand(pager *goless.Pager, startup programStartup) {
 	}
 }
 
-func loadProgramInput(pager *goless.Pager, loader *programInputLoader, path string, startup programStartup) (programViewportSnapshot, error) {
+func loadProgramInput(pager *goless.Pager, loader *programInputLoader, path string, startup programStartup) (programViewportSnapshot, os.FileInfo, error) {
 	var (
 		file io.ReadCloser
 		err  error
@@ -1278,19 +1282,31 @@ func loadProgramInput(pager *goless.Pager, loader *programInputLoader, path stri
 		file, err = os.Open(path)
 	}
 	if err != nil {
-		return programViewportSnapshot{}, err
+		return programViewportSnapshot{}, nil, err
 	}
 	defer file.Close()
+	var info os.FileInfo
+	if statter, ok := file.(interface{ Stat() (os.FileInfo, error) }); ok && !isProgramStdinInput(path) {
+		info, err = statter.Stat()
+		if err != nil {
+			return programViewportSnapshot{}, nil, err
+		}
+	}
 	if _, err := pager.ReadFrom(file); err != nil {
-		return programViewportSnapshot{}, err
+		return programViewportSnapshot{}, nil, err
 	}
 	pager.Flush()
 	snapshot := snapshotProgramPager(pager)
 	applyStartupCommand(pager, startup)
-	return snapshot, nil
+	return snapshot, info, nil
 }
 
 func reloadProgramInputInPlace(pager *goless.Pager, loader *programInputLoader, path string) error {
+	_, err := reloadProgramInputInPlaceWithInfo(pager, loader, path)
+	return err
+}
+
+func reloadProgramInputInPlaceWithInfo(pager *goless.Pager, loader *programInputLoader, path string) (os.FileInfo, error) {
 	var (
 		file io.ReadCloser
 		err  error
@@ -1303,14 +1319,21 @@ func reloadProgramInputInPlace(pager *goless.Pager, loader *programInputLoader, 
 		file, err = os.Open(path)
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer file.Close()
+	var info os.FileInfo
+	if statter, ok := file.(interface{ Stat() (os.FileInfo, error) }); ok && !isProgramStdinInput(path) {
+		info, err = statter.Stat()
+		if err != nil {
+			return nil, err
+		}
+	}
 	if _, err := pager.ReloadFrom(file); err != nil {
-		return err
+		return nil, err
 	}
 	pager.Flush()
-	return nil
+	return info, nil
 }
 
 func stdinIsTerminal() bool {
