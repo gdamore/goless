@@ -120,11 +120,11 @@ Implemented:
 - `>` goes to bottom of file
 - `h` opens and closes help
 - `W` toggles wrap so `w` can stay less-compatible
+- `R` reloads the current file/input in place
 
 Still open:
 
 - no additional single-key alias changes selected in this batch
-- `R` hard reload behavior is still missing entirely
 
 Keep fine horizontal scrolling on the existing shifted-arrow bindings. This is a
 better trade than spending two prominent `less` keys on a niche horizontal
@@ -140,6 +140,7 @@ Implemented:
 - `:x`
 - `=`
 - `Ctrl-G`
+- `:reload`
 
 `=` and `Ctrl-G` report the same current-file/session status already available
 through `:file`.
@@ -147,7 +148,6 @@ through `:file`.
 Still open:
 
 - `:e <file>`
-- `R` / `:reload`
 
 ### 3. Add common CLI aliases with low behavioral risk
 
@@ -201,6 +201,6 @@ surface area without materially improving the experience for most users.
 
 ## Suggested Follow-Up Issues
 
-- Add standalone program `:e <file>`, `R` / `:reload`, and any secure shell-command opt-ins
+- Add standalone program `:e <file>` and any secure shell-command opt-ins
 - Design numeric-prefix support for normal-mode commands
 - Decide whether to add sequence support or keep keymaps single-event only

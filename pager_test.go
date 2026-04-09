@@ -4,6 +4,8 @@
 package goless
 
 import (
+	"errors"
+	"io"
 	"runtime"
 	"strings"
 	"testing"
@@ -43,6 +45,137 @@ func TestPagerReadFrom(t *testing.T) {
 	if got, want := pager.Len(), int64(len("alpha\nbeta\n")); got != want {
 		t.Fatalf("Len = %d, want %d", got, want)
 	}
+}
+
+func TestPagerReloadFromReplacesContent(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap})
+	pager.SetSize(20, 4)
+
+	if err := pager.AppendString("alpha\nbeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	n, err := pager.ReloadFrom(strings.NewReader("gamma\ndelta\n"))
+	if err != nil {
+		t.Fatalf("ReloadFrom failed: %v", err)
+	}
+	pager.Flush()
+
+	if got, want := n, int64(len("gamma\ndelta\n")); got != want {
+		t.Fatalf("ReloadFrom count = %d, want %d", got, want)
+	}
+	if got, want := pager.Len(), int64(len("gamma\ndelta\n")); got != want {
+		t.Fatalf("Len = %d, want %d", got, want)
+	}
+	screen := newPagerMockScreen(t, 20, 4)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if got, want := strings.TrimRight(pagerRowString(screen, 0, 20), " "), "gamma"; got != want {
+		t.Fatalf("first row = %q, want %q", got, want)
+	}
+}
+
+func TestPagerReloadFromPreservesViewportWhenPossible(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap})
+	pager.SetSize(8, 3)
+
+	if err := pager.AppendString("one\ntwo\nthree\nfour\nfive\n0123456789abcdef\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.ScrollDown(2)
+	pager.ScrollRight(4)
+
+	before := pager.Position()
+
+	if _, err := pager.ReloadFrom(strings.NewReader("uno\ndos\ntres\ncuatro\ncinco\nABCDEFGHIJKLMNOP\n")); err != nil {
+		t.Fatalf("ReloadFrom failed: %v", err)
+	}
+	pager.Flush()
+
+	after := pager.Position()
+	if got, want := after.Row, before.Row; got != want {
+		t.Fatalf("Position().Row after reload = %d, want %d", got, want)
+	}
+	if got, want := after.Column, before.Column; got != want {
+		t.Fatalf("Position().Column after reload = %d, want %d", got, want)
+	}
+}
+
+func TestPagerReloadFromClampsViewportWhenContentShrinks(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap})
+	pager.SetSize(8, 3)
+
+	if err := pager.AppendString("one\ntwo\nthree\nfour\nfive\n0123456789abcdef\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.ScrollDown(10)
+	pager.ScrollRight(10)
+
+	if _, err := pager.ReloadFrom(strings.NewReader("short\nx\n")); err != nil {
+		t.Fatalf("ReloadFrom failed: %v", err)
+	}
+	pager.Flush()
+
+	pos := pager.Position()
+	if got, want := pos.Row, 1; got != want {
+		t.Fatalf("Position().Row after shrink reload = %d, want %d", got, want)
+	}
+	if got, want := pos.Column, 1; got != want {
+		t.Fatalf("Position().Column after shrink reload = %d, want %d", got, want)
+	}
+}
+
+func TestPagerReloadFromKeepsOldContentOnError(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap})
+	pager.SetSize(20, 4)
+
+	if err := pager.AppendString("alpha\nbeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	wantErr := errors.New("reload failed")
+	n, err := pager.ReloadFrom(&failingReader{
+		text:    "gamma\n",
+		failErr: wantErr,
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("ReloadFrom error = %v, want %v", err, wantErr)
+	}
+	if got, want := n, int64(len("gamma\n")); got != want {
+		t.Fatalf("ReloadFrom count = %d, want %d", got, want)
+	}
+	pager.Flush()
+
+	if got, want := pager.Len(), int64(len("alpha\nbeta\n")); got != want {
+		t.Fatalf("Len after failed reload = %d, want %d", got, want)
+	}
+	screen := newPagerMockScreen(t, 20, 4)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if got, want := strings.TrimRight(pagerRowString(screen, 0, 20), " "), "alpha"; got != want {
+		t.Fatalf("first row after failed reload = %q, want %q", got, want)
+	}
+}
+
+type failingReader struct {
+	text    string
+	read    bool
+	failErr error
+}
+
+func (r *failingReader) Read(p []byte) (int, error) {
+	if !r.read {
+		r.read = true
+		n := copy(p, r.text)
+		return n, r.failErr
+	}
+	return 0, io.EOF
 }
 
 func TestPagerHandleKey(t *testing.T) {
