@@ -2102,13 +2102,9 @@ func TestSyncProgramFileFollowReloadsReplacedFileWithSameSize(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
-	if _, _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
-		t.Fatalf("loadProgramInput(file) failed: %v", err)
-	}
-
-	initialInfo, err := os.Stat(path)
+	_, initialInfo, err := loadProgramInput(pager, nil, path, programStartup{})
 	if err != nil {
-		t.Fatalf("Stat(sample) failed: %v", err)
+		t.Fatalf("loadProgramInput(file) failed: %v", err)
 	}
 	var previous os.FileInfo = initialInfo
 
@@ -2147,13 +2143,9 @@ func TestSyncProgramFileFollowReloadsReplacedFileWithLargerSize(t *testing.T) {
 
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
 	pager.SetSize(20, 3)
-	if _, _, err := loadProgramInput(pager, nil, path, programStartup{}); err != nil {
-		t.Fatalf("loadProgramInput(file) failed: %v", err)
-	}
-
-	initialInfo, err := os.Stat(path)
+	_, initialInfo, err := loadProgramInput(pager, nil, path, programStartup{})
 	if err != nil {
-		t.Fatalf("Stat(sample) failed: %v", err)
+		t.Fatalf("loadProgramInput(file) failed: %v", err)
 	}
 	var previous os.FileInfo = initialInfo
 
