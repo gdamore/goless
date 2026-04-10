@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"runtime/debug"
 	"slices"
 	"strconv"
@@ -46,6 +47,7 @@ type programOptions struct {
 	quitIfOneScreen   bool
 	renderName        string
 	searchCaseMode    goless.SearchCaseMode
+	secure            bool
 	showHelp          bool
 	showLicense       bool
 	squeeze           bool
@@ -65,7 +67,6 @@ type programInputResult struct {
 	action  goless.KeyAction
 	context goless.KeyContext
 }
-
 type programFileFollower struct {
 	path  string
 	pager *goless.Pager
@@ -80,6 +81,7 @@ var (
 	programStdoutIsTerminalFunc     = stdoutIsTerminal
 	programDefaultScreenFactory     = tcell.NewScreen
 	programTerminfoScreenFactory    = tcell.NewTerminfoScreen
+	programEditorLauncher           = launchProgramEditor
 )
 
 func main() {
@@ -208,6 +210,9 @@ func run() error {
 						pager.ShowInformation(title, body)
 					}
 				},
+				func() error {
+					return editProgramCurrentFile(screen, pager, session, opts.secure, reloadDisplayed)
+				},
 			),
 		)
 	}
@@ -306,6 +311,10 @@ func run() error {
 				break
 			}
 			if shouldHandleProgramStatusKey(keyResult) && handleProgramStatusKey(pager, event) {
+				pager.Draw(screen)
+				break
+			}
+			if shouldHandleProgramEditKey(keyResult) && handleProgramEditKey(pager, event) {
 				pager.Draw(screen)
 				break
 			}
@@ -415,7 +424,7 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	fs := flag.NewFlagSet("goless", flag.ContinueOnError)
 	fs.SetOutput(output)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-F|-N|-R|-S|-i|-I|-s] [-x n] [-preset dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [-license] [+line|+/pattern] [-version] [path ...]\n")
+		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-F|-N|-R|-S|-i|-I|-s|-secure] [-x n] [-preset dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [-license] [+line|+/pattern] [-version] [path ...]\n")
 	}
 
 	fs.BoolVar(&opts.showHelp, "?", false, "show help")
@@ -432,6 +441,7 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	fs.BoolVar(&opts.liveLinks, "live-links", false, "enable live OSC 8 hyperlinks in the program")
 	fs.BoolVar(&opts.quitAtEOF, "quit-at-eof", false, "long form of -e")
 	fs.BoolVar(&opts.quitAtEOFFirst, "QUIT-AT-EOF", false, "long form of -E")
+	fs.BoolVar(&opts.secure, "secure", false, "disable standalone commands that launch external programs")
 	fs.BoolVar(&opts.squeeze, "s", false, "collapse repeated blank lines in the current view")
 	fs.BoolVar(&opts.squeeze, "squeeze", false, "collapse repeated blank lines in the current view")
 	fs.StringVar(&opts.presetName, "preset", "pretty", "visual preset: none, dark, light, plain, pretty")
@@ -1065,11 +1075,19 @@ func (s *programSession) last() bool {
 	return true
 }
 
-func (s *programSession) commandHandler(load func() error, reload func() error, showInformation func(title, body string)) func(goless.Command) goless.CommandResult {
+func (s *programSession) commandHandler(load func() error, reload func() error, showInformation func(title, body string), edit func() error) func(goless.Command) goless.CommandResult {
 	return func(cmd goless.Command) goless.CommandResult {
 		switch cmd.Name {
 		case "q", "Q", "quit":
 			return goless.CommandResult{Handled: true, Quit: true}
+		case "v", "edit":
+			if edit == nil {
+				return goless.CommandResult{Handled: true, Message: "editor unavailable for current input"}
+			}
+			if err := edit(); err != nil {
+				return goless.CommandResult{Handled: true, Message: err.Error()}
+			}
+			return goless.CommandResult{Handled: true}
 		case "file", "f":
 			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
 		case "license":
@@ -1178,6 +1196,20 @@ func shouldHandleProgramReloadKey(result goless.KeyResult) bool {
 	return !result.Handled && result.Context == goless.NormalKeyContext
 }
 
+func handleProgramEditKey(pager *goless.Pager, ev *tcell.EventKey) bool {
+	if pager == nil || ev == nil {
+		return false
+	}
+	if ev.Key() != tcell.KeyRune || ev.Str() != "v" || ev.Modifiers() != tcell.ModNone {
+		return false
+	}
+	return runProgramCommand(pager, "v")
+}
+
+func shouldHandleProgramEditKey(result goless.KeyResult) bool {
+	return !result.Handled && result.Context == goless.NormalKeyContext
+}
+
 func runProgramCommand(pager *goless.Pager, command string) bool {
 	if pager == nil || command == "" {
 		return false
@@ -1188,6 +1220,136 @@ func runProgramCommand(pager *goless.Pager, command string) bool {
 	}
 	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyEnter, "", tcell.ModNone))
 	return true
+}
+
+func editProgramCurrentFile(screen tcell.Screen, pager *goless.Pager, session *programSession, secure bool, reload func() error) error {
+	if secure {
+		return fmt.Errorf("editor disabled in secure mode")
+	}
+	if session == nil {
+		return fmt.Errorf("editor unavailable for current input")
+	}
+	path := session.currentFile()
+	if path == "" || isProgramStdinInput(path) {
+		return fmt.Errorf("editor unavailable for current input")
+	}
+	line := 1
+	if pager != nil {
+		if row := pager.Position().Row; row > 0 {
+			line = row
+		}
+	}
+	if err := suspendProgramScreen(screen, pager, func() error {
+		return programEditorLauncher(line, path)
+	}); err != nil {
+		return err
+	}
+	if reload != nil {
+		return reload()
+	}
+	return nil
+}
+
+func suspendProgramScreen(screen tcell.Screen, pager *goless.Pager, action func() error) error {
+	if action == nil {
+		return nil
+	}
+	if screen == nil {
+		return action()
+	}
+	screen.Fini()
+	actionErr := action()
+	initErr := screen.Init()
+	if initErr == nil {
+		screen.EnableMouse()
+		if pager != nil {
+			width, height := screen.Size()
+			pager.SetSize(width, height)
+		}
+		screen.Sync()
+	}
+	if actionErr != nil {
+		if initErr != nil {
+			return fmt.Errorf("%v; screen restore failed: %w", actionErr, initErr)
+		}
+		return actionErr
+	}
+	return initErr
+}
+
+func launchProgramEditor(line int, path string) error {
+	editor := os.Getenv("EDITOR")
+	if strings.TrimSpace(editor) == "" {
+		return fmt.Errorf("EDITOR is not set")
+	}
+	args, err := splitProgramEditor(editor)
+	if err != nil {
+		return fmt.Errorf("invalid EDITOR: %w", err)
+	}
+	args = append(args, fmt.Sprintf("+%d", line), path)
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func splitProgramEditor(spec string) ([]string, error) {
+	var (
+		args        []string
+		current     strings.Builder
+		quote       rune
+		escaped     bool
+		tokenActive bool
+	)
+	flush := func() {
+		if !tokenActive {
+			return
+		}
+		args = append(args, current.String())
+		current.Reset()
+		tokenActive = false
+	}
+	for _, r := range spec {
+		switch {
+		case escaped:
+			current.WriteRune(r)
+			tokenActive = true
+			escaped = false
+		case quote != 0:
+			switch {
+			case r == quote:
+				quote = 0
+			case quote == '"' && r == '\\':
+				escaped = true
+			default:
+				current.WriteRune(r)
+				tokenActive = true
+			}
+		case r == '\\':
+			escaped = true
+			tokenActive = true
+		case r == '\'' || r == '"':
+			quote = r
+			tokenActive = true
+		case r == ' ' || r == '\t' || r == '\n' || r == '\r':
+			flush()
+		default:
+			current.WriteRune(r)
+			tokenActive = true
+		}
+	}
+	if escaped {
+		return nil, fmt.Errorf("trailing escape")
+	}
+	if quote != 0 {
+		return nil, fmt.Errorf("unterminated quote")
+	}
+	flush()
+	if len(args) == 0 {
+		return nil, fmt.Errorf("empty command")
+	}
+	return args, nil
 }
 
 func snapshotProgramPager(pager *goless.Pager) programViewportSnapshot {

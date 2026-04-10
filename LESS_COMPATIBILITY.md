@@ -141,6 +141,7 @@ Implemented:
 - `=`
 - `Ctrl-G`
 - `:reload`
+- `v` to launch `$EDITOR` for the current file, unless `-secure` is set
 
 `=` and `Ctrl-G` report the same current-file/session status already available
 through `:file`.
@@ -190,7 +191,6 @@ These should remain intentionally unsupported unless the project direction
 changes:
 
 - shell escape commands such as `!`, `#`, and `|`
-- editor launch via `v`
 - save-to-file commands
 - `LESSOPEN`, lesskey, and other external-process integration points
 - raw control-character passthrough mode `-r`

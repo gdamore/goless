@@ -3,6 +3,7 @@
  q Q Esc             quit
   r ^L                repaint
   R                   reload current file/input
+  v                   edit current file using $EDITOR
   F4                  cycle themes
 
 [1;4mNavigation[0m
