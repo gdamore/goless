@@ -2095,9 +2095,10 @@ func TestSplitProgramEditor(t *testing.T) {
 		{name: "simple", spec: "vim", want: []string{"vim"}},
 		{name: "with args", spec: "vim -u NONE", want: []string{"vim", "-u", "NONE"}},
 		{name: "quoted path", spec: "\"/Applications/Vim MacVim.app/Contents/bin/mvim\" -f", want: []string{"/Applications/Vim MacVim.app/Contents/bin/mvim", "-f"}},
+		{name: "quoted windows path", spec: "\"C:\\Program Files\\Vim\\vim.exe\" -f", want: []string{"C:\\Program Files\\Vim\\vim.exe", "-f"}},
 		{name: "single quotes", spec: "'/opt/editor bin/vim' -u NONE", want: []string{"/opt/editor bin/vim", "-u", "NONE"}},
 		{name: "unterminated quote", spec: "\"vim", wantErr: true},
-		{name: "trailing escape", spec: "vim\\", wantErr: true},
+		{name: "literal trailing backslash", spec: "vim\\", want: []string{"vim\\"}},
 	}
 
 	for _, tt := range tests {
@@ -2124,25 +2125,40 @@ func TestSplitProgramEditor(t *testing.T) {
 	}
 }
 
-func TestLaunchProgramEditorRequiresEditor(t *testing.T) {
+func TestLaunchProgramEditorDefaultsToVi(t *testing.T) {
+	dir := t.TempDir()
+	argsFile := filepath.Join(dir, "vi.args")
+	script := filepath.Join(dir, "vi")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > "+argsFile+"\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile(vi) failed: %v", err)
+	}
+
 	previous := os.Getenv("EDITOR")
 	if err := os.Unsetenv("EDITOR"); err != nil {
 		t.Fatalf("Unsetenv(EDITOR) failed: %v", err)
 	}
+	previousPath := os.Getenv("PATH")
+	if err := os.Setenv("PATH", dir+string(os.PathListSeparator)+previousPath); err != nil {
+		t.Fatalf("Setenv(PATH) failed: %v", err)
+	}
 	t.Cleanup(func() {
 		if previous == "" {
 			_ = os.Unsetenv("EDITOR")
-			return
+		} else {
+			_ = os.Setenv("EDITOR", previous)
 		}
-		_ = os.Setenv("EDITOR", previous)
+		_ = os.Setenv("PATH", previousPath)
 	})
 
-	err := launchProgramEditor(3, "sample.txt")
-	if err == nil {
-		t.Fatal("launchProgramEditor(...) = nil error, want error")
+	if err := launchProgramEditor(3, "sample.txt"); err != nil {
+		t.Fatalf("launchProgramEditor(...) failed: %v", err)
 	}
-	if got, want := err.Error(), "EDITOR is not set"; got != want {
-		t.Fatalf("launchProgramEditor error = %q, want %q", got, want)
+	data, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatalf("ReadFile(vi.args) failed: %v", err)
+	}
+	if got, want := string(data), "+3\nsample.txt\n"; got != want {
+		t.Fatalf("vi args = %q, want %q", got, want)
 	}
 }
 
