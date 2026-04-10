@@ -25,6 +25,9 @@ printf 'hello\nworld\n' | go run ./cmd/goless -- -
 When `stdout` is redirected or piped, `goless` falls back to pass-through mode
 and writes the selected input unchanged instead of opening the full-screen UI.
 
+When you are viewing a regular file in the full-screen UI, `v` opens that file
+in `$EDITOR` at the current line. Use `-secure` to disable editor launch.
+
 ## What Users Need First
 
 The first user-facing page should answer these questions quickly:

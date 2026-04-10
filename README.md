@@ -14,7 +14,7 @@ similar to `less`.
 
 It is designed both for applications that need to display untrusted text safely
 inside their own terminal UI and for the emerging standalone `goless` program,
-without shell escapes, subprocess hooks, or raw terminal control passthrough.
+without shell escapes or raw terminal control passthrough in the pager core.
 It is implemented in pure Go, targets [`tcell`](https://github.com/gdamore/tcell),
 and does not rely on cgo.
 
@@ -68,8 +68,10 @@ hugo server --source site
   the host terminal
 - Parsed OSC 8 hyperlinks are inert by default. An embedder must opt in with
   `HyperlinkHandler` before content becomes a live link.
-- There is no shell escape support, editor launch support, or subprocess
-  execution support
+- The pager core does not expose shell escape support or arbitrary subprocess
+  execution
+- The standalone `goless` program can launch `$EDITOR` for the current file
+  with `v`; `-secure` disables that command
 
 That is the core contract of the package: applications can display hostile or
 arbitrary text without handing terminal control to the input stream.
@@ -334,6 +336,7 @@ Program flags:
 - `-N` to enable line numbers
 - `-R` accepted as a less-compatibility no-op
 - `-S` accepted as a less-compatibility no-op because no-wrap is already the default
+- `-secure` to disable standalone commands that launch external programs
 - `-i` for smart-case search behavior
 - `-I` for case-insensitive search behavior
 - `--license` to open the bundled Apache license, or print it when stdout is not a terminal
@@ -357,6 +360,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `g`/`G` for top/bottom
 - `W` to toggle wrap
 - `r` or `Ctrl-L` to repaint the screen
+- `v` to open the current file in `$EDITOR` at the current line unless `-secure` is set
 - `/` and `?` to search forward/backward
 - `n` and `N` to repeat search
 - `F2` to cycle search case mode in the bundled key group

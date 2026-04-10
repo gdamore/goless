@@ -861,6 +861,23 @@ func TestParseProgramFlagsCompatibilityAliases(t *testing.T) {
 	}
 }
 
+func TestParseProgramFlagsSecure(t *testing.T) {
+	var out bytes.Buffer
+	opts, args, err := parseProgramFlags([]string{"-secure", "sample.txt"}, &out)
+	if err != nil {
+		t.Fatalf("parseProgramFlags(-secure) failed: %v", err)
+	}
+	if !opts.secure {
+		t.Fatal("parseProgramFlags(-secure) did not enable secure mode")
+	}
+	if got, want := len(args), 1; got != want {
+		t.Fatalf("len(args) = %d, want %d", got, want)
+	}
+	if got, want := args[0], "sample.txt"; got != want {
+		t.Fatalf("args[0] = %q, want %q", got, want)
+	}
+}
+
 func TestParseProgramFlagsRejectsConflictingSearchCaseFlags(t *testing.T) {
 	var out bytes.Buffer
 
@@ -1250,7 +1267,7 @@ func TestDemoSessionCommandHandler(t *testing.T) {
 	}, func() error {
 		reloads++
 		return nil
-	}, nil)
+	}, nil, nil)
 
 	if result := handler(goless.Command{Name: "quit"}); !result.Handled || !result.Quit {
 		t.Fatalf("quit command result = %+v, want handled quit", result)
@@ -1323,7 +1340,7 @@ func TestDemoSessionAdditionalCommands(t *testing.T) {
 		return nil
 	}, func() error {
 		return nil
-	}, nil)
+	}, nil, nil)
 
 	result := handler(goless.Command{Name: "file"})
 	if !result.Handled || result.Quit {
@@ -1390,7 +1407,7 @@ func TestDemoSessionLicenseCommandShowsBundledLicense(t *testing.T) {
 	}, func(gotTitle, gotBody string) {
 		title = gotTitle
 		body = gotBody
-	})
+	}, nil)
 
 	result := handler(goless.Command{Name: "license"})
 	if !result.Handled || result.Quit {
@@ -1407,6 +1424,41 @@ func TestDemoSessionLicenseCommandShowsBundledLicense(t *testing.T) {
 	}
 	if !strings.Contains(body, "Version 2.0, January 2004") {
 		t.Fatalf("license body missing version heading: %q", body)
+	}
+}
+
+func TestDemoSessionEditCommand(t *testing.T) {
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
+	edits := 0
+	handler := session.commandHandler(nil, nil, nil, func() error {
+		edits++
+		return nil
+	})
+
+	result := handler(goless.Command{Name: "v"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("edit command result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, ""; got != want {
+		t.Fatalf("edit command message = %q, want empty", got)
+	}
+	if got, want := edits, 1; got != want {
+		t.Fatalf("edit count = %d, want %d", got, want)
+	}
+}
+
+func TestDemoSessionEditCommandReturnsError(t *testing.T) {
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
+	handler := session.commandHandler(nil, nil, nil, func() error {
+		return fmt.Errorf("EDITOR is not set")
+	})
+
+	result := handler(goless.Command{Name: "edit"})
+	if !result.Handled || result.Quit {
+		t.Fatalf("edit error result = %+v, want handled non-quit", result)
+	}
+	if got, want := result.Message, "EDITOR is not set"; got != want {
+		t.Fatalf("edit error message = %q, want %q", got, want)
 	}
 }
 
@@ -1496,6 +1548,40 @@ func TestHandleProgramReloadKey(t *testing.T) {
 	}
 }
 
+func TestHandleProgramEditKey(t *testing.T) {
+	var seen []string
+	pager := goless.New(goless.Config{
+		TabWidth:   4,
+		WrapMode:   goless.NoWrap,
+		ShowStatus: true,
+		CommandHandler: func(cmd goless.Command) goless.CommandResult {
+			seen = append(seen, cmd.Name)
+			if cmd.Name == "v" {
+				return goless.CommandResult{Handled: true}
+			}
+			return goless.CommandResult{}
+		},
+	})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("one\ntwo\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if !handleProgramEditKey(pager, tcell.NewEventKey(tcell.KeyRune, "v", tcell.ModNone)) {
+		t.Fatal("handleProgramEditKey(v) = false, want true")
+	}
+	if got, want := len(seen), 1; got != want {
+		t.Fatalf("command count after v = %d, want %d", got, want)
+	}
+	if got, want := seen[0], "v"; got != want {
+		t.Fatalf("command after v = %q, want %q", got, want)
+	}
+	if handleProgramEditKey(pager, tcell.NewEventKey(tcell.KeyRune, "v", tcell.ModAlt)) {
+		t.Fatal("handleProgramEditKey(Alt-v) = true, want false")
+	}
+}
+
 func TestShouldHandleProgramReloadKey(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -1512,6 +1598,27 @@ func TestShouldHandleProgramReloadKey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := shouldHandleProgramReloadKey(tt.result); got != tt.want {
 				t.Fatalf("shouldHandleProgramReloadKey(%+v) = %v, want %v", tt.result, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestShouldHandleProgramEditKey(t *testing.T) {
+	tests := []struct {
+		name   string
+		result goless.KeyResult
+		want   bool
+	}{
+		{name: "normal-unhandled", result: goless.KeyResult{}, want: true},
+		{name: "normal-handled", result: goless.KeyResult{Handled: true, Context: goless.NormalKeyContext}, want: false},
+		{name: "prompt-unhandled", result: goless.KeyResult{Context: goless.PromptKeyContext}, want: false},
+		{name: "help-unhandled", result: goless.KeyResult{Context: goless.HelpKeyContext}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldHandleProgramEditKey(tt.result); got != tt.want {
+				t.Fatalf("shouldHandleProgramEditKey(%+v) = %v, want %v", tt.result, got, tt.want)
 			}
 		})
 	}
@@ -1568,7 +1675,7 @@ func TestDemoSessionLabelsExplicitStdin(t *testing.T) {
 		return nil
 	}, func() error {
 		return nil
-	}, nil)
+	}, nil, nil)
 
 	result := handler(goless.Command{Name: "next"})
 	if !result.Handled || result.Quit {
@@ -1596,7 +1703,7 @@ func TestDemoSessionCommandHandlerBlocksNavigationWhileStdinReading(t *testing.T
 		return fmt.Errorf("stdin still reading")
 	}, func() error {
 		return fmt.Errorf("stdin still reading")
-	}, nil)
+	}, nil, nil)
 
 	result := handler(goless.Command{Name: "next"})
 	if !result.Handled || result.Quit {
@@ -1616,7 +1723,7 @@ func TestDemoSessionCommandHandlerReloadFailureRestoresIndex(t *testing.T) {
 		return fmt.Errorf("reload failed")
 	}, func() error {
 		return fmt.Errorf("reload failed")
-	}, nil)
+	}, nil, nil)
 
 	result := handler(goless.Command{Name: "next"})
 	if !result.Handled || result.Quit {
@@ -1636,7 +1743,7 @@ func TestDemoSessionCommandHandlerReloadFailureRestoresIndexForLast(t *testing.T
 		return fmt.Errorf("reload failed")
 	}, func() error {
 		return fmt.Errorf("reload failed")
-	}, nil)
+	}, nil, nil)
 
 	result := handler(goless.Command{Name: "last"})
 	if !result.Handled || result.Quit {
@@ -1660,7 +1767,7 @@ func TestDemoSessionCommandHandlerReloadUsesReloadHook(t *testing.T) {
 	}, func() error {
 		reloads++
 		return nil
-	}, nil)
+	}, nil, nil)
 
 	result := handler(goless.Command{Name: "reload"})
 	if !result.Handled || result.Quit {
@@ -1685,7 +1792,7 @@ func TestDemoSessionCommandHandlerReloadUnavailable(t *testing.T) {
 	handler := session.commandHandler(func() error {
 		t.Fatal("load should not be called when reload is unavailable")
 		return nil
-	}, nil, nil)
+	}, nil, nil, nil)
 
 	result := handler(goless.Command{Name: "reload"})
 	if !result.Handled || result.Quit {
@@ -1701,7 +1808,7 @@ func TestDemoSessionCommandHandlerNextUnavailable(t *testing.T) {
 	handler := session.commandHandler(nil, func() error {
 		t.Fatal("reload should not be called when load is unavailable")
 		return nil
-	}, nil)
+	}, nil, nil)
 
 	result := handler(goless.Command{Name: "next"})
 	if !result.Handled || result.Quit {
@@ -1753,7 +1860,7 @@ func TestDemoSessionCommandHandlerNavigationUnavailable(t *testing.T) {
 			handler := session.commandHandler(nil, func() error {
 				t.Fatal("reload should not be called when load is unavailable")
 				return nil
-			}, nil)
+			}, nil, nil)
 
 			result := handler(goless.Command{Name: tt.command})
 			if !result.Handled || result.Quit {
@@ -1776,7 +1883,7 @@ func TestDemoSessionCommandHandlerReloadFailureReturnsMessage(t *testing.T) {
 		return nil
 	}, func() error {
 		return fmt.Errorf("reload failed")
-	}, nil)
+	}, nil, nil)
 
 	result := handler(goless.Command{Name: "reload"})
 	if !result.Handled || result.Quit {
@@ -1890,6 +1997,152 @@ func TestApplyStartupCommand(t *testing.T) {
 	}
 	if got, want := pager.Position().Row, 2; got != want {
 		t.Fatalf("Position().Row after startup search = %d, want %d", got, want)
+	}
+}
+
+func TestEditProgramCurrentFileUsesCurrentLineAndReloads(t *testing.T) {
+	previous := programEditorLauncher
+	t.Cleanup(func() {
+		programEditorLauncher = previous
+	})
+
+	var (
+		gotLine int
+		gotPath string
+	)
+	programEditorLauncher = func(line int, path string) error {
+		gotLine = line
+		gotPath = path
+		return nil
+	}
+
+	term := vt.NewMockTerm(vt.MockOptSize{X: 80, Y: 24})
+	screen, err := tcell.NewTerminfoScreenFromTty(term)
+	if err != nil {
+		t.Fatalf("NewTerminfoScreenFromTty failed: %v", err)
+	}
+	if err := screen.Init(); err != nil {
+		t.Fatalf("screen.Init failed: %v", err)
+	}
+	defer screen.Fini()
+
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+	pager.SetSize(20, 3)
+	if err := pager.AppendString("one\ntwo\nthree\nfour\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.JumpToLine(3)
+
+	path := filepath.Join(t.TempDir(), "sample.txt")
+	session := newProgramSession([]string{path}, programStartup{})
+	reloads := 0
+	if err := editProgramCurrentFile(screen, pager, session, false, func() error {
+		reloads++
+		return nil
+	}); err != nil {
+		t.Fatalf("editProgramCurrentFile(...) failed: %v", err)
+	}
+	if got, want := gotLine, 3; got != want {
+		t.Fatalf("editor line = %d, want %d", got, want)
+	}
+	if got, want := gotPath, path; got != want {
+		t.Fatalf("editor path = %q, want %q", got, want)
+	}
+	if got, want := reloads, 1; got != want {
+		t.Fatalf("reload count = %d, want %d", got, want)
+	}
+}
+
+func TestEditProgramCurrentFileSecureMode(t *testing.T) {
+	session := newProgramSession([]string{"sample.txt"}, programStartup{})
+	err := editProgramCurrentFile(nil, nil, session, true, nil)
+	if err == nil {
+		t.Fatal("editProgramCurrentFile(..., secure=true, ...) = nil error, want error")
+	}
+	if got, want := err.Error(), "editor disabled in secure mode"; got != want {
+		t.Fatalf("secure mode error = %q, want %q", got, want)
+	}
+}
+
+func TestEditProgramCurrentFileRejectsCurrentInputWithoutFile(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		session *programSession
+	}{
+		{name: "nil session"},
+		{name: "stdin session", session: newProgramSession([]string{"-"}, programStartup{})},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := editProgramCurrentFile(nil, nil, tt.session, false, nil)
+			if err == nil {
+				t.Fatal("editProgramCurrentFile(...) = nil error, want error")
+			}
+			if got, want := err.Error(), "editor unavailable for current input"; got != want {
+				t.Fatalf("error = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestSplitProgramEditor(t *testing.T) {
+	tests := []struct {
+		name    string
+		spec    string
+		want    []string
+		wantErr bool
+	}{
+		{name: "simple", spec: "vim", want: []string{"vim"}},
+		{name: "with args", spec: "vim -u NONE", want: []string{"vim", "-u", "NONE"}},
+		{name: "quoted path", spec: "\"/Applications/Vim MacVim.app/Contents/bin/mvim\" -f", want: []string{"/Applications/Vim MacVim.app/Contents/bin/mvim", "-f"}},
+		{name: "single quotes", spec: "'/opt/editor bin/vim' -u NONE", want: []string{"/opt/editor bin/vim", "-u", "NONE"}},
+		{name: "unterminated quote", spec: "\"vim", wantErr: true},
+		{name: "trailing escape", spec: "vim\\", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := splitProgramEditor(tt.spec)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("splitProgramEditor(...) = nil error, want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("splitProgramEditor(...) failed: %v", err)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("len(args) = %d, want %d", len(got), len(tt.want))
+			}
+			for i := range tt.want {
+				if got[i] != tt.want[i] {
+					t.Fatalf("args[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestLaunchProgramEditorRequiresEditor(t *testing.T) {
+	previous := os.Getenv("EDITOR")
+	if err := os.Unsetenv("EDITOR"); err != nil {
+		t.Fatalf("Unsetenv(EDITOR) failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if previous == "" {
+			_ = os.Unsetenv("EDITOR")
+			return
+		}
+		_ = os.Setenv("EDITOR", previous)
+	})
+
+	err := launchProgramEditor(3, "sample.txt")
+	if err == nil {
+		t.Fatal("launchProgramEditor(...) = nil error, want error")
+	}
+	if got, want := err.Error(), "EDITOR is not set"; got != want {
+		t.Fatalf("launchProgramEditor error = %q, want %q", got, want)
 	}
 }
 
