@@ -1278,9 +1278,9 @@ func suspendProgramScreen(screen tcell.Screen, pager *goless.Pager, action func(
 }
 
 func launchProgramEditor(line int, path string) error {
-	editor := os.Getenv("EDITOR")
-	if strings.TrimSpace(editor) == "" {
-		return fmt.Errorf("EDITOR is not set")
+	editor := strings.TrimSpace(os.Getenv("EDITOR"))
+	if editor == "" {
+		editor = "vi"
 	}
 	args, err := splitProgramEditor(editor)
 	if err != nil {
@@ -1299,7 +1299,6 @@ func splitProgramEditor(spec string) ([]string, error) {
 		args        []string
 		current     strings.Builder
 		quote       rune
-		escaped     bool
 		tokenActive bool
 	)
 	flush := func() {
@@ -1310,25 +1309,33 @@ func splitProgramEditor(spec string) ([]string, error) {
 		current.Reset()
 		tokenActive = false
 	}
-	for _, r := range spec {
+	runes := []rune(spec)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
 		switch {
-		case escaped:
+		case quote == '\'':
+			if r == '\'' {
+				quote = 0
+				continue
+			}
 			current.WriteRune(r)
 			tokenActive = true
-			escaped = false
-		case quote != 0:
+		case quote == '"':
 			switch {
 			case r == quote:
 				quote = 0
-			case quote == '"' && r == '\\':
-				escaped = true
+			case r == '\\':
+				if i+1 < len(runes) && (runes[i+1] == '"' || runes[i+1] == '\\') {
+					i++
+					current.WriteRune(runes[i])
+				} else {
+					current.WriteRune(r)
+				}
+				tokenActive = true
 			default:
 				current.WriteRune(r)
 				tokenActive = true
 			}
-		case r == '\\':
-			escaped = true
-			tokenActive = true
 		case r == '\'' || r == '"':
 			quote = r
 			tokenActive = true
@@ -1338,9 +1345,6 @@ func splitProgramEditor(spec string) ([]string, error) {
 			current.WriteRune(r)
 			tokenActive = true
 		}
-	}
-	if escaped {
-		return nil, fmt.Errorf("trailing escape")
 	}
 	if quote != 0 {
 		return nil, fmt.Errorf("unterminated quote")
