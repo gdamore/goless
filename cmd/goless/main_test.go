@@ -2129,8 +2129,12 @@ func TestLaunchProgramEditorDefaultsToVi(t *testing.T) {
 	dir := t.TempDir()
 	argsFile := filepath.Join(dir, "vi.args")
 	script := filepath.Join(dir, "vi")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > "+argsFile+"\n"), 0o755); err != nil {
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$GOLESS_TEST_VI_ARGS\"\n"), 0o755); err != nil {
 		t.Fatalf("WriteFile(vi) failed: %v", err)
+	}
+	batch := filepath.Join(dir, "vi.bat")
+	if err := os.WriteFile(batch, []byte("@echo off\r\n> \"%GOLESS_TEST_VI_ARGS%\" (\r\nfor %%A in (%*) do echo %%~A\r\n)\r\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(vi.bat) failed: %v", err)
 	}
 
 	previous := os.Getenv("EDITOR")
@@ -2138,6 +2142,10 @@ func TestLaunchProgramEditorDefaultsToVi(t *testing.T) {
 		t.Fatalf("Unsetenv(EDITOR) failed: %v", err)
 	}
 	previousPath := os.Getenv("PATH")
+	previousArgsPath := os.Getenv("GOLESS_TEST_VI_ARGS")
+	if err := os.Setenv("GOLESS_TEST_VI_ARGS", argsFile); err != nil {
+		t.Fatalf("Setenv(GOLESS_TEST_VI_ARGS) failed: %v", err)
+	}
 	if err := os.Setenv("PATH", dir+string(os.PathListSeparator)+previousPath); err != nil {
 		t.Fatalf("Setenv(PATH) failed: %v", err)
 	}
@@ -2146,6 +2154,11 @@ func TestLaunchProgramEditorDefaultsToVi(t *testing.T) {
 			_ = os.Unsetenv("EDITOR")
 		} else {
 			_ = os.Setenv("EDITOR", previous)
+		}
+		if previousArgsPath == "" {
+			_ = os.Unsetenv("GOLESS_TEST_VI_ARGS")
+		} else {
+			_ = os.Setenv("GOLESS_TEST_VI_ARGS", previousArgsPath)
 		}
 		_ = os.Setenv("PATH", previousPath)
 	})
