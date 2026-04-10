@@ -2170,7 +2170,7 @@ func TestLaunchProgramEditorDefaultsToVi(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile(vi.args) failed: %v", err)
 	}
-	if got, want := string(data), "+3\nsample.txt\n"; got != want {
+	if got, want := strings.ReplaceAll(string(data), "\r\n", "\n"), "+3\nsample.txt\n"; got != want {
 		t.Fatalf("vi args = %q, want %q", got, want)
 	}
 }
