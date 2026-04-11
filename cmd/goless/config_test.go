@@ -34,20 +34,20 @@ func TestLoadProgramConfigRejectsUnknownFields(t *testing.T) {
 }
 
 func TestLoadProgramConfigRejectsInvalidPreset(t *testing.T) {
-	path := writeTestProgramConfig(t, `{"preset":"bogus"}`)
+	path := writeTestProgramConfig(t, `{"theme":"bogus"}`)
 
 	_, err := loadProgramConfigAtPath(path, true)
 	if err == nil {
-		t.Fatal("loadProgramConfig(...) = nil error, want preset validation error")
+		t.Fatal("loadProgramConfig(...) = nil error, want theme validation error")
 	}
-	if !strings.Contains(err.Error(), "unknown preset") {
-		t.Fatalf("loadProgramConfig(...) error = %q, want preset validation detail", err)
+	if !strings.Contains(err.Error(), "unknown theme") {
+		t.Fatalf("loadProgramConfig(...) error = %q, want theme validation detail", err)
 	}
 }
 
 func TestParseProgramFlagsLoadsDefaultProgramConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
-	writeDefaultTestProgramConfig(t, `{"preset":"dark","hidden":true,"line-numbers":true,"live-links":true,"secure":true}`)
+	writeDefaultTestProgramConfig(t, `{"theme":"dark","hidden":true,"line-numbers":true,"live-links":true,"secure":true}`)
 
 	var out bytes.Buffer
 	opts, args, err := parseProgramFlags([]string{"sample.txt"}, &out)
@@ -55,7 +55,7 @@ func TestParseProgramFlagsLoadsDefaultProgramConfig(t *testing.T) {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
 	if got, want := opts.presetName, "dark"; got != want {
-		t.Fatalf("preset = %q, want %q", got, want)
+		t.Fatalf("theme = %q, want %q", got, want)
 	}
 	if !opts.hidden {
 		t.Fatal("hidden = false, want true from config")
@@ -76,15 +76,15 @@ func TestParseProgramFlagsLoadsDefaultProgramConfig(t *testing.T) {
 
 func TestParseProgramFlagsCLIOverridesProgramConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
-	writeDefaultTestProgramConfig(t, `{"preset":"dark","hidden":true,"line-numbers":true,"live-links":true,"secure":true}`)
+	writeDefaultTestProgramConfig(t, `{"theme":"dark","hidden":true,"line-numbers":true,"live-links":true,"secure":true}`)
 
 	var out bytes.Buffer
-	opts, _, err := parseProgramFlags([]string{"-preset", "light", "-N=false", "-hidden=false", "-live-links=false", "-secure=false"}, &out)
+	opts, _, err := parseProgramFlags([]string{"-theme", "light", "-N=false", "-hidden=false", "-live-links=false", "-secure=false"}, &out)
 	if err != nil {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
 	if got, want := opts.presetName, "light"; got != want {
-		t.Fatalf("preset = %q, want %q", got, want)
+		t.Fatalf("theme = %q, want %q", got, want)
 	}
 	if opts.hidden {
 		t.Fatal("hidden = true, want CLI override false")
@@ -102,8 +102,8 @@ func TestParseProgramFlagsCLIOverridesProgramConfig(t *testing.T) {
 
 func TestParseProgramFlagsExplicitConfigOverridesDefaultPath(t *testing.T) {
 	setTestProgramConfigHome(t)
-	writeDefaultTestProgramConfig(t, `{"preset":"dark","line-numbers":true}`)
-	explicitPath := writeTestProgramConfig(t, `{"preset":"light","hidden":true}`)
+	writeDefaultTestProgramConfig(t, `{"theme":"dark","line-numbers":true}`)
+	explicitPath := writeTestProgramConfig(t, `{"theme":"light","hidden":true}`)
 
 	var out bytes.Buffer
 	opts, _, err := parseProgramFlags([]string{"-config", explicitPath}, &out)
@@ -114,7 +114,7 @@ func TestParseProgramFlagsExplicitConfigOverridesDefaultPath(t *testing.T) {
 		t.Fatalf("configPath = %q, want %q", got, want)
 	}
 	if got, want := opts.presetName, "light"; got != want {
-		t.Fatalf("preset = %q, want %q", got, want)
+		t.Fatalf("theme = %q, want %q", got, want)
 	}
 	if !opts.hidden {
 		t.Fatal("hidden = false, want true from explicit config")
@@ -126,7 +126,7 @@ func TestParseProgramFlagsExplicitConfigOverridesDefaultPath(t *testing.T) {
 
 func TestParseProgramFlagsLoadsEnvProgramConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
-	envPath := writeTestProgramConfig(t, `{"preset":"light","hidden":true,"line-numbers":true}`)
+	envPath := writeTestProgramConfig(t, `{"theme":"light","hidden":true,"line-numbers":true}`)
 	t.Setenv("GOLESS_CONFIG", envPath)
 
 	var out bytes.Buffer
@@ -138,7 +138,7 @@ func TestParseProgramFlagsLoadsEnvProgramConfig(t *testing.T) {
 		t.Fatalf("configPath = %q, want %q", got, want)
 	}
 	if got, want := opts.presetName, "light"; got != want {
-		t.Fatalf("preset = %q, want %q", got, want)
+		t.Fatalf("theme = %q, want %q", got, want)
 	}
 	if !opts.hidden {
 		t.Fatal("hidden = false, want true from GOLESS_CONFIG")
@@ -150,8 +150,8 @@ func TestParseProgramFlagsLoadsEnvProgramConfig(t *testing.T) {
 
 func TestParseProgramFlagsEnvConfigOverridesDefaultPath(t *testing.T) {
 	setTestProgramConfigHome(t)
-	writeDefaultTestProgramConfig(t, `{"preset":"dark","hidden":false}`)
-	envPath := writeTestProgramConfig(t, `{"preset":"light","hidden":true}`)
+	writeDefaultTestProgramConfig(t, `{"theme":"dark","hidden":false}`)
+	envPath := writeTestProgramConfig(t, `{"theme":"light","hidden":true}`)
 	t.Setenv("GOLESS_CONFIG", envPath)
 
 	var out bytes.Buffer
@@ -160,7 +160,7 @@ func TestParseProgramFlagsEnvConfigOverridesDefaultPath(t *testing.T) {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
 	if got, want := opts.presetName, "light"; got != want {
-		t.Fatalf("preset = %q, want %q", got, want)
+		t.Fatalf("theme = %q, want %q", got, want)
 	}
 	if !opts.hidden {
 		t.Fatal("hidden = false, want true from GOLESS_CONFIG")
@@ -169,8 +169,8 @@ func TestParseProgramFlagsEnvConfigOverridesDefaultPath(t *testing.T) {
 
 func TestParseProgramFlagsExplicitConfigOverridesEnvConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
-	envPath := writeTestProgramConfig(t, `{"preset":"dark","hidden":true}`)
-	explicitPath := writeTestProgramConfigAtPath(t, filepath.Join(t.TempDir(), "explicit.json"), `{"preset":"light","hidden":false,"line-numbers":true}`)
+	envPath := writeTestProgramConfig(t, `{"theme":"dark","hidden":true}`)
+	explicitPath := writeTestProgramConfigAtPath(t, filepath.Join(t.TempDir(), "explicit.json"), `{"theme":"light","hidden":false,"line-numbers":true}`)
 	t.Setenv("GOLESS_CONFIG", envPath)
 
 	var out bytes.Buffer
@@ -182,7 +182,7 @@ func TestParseProgramFlagsExplicitConfigOverridesEnvConfig(t *testing.T) {
 		t.Fatalf("configPath = %q, want %q", got, want)
 	}
 	if got, want := opts.presetName, "light"; got != want {
-		t.Fatalf("preset = %q, want %q", got, want)
+		t.Fatalf("theme = %q, want %q", got, want)
 	}
 	if opts.hidden {
 		t.Fatal("hidden = true, want false from explicit config")

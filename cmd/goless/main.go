@@ -441,7 +441,7 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	fs := flag.NewFlagSet("goless", flag.ContinueOnError)
 	fs.SetOutput(output)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-F|-N|-R|-S|-i|-I|-s|-secure] [-x n] [-config path] [-preset dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [-license] [+line|+/pattern] [-version] [path ...]\n")
+		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-F|-N|-R|-S|-i|-I|-s|-secure] [-x n] [-config path] [-theme dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [-license] [+line|+/pattern] [-version] [path ...]\n")
 		fmt.Fprintln(fs.Output(), "config: goless loads GOLESS_CONFIG when set, otherwise goless/config.json from the per-user config directory; -config overrides both")
 	}
 
@@ -463,7 +463,7 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	fs.BoolVar(&opts.squeeze, "s", opts.squeeze, "collapse repeated blank lines in the current view")
 	fs.BoolVar(&opts.squeeze, "squeeze", opts.squeeze, "collapse repeated blank lines in the current view")
 	fs.StringVar(&opts.configPath, "config", opts.configPath, "path to a JSON config file")
-	fs.StringVar(&opts.presetName, "preset", opts.presetName, "visual preset: none, dark, light, plain, pretty")
+	fs.StringVar(&opts.presetName, "theme", opts.presetName, "visual theme: dark, light, plain, pretty")
 	fs.StringVar(&opts.chromeName, "chrome", opts.chromeName, "chrome override: auto, none, single, rounded")
 	fs.StringVar(&opts.renderName, "render", opts.renderName, "render mode: hybrid, literal, presentation")
 	fs.StringVar(&opts.title, "title", opts.title, "frame title")
@@ -1596,7 +1596,7 @@ func programPreset(name string) (goless.Preset, error) {
 	case "pretty":
 		return goless.PrettyPreset, nil
 	default:
-		return goless.Preset{}, fmt.Errorf("unknown preset %q; expected none, dark, light, plain, or pretty", name)
+		return goless.Preset{}, fmt.Errorf("unknown theme %q; expected dark, light, plain, or pretty", name)
 	}
 }
 
