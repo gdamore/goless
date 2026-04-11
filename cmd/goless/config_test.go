@@ -21,6 +21,28 @@ func TestLoadProgramConfigMissing(t *testing.T) {
 	}
 }
 
+func TestLoadProgramConfigEmptyPath(t *testing.T) {
+	cfg, err := loadProgramConfigAtPath("", true)
+	if err != nil {
+		t.Fatalf("loadProgramConfigAtPath(empty) failed: %v", err)
+	}
+	if cfg != (programConfig{}) {
+		t.Fatalf("loadProgramConfigAtPath(empty) = %+v, want zero config", cfg)
+	}
+}
+
+func TestLoadProgramConfigBlankFile(t *testing.T) {
+	path := writeTestProgramConfig(t, "\n\t  \n")
+
+	cfg, err := loadProgramConfigAtPath(path, true)
+	if err != nil {
+		t.Fatalf("loadProgramConfigAtPath(blank file) failed: %v", err)
+	}
+	if cfg != (programConfig{}) {
+		t.Fatalf("loadProgramConfigAtPath(blank file) = %+v, want zero config", cfg)
+	}
+}
+
 func TestLoadProgramConfigRejectsUnknownFields(t *testing.T) {
 	path := writeTestProgramConfig(t, `{"bogus":true}`)
 
@@ -42,6 +64,18 @@ func TestLoadProgramConfigRejectsInvalidPreset(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unknown theme") {
 		t.Fatalf("loadProgramConfig(...) error = %q, want theme validation detail", err)
+	}
+}
+
+func TestLoadProgramConfigRejectsTrailingContent(t *testing.T) {
+	path := writeTestProgramConfig(t, "{\"theme\":\"dark\"}\n{}\n")
+
+	_, err := loadProgramConfigAtPath(path, true)
+	if err == nil {
+		t.Fatal("loadProgramConfig(...) = nil error, want trailing content error")
+	}
+	if !strings.Contains(err.Error(), "unexpected trailing content") {
+		t.Fatalf("loadProgramConfig(...) error = %q, want trailing content detail", err)
 	}
 }
 
@@ -205,6 +239,151 @@ func TestParseProgramFlagsRejectsMissingExplicitConfig(t *testing.T) {
 	}
 }
 
+func TestParseProgramFlagsHelpSkipsBrokenDefaultProgramConfig(t *testing.T) {
+	setTestProgramConfigHome(t)
+	writeDefaultTestProgramConfig(t, `{"theme":"dark"`)
+
+	var out bytes.Buffer
+	opts, args, err := parseProgramFlags([]string{"--help"}, &out)
+	if err != nil {
+		t.Fatalf("parseProgramFlags(--help) failed: %v", err)
+	}
+	if !opts.showHelp {
+		t.Fatal("parseProgramFlags(--help) did not set showHelp")
+	}
+	if len(args) != 0 {
+		t.Fatalf("len(args) after --help = %d, want 0", len(args))
+	}
+}
+
+func TestParseProgramFlagsVersionSkipsBrokenEnvProgramConfig(t *testing.T) {
+	setTestProgramConfigHome(t)
+	path := writeTestProgramConfig(t, `{"theme":"dark"`)
+	t.Setenv("GOLESS_CONFIG", path)
+
+	var out bytes.Buffer
+	opts, args, err := parseProgramFlags([]string{"--version"}, &out)
+	if err != nil {
+		t.Fatalf("parseProgramFlags(--version) failed: %v", err)
+	}
+	if !opts.version {
+		t.Fatal("parseProgramFlags(--version) did not set version")
+	}
+	if len(args) != 0 {
+		t.Fatalf("len(args) after --version = %d, want 0", len(args))
+	}
+}
+
+func TestParseProgramFlagsHelpSkipsBrokenExplicitProgramConfig(t *testing.T) {
+	setTestProgramConfigHome(t)
+	path := writeTestProgramConfig(t, `{"theme":"dark"`)
+
+	var out bytes.Buffer
+	opts, args, err := parseProgramFlags([]string{"--help", "-config", path}, &out)
+	if err != nil {
+		t.Fatalf("parseProgramFlags(--help, -config) failed: %v", err)
+	}
+	if !opts.showHelp {
+		t.Fatal("parseProgramFlags(--help, -config) did not set showHelp")
+	}
+	if len(args) != 0 {
+		t.Fatalf("len(args) after --help = %d, want 0", len(args))
+	}
+}
+
+func TestParseProgramFlagsVersionSkipsBrokenExplicitProgramConfig(t *testing.T) {
+	setTestProgramConfigHome(t)
+	path := writeTestProgramConfig(t, `{"theme":"dark"`)
+
+	var out bytes.Buffer
+	opts, args, err := parseProgramFlags([]string{"--version", "-config", path}, &out)
+	if err != nil {
+		t.Fatalf("parseProgramFlags(--version, -config) failed: %v", err)
+	}
+	if !opts.version {
+		t.Fatal("parseProgramFlags(--version, -config) did not set version")
+	}
+	if len(args) != 0 {
+		t.Fatalf("len(args) after --version = %d, want 0", len(args))
+	}
+}
+
+func TestProgramHasImmediateExitFlag(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{name: "none", args: []string{"sample.txt"}, want: false},
+		{name: "help long", args: []string{"--help"}, want: true},
+		{name: "help short", args: []string{"-h"}, want: true},
+		{name: "help question", args: []string{"-?"}, want: true},
+		{name: "version long", args: []string{"--version"}, want: true},
+		{name: "version short", args: []string{"-version"}, want: true},
+		{name: "help explicit true", args: []string{"--help=true"}, want: true},
+		{name: "version explicit true", args: []string{"--version=true"}, want: true},
+		{name: "help explicit false", args: []string{"--help=false"}, want: false},
+		{name: "stops at double dash", args: []string{"--", "--help"}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := programHasImmediateExitFlag(tt.args); got != tt.want {
+				t.Fatalf("programHasImmediateExitFlag(%v) = %v, want %v", tt.args, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProgramConfigPathFromArgsRejectsEmptyValue(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "separate arg", args: []string{"-config", ""}},
+		{name: "inline short", args: []string{"-config="}},
+		{name: "inline long", args: []string{"--config="}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := programConfigPathFromArgs(tt.args)
+			if err == nil {
+				t.Fatal("programConfigPathFromArgs(...) = nil error, want error")
+			}
+			if !strings.Contains(err.Error(), "non-empty argument") {
+				t.Fatalf("programConfigPathFromArgs(...) error = %q, want non-empty argument detail", err)
+			}
+		})
+	}
+}
+
+func TestProgramConfigPathFromArgsUsesLastExplicitConfig(t *testing.T) {
+	got, explicit, err := programConfigPathFromArgs([]string{"-config", "first.json", "--config=second.json"})
+	if err != nil {
+		t.Fatalf("programConfigPathFromArgs(...) failed: %v", err)
+	}
+	if !explicit {
+		t.Fatal("programConfigPathFromArgs(...) explicit = false, want true")
+	}
+	if want := "second.json"; got != want {
+		t.Fatalf("programConfigPathFromArgs(...) path = %q, want %q", got, want)
+	}
+}
+
+func TestProgramConfigPathFromArgsStopsAtDoubleDash(t *testing.T) {
+	got, explicit, err := programConfigPathFromArgs([]string{"--", "-config", "ignored.json"})
+	if err != nil {
+		t.Fatalf("programConfigPathFromArgs(...) failed: %v", err)
+	}
+	if explicit {
+		t.Fatal("programConfigPathFromArgs(...) explicit = true, want false")
+	}
+	if got != "" {
+		t.Fatalf("programConfigPathFromArgs(...) path = %q, want empty", got)
+	}
+}
+
 func TestParseProgramFlagsHelpMentionsConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
 
@@ -228,6 +407,7 @@ func setTestProgramConfigHome(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
+	t.Setenv("APPDATA", filepath.Join(dir, "AppData", "Roaming"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".config"))
 }
 
