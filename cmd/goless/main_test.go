@@ -21,14 +21,14 @@ import (
 )
 
 const (
-	testInputAlphaBeta         = "alpha\nbeta\n"
-	testInputOneTwo            = "one\ntwo\n"
-	testInputOneTwoThree       = "one\ntwo\nthree\n"
-	testInputOneTwoThreeFour   = "one\ntwo\nthree\nfour\n"
-	testInputOneToFive         = "one\ntwo\nthree\nfour\nfive\n"
-	testInputTallTenLines      = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n"
-	testSampleFileName         = "sample.txt"
-	testStdinFixtureFileName   = "stdin.txt"
+	testInputAlphaBeta       = "alpha\nbeta\n"
+	testInputOneTwo          = "one\ntwo\n"
+	testInputOneTwoThree     = "one\ntwo\nthree\n"
+	testInputOneTwoThreeFour = "one\ntwo\nthree\nfour\n"
+	testInputOneToFive       = "one\ntwo\nthree\nfour\nfive\n"
+	testInputTallTenLines    = "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n"
+	testSampleFileName       = "sample.txt"
+	testStdinFixtureFileName = "stdin.txt"
 )
 
 func runProgramForTest(t *testing.T, args []string, stdin string) (string, error) {
@@ -1019,13 +1019,13 @@ func TestRunRejectsUnknownRenderMode(t *testing.T) {
 	}
 }
 
-func TestRunRejectsUnknownPreset(t *testing.T) {
-	_, err := runProgramForTest(t, []string{"--preset", "bogus"}, "")
+func TestRunRejectsUnknownTheme(t *testing.T) {
+	_, err := runProgramForTest(t, []string{"--theme", "bogus"}, "")
 	if err == nil {
-		t.Fatal("run(--preset bogus) = nil error, want error")
+		t.Fatal("run(--theme bogus) = nil error, want error")
 	}
-	if got := err.Error(); !strings.Contains(got, "unknown preset") {
-		t.Fatalf("run(--preset bogus) error = %q, want unknown preset", got)
+	if got := err.Error(); !strings.Contains(got, "unknown theme") {
+		t.Fatalf("run(--theme bogus) error = %q, want unknown theme", got)
 	}
 }
 

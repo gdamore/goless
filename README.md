@@ -340,8 +340,9 @@ Program flags:
 - `-i` for smart-case search behavior
 - `-I` for case-insensitive search behavior
 - `--license` to open the bundled Apache license, or print it when stdout is not a terminal
+- `-config path` to load a specific JSON config file instead of the default per-user path
 - `-x n` to set tab width
-- `-preset dark|light|plain|pretty`
+- `-theme dark|light|plain|pretty`
 - `-chrome auto|none|single|rounded`
 - `-hidden`
 - `-live-links`
@@ -350,6 +351,33 @@ Program flags:
 - `-title text`
 - optional `+line` or `+/pattern` startup directive before paths
 - `-` as an explicit stdin path
+
+When present, `goless` also loads per-user configuration from
+`goless/config.json` under the OS config directory returned by
+`os.UserConfigDir()`; on most Linux systems that means
+`$XDG_CONFIG_HOME/goless/config.json` or `~/.config/goless/config.json`.
+
+Config selection precedence is:
+
+1. `-config path`
+2. `GOLESS_CONFIG`
+3. the default per-user config path
+
+The initial config schema is intentionally small:
+
+```json
+{
+  "theme": "pretty",
+  "hidden": false,
+  "line-numbers": false,
+  "live-links": false,
+  "secure": false
+}
+```
+
+CLI flags still take precedence over config values, so
+`goless -config ./alt.json -theme dark file.txt` overrides the selected config
+file's `"theme"` value for that invocation.
 
 The default key group is intentionally less-like. Common bindings include:
 
@@ -365,7 +393,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `n` and `N` to repeat search
 - `F2` to cycle search case mode in the bundled key group
 - `F3` to cycle substring, whole-word, and regex matching in the bundled key group
-- `F4` to cycle visual presets in the standalone program
+- `F4` to cycle visual themes in the standalone program
 - `F5` to toggle hidden-character markers in the standalone program
 - `:` then a number to jump to a line
 - `:50%` to jump near the middle of the document

@@ -28,6 +28,30 @@ and writes the selected input unchanged instead of opening the full-screen UI.
 When you are viewing a regular file in the full-screen UI, `v` opens that file
 in `$EDITOR` at the current line. Use `-secure` to disable editor launch.
 
+If you want a default visual theme, `goless` also looks for a per-user JSON
+config at `goless/config.json` under the directory returned by
+`os.UserConfigDir()`.
+
+Config selection precedence is:
+
+1. `-config path`
+2. `GOLESS_CONFIG`
+3. the default per-user config path
+
+The initial format is:
+
+```json
+{
+  "theme": "pretty",
+  "hidden": false,
+  "line-numbers": false,
+  "live-links": false,
+  "secure": false
+}
+```
+
+Command-line flags still win over config values for a single invocation.
+
 ## What Users Need First
 
 The first user-facing page should answer these questions quickly:
