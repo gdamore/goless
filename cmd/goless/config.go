@@ -17,8 +17,8 @@ type programConfig struct {
 	Hidden      *bool  `json:"hidden"`
 	LineNumbers *bool  `json:"line-numbers"`
 	LiveLinks   *bool  `json:"live-links"`
-	Preset      string `json:"preset"`
 	Secure      *bool  `json:"secure"`
+	Theme       string `json:"theme"`
 }
 
 func defaultProgramConfigPath() (string, error) {
@@ -84,8 +84,8 @@ func loadProgramConfigAtPath(path string, optional bool) (programConfig, error) 
 		}
 		return programConfig{}, fmt.Errorf("parse config %q: %w", path, err)
 	}
-	if cfg.Preset != "" {
-		if _, err := programPreset(cfg.Preset); err != nil {
+	if cfg.Theme != "" {
+		if _, err := programPreset(cfg.Theme); err != nil {
 			return programConfig{}, fmt.Errorf("parse config %q: %w", path, err)
 		}
 	}
@@ -105,8 +105,8 @@ func applyProgramConfig(opts programOptions, cfg programConfig) programOptions {
 	if cfg.Secure != nil {
 		opts.secure = *cfg.Secure
 	}
-	if cfg.Preset != "" {
-		opts.presetName = cfg.Preset
+	if cfg.Theme != "" {
+		opts.presetName = cfg.Theme
 	}
 	return opts
 }

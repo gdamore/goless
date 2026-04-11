@@ -28,7 +28,7 @@ and writes the selected input unchanged instead of opening the full-screen UI.
 When you are viewing a regular file in the full-screen UI, `v` opens that file
 in `$EDITOR` at the current line. Use `-secure` to disable editor launch.
 
-If you want a default visual preset, `goless` also looks for a per-user JSON
+If you want a default visual theme, `goless` also looks for a per-user JSON
 config at `goless/config.json` under the directory returned by
 `os.UserConfigDir()`.
 
@@ -42,7 +42,7 @@ The initial format is:
 
 ```json
 {
-  "preset": "pretty",
+  "theme": "pretty",
   "hidden": false,
   "line-numbers": false,
   "live-links": false,
