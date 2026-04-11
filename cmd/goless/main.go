@@ -421,22 +421,24 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 		searchCaseMode: goless.SearchSmartCase,
 		tabWidth:       8,
 	}
-	configPath, hasExplicitConfigPath, err := programConfigPathFromArgs(args)
-	if err != nil {
-		return programOptions{}, nil, err
-	}
+	if !programHasImmediateExitFlag(args) {
+		configPath, hasExplicitConfigPath, err := programConfigPathFromArgs(args)
+		if err != nil {
+			return programOptions{}, nil, err
+		}
 
-	var cfg programConfig
-	if hasExplicitConfigPath {
-		opts.configPath = configPath
-		cfg, err = loadRequiredProgramConfig(configPath)
-	} else {
-		cfg, opts.configPath, err = loadDefaultProgramConfig()
+		var cfg programConfig
+		if hasExplicitConfigPath {
+			opts.configPath = configPath
+			cfg, err = loadRequiredProgramConfig(configPath)
+		} else {
+			cfg, opts.configPath, err = loadDefaultProgramConfig()
+		}
+		if err != nil {
+			return programOptions{}, nil, err
+		}
+		opts = applyProgramConfig(opts, cfg)
 	}
-	if err != nil {
-		return programOptions{}, nil, err
-	}
-	opts = applyProgramConfig(opts, cfg)
 
 	fs := flag.NewFlagSet("goless", flag.ContinueOnError)
 	fs.SetOutput(output)
@@ -504,28 +506,61 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	return opts, fs.Args(), nil
 }
 
+func programHasImmediateExitFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--" {
+			return false
+		}
+		name, value, hasValue := strings.Cut(arg, "=")
+		switch name {
+		case "-?", "-h", "--help":
+			return !hasValue || value == "true"
+		case "-version", "--version":
+			return !hasValue || value == "true"
+		}
+	}
+	return false
+}
+
 func programConfigPathFromArgs(args []string) (string, bool, error) {
+	var (
+		path     string
+		explicit bool
+	)
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
 		case arg == "--":
-			return "", false, nil
+			return path, explicit, nil
 		case arg == "-config" || arg == "--config":
 			if i+1 >= len(args) {
 				return "", false, fmt.Errorf("flag needs an argument: %s", arg)
 			}
-			return args[i+1], true, nil
+			if args[i+1] == "" {
+				return "", false, fmt.Errorf("flag needs a non-empty argument: %s", arg)
+			}
+			path = args[i+1]
+			explicit = true
+			i++
 		case strings.HasPrefix(arg, "-config="):
-			return strings.TrimPrefix(arg, "-config="), true, nil
+			path = strings.TrimPrefix(arg, "-config=")
+			if path == "" {
+				return "", false, fmt.Errorf("flag needs a non-empty argument: -config")
+			}
+			explicit = true
 		case strings.HasPrefix(arg, "--config="):
-			return strings.TrimPrefix(arg, "--config="), true, nil
+			path = strings.TrimPrefix(arg, "--config=")
+			if path == "" {
+				return "", false, fmt.Errorf("flag needs a non-empty argument: --config")
+			}
+			explicit = true
 		case strings.HasPrefix(arg, "-"):
 			continue
 		default:
-			return "", false, nil
+			return path, explicit, nil
 		}
 	}
-	return "", false, nil
+	return path, explicit, nil
 }
 
 func programQuitAtEOFPolicyFromFlags(quitAtEOF, quitAtEOFFirst bool) programQuitAtEOFPolicy {
