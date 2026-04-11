@@ -36,6 +36,7 @@ const programFileFollowInterval = 250 * time.Millisecond
 
 type programOptions struct {
 	chromeName        string
+	configPath        string
 	hidden            bool
 	ignoredChopLines  bool
 	ignoredRawControl bool
@@ -76,12 +77,12 @@ type programFileFollower struct {
 }
 
 var (
-	programScreenFactory            = newProgramScreen
-	programStdinIsTerminalFunc      = stdinIsTerminal
-	programStdoutIsTerminalFunc     = stdoutIsTerminal
-	programDefaultScreenFactory     = tcell.NewScreen
-	programTerminfoScreenFactory    = tcell.NewTerminfoScreen
-	programEditorLauncher           = launchProgramEditor
+	programScreenFactory         = newProgramScreen
+	programStdinIsTerminalFunc   = stdinIsTerminal
+	programStdoutIsTerminalFunc  = stdoutIsTerminal
+	programDefaultScreenFactory  = tcell.NewScreen
+	programTerminfoScreenFactory = tcell.NewTerminfoScreen
+	programEditorLauncher        = launchProgramEditor
 )
 
 func main() {
@@ -420,36 +421,54 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 		searchCaseMode: goless.SearchSmartCase,
 		tabWidth:       8,
 	}
+	configPath, hasExplicitConfigPath, err := programConfigPathFromArgs(args)
+	if err != nil {
+		return programOptions{}, nil, err
+	}
+
+	var cfg programConfig
+	if hasExplicitConfigPath {
+		opts.configPath = configPath
+		cfg, err = loadRequiredProgramConfig(configPath)
+	} else {
+		cfg, opts.configPath, err = loadDefaultProgramConfig()
+	}
+	if err != nil {
+		return programOptions{}, nil, err
+	}
+	opts = applyProgramConfig(opts, cfg)
 
 	fs := flag.NewFlagSet("goless", flag.ContinueOnError)
 	fs.SetOutput(output)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-F|-N|-R|-S|-i|-I|-s|-secure] [-x n] [-preset dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [-license] [+line|+/pattern] [-version] [path ...]\n")
+		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-F|-N|-R|-S|-i|-I|-s|-secure] [-x n] [-config path] [-preset dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [-license] [+line|+/pattern] [-version] [path ...]\n")
+		fmt.Fprintln(fs.Output(), "config: goless loads GOLESS_CONFIG when set, otherwise goless/config.json from the per-user config directory; -config overrides both")
 	}
 
-	fs.BoolVar(&opts.showHelp, "?", false, "show help")
-	fs.BoolVar(&opts.showHelp, "help", false, "show help")
-	fs.BoolVar(&opts.showHelp, "h", false, "show help")
-	fs.BoolVar(&opts.showLicense, "license", false, "show the bundled Apache license")
-	fs.BoolVar(&opts.quitAtEOF, "e", false, "quit on the first forward command at EOF")
-	fs.BoolVar(&opts.quitAtEOFFirst, "E", false, "quit when EOF is already visible on screen")
-	fs.BoolVar(&opts.quitIfOneScreen, "F", false, "quit if the entire input fits on one screen")
-	fs.BoolVar(&opts.lineNumbers, "N", false, "show line numbers")
-	fs.BoolVar(&opts.ignoredRawControl, "R", false, "accepted as a less compatibility no-op")
-	fs.BoolVar(&opts.ignoredChopLines, "S", false, "accepted as a less compatibility no-op")
-	fs.BoolVar(&opts.hidden, "hidden", false, "show tabs, line endings, carriage returns, and EOF markers")
-	fs.BoolVar(&opts.liveLinks, "live-links", false, "enable live OSC 8 hyperlinks in the program")
-	fs.BoolVar(&opts.quitAtEOF, "quit-at-eof", false, "long form of -e")
-	fs.BoolVar(&opts.quitAtEOFFirst, "QUIT-AT-EOF", false, "long form of -E")
-	fs.BoolVar(&opts.secure, "secure", false, "disable standalone commands that launch external programs")
-	fs.BoolVar(&opts.squeeze, "s", false, "collapse repeated blank lines in the current view")
-	fs.BoolVar(&opts.squeeze, "squeeze", false, "collapse repeated blank lines in the current view")
-	fs.StringVar(&opts.presetName, "preset", "pretty", "visual preset: none, dark, light, plain, pretty")
-	fs.StringVar(&opts.chromeName, "chrome", "auto", "chrome override: auto, none, single, rounded")
-	fs.StringVar(&opts.renderName, "render", "hybrid", "render mode: hybrid, literal, presentation")
-	fs.StringVar(&opts.title, "title", "", "frame title")
-	fs.IntVar(&opts.tabWidth, "x", 8, "tab width")
-	fs.BoolVar(&opts.version, "version", false, "display program version and exit")
+	fs.BoolVar(&opts.showHelp, "?", opts.showHelp, "show help")
+	fs.BoolVar(&opts.showHelp, "help", opts.showHelp, "show help")
+	fs.BoolVar(&opts.showHelp, "h", opts.showHelp, "show help")
+	fs.BoolVar(&opts.showLicense, "license", opts.showLicense, "show the bundled Apache license")
+	fs.BoolVar(&opts.quitAtEOF, "e", opts.quitAtEOF, "quit on the first forward command at EOF")
+	fs.BoolVar(&opts.quitAtEOFFirst, "E", opts.quitAtEOFFirst, "quit when EOF is already visible on screen")
+	fs.BoolVar(&opts.quitIfOneScreen, "F", opts.quitIfOneScreen, "quit if the entire input fits on one screen")
+	fs.BoolVar(&opts.lineNumbers, "N", opts.lineNumbers, "show line numbers")
+	fs.BoolVar(&opts.ignoredRawControl, "R", opts.ignoredRawControl, "accepted as a less compatibility no-op")
+	fs.BoolVar(&opts.ignoredChopLines, "S", opts.ignoredChopLines, "accepted as a less compatibility no-op")
+	fs.BoolVar(&opts.hidden, "hidden", opts.hidden, "show tabs, line endings, carriage returns, and EOF markers")
+	fs.BoolVar(&opts.liveLinks, "live-links", opts.liveLinks, "enable live OSC 8 hyperlinks in the program")
+	fs.BoolVar(&opts.quitAtEOF, "quit-at-eof", opts.quitAtEOF, "long form of -e")
+	fs.BoolVar(&opts.quitAtEOFFirst, "QUIT-AT-EOF", opts.quitAtEOFFirst, "long form of -E")
+	fs.BoolVar(&opts.secure, "secure", opts.secure, "disable standalone commands that launch external programs")
+	fs.BoolVar(&opts.squeeze, "s", opts.squeeze, "collapse repeated blank lines in the current view")
+	fs.BoolVar(&opts.squeeze, "squeeze", opts.squeeze, "collapse repeated blank lines in the current view")
+	fs.StringVar(&opts.configPath, "config", opts.configPath, "path to a JSON config file")
+	fs.StringVar(&opts.presetName, "preset", opts.presetName, "visual preset: none, dark, light, plain, pretty")
+	fs.StringVar(&opts.chromeName, "chrome", opts.chromeName, "chrome override: auto, none, single, rounded")
+	fs.StringVar(&opts.renderName, "render", opts.renderName, "render mode: hybrid, literal, presentation")
+	fs.StringVar(&opts.title, "title", opts.title, "frame title")
+	fs.IntVar(&opts.tabWidth, "x", opts.tabWidth, "tab width")
+	fs.BoolVar(&opts.version, "version", opts.version, "display program version and exit")
 
 	var ignoreSmartCase bool
 	var ignoreCase bool
@@ -483,6 +502,30 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 		}
 	}
 	return opts, fs.Args(), nil
+}
+
+func programConfigPathFromArgs(args []string) (string, bool, error) {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--":
+			return "", false, nil
+		case arg == "-config" || arg == "--config":
+			if i+1 >= len(args) {
+				return "", false, fmt.Errorf("flag needs an argument: %s", arg)
+			}
+			return args[i+1], true, nil
+		case strings.HasPrefix(arg, "-config="):
+			return strings.TrimPrefix(arg, "-config="), true, nil
+		case strings.HasPrefix(arg, "--config="):
+			return strings.TrimPrefix(arg, "--config="), true, nil
+		case strings.HasPrefix(arg, "-"):
+			continue
+		default:
+			return "", false, nil
+		}
+	}
+	return "", false, nil
 }
 
 func programQuitAtEOFPolicyFromFlags(quitAtEOF, quitAtEOFFirst bool) programQuitAtEOFPolicy {
