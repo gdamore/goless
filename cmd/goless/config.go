@@ -21,6 +21,24 @@ type programConfig struct {
 	Theme       string `json:"theme"`
 }
 
+type programConfigDefaults struct {
+	Theme       string `json:"theme"`
+	Hidden      bool   `json:"hidden"`
+	LineNumbers bool   `json:"line-numbers"`
+	LiveLinks   bool   `json:"live-links"`
+	Secure      bool   `json:"secure"`
+}
+
+func defaultProgramConfigValues() programConfigDefaults {
+	return programConfigDefaults{
+		Theme:       programDefaultTheme,
+		Hidden:      false,
+		LineNumbers: false,
+		LiveLinks:   false,
+		Secure:      false,
+	}
+}
+
 func defaultProgramConfigPath() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
@@ -109,4 +127,16 @@ func applyProgramConfig(opts programOptions, cfg programConfig) programOptions {
 		opts.presetName = cfg.Theme
 	}
 	return opts
+}
+
+func writeDefaultProgramConfig(w io.Writer) error {
+	if w == nil {
+		return nil
+	}
+	data, err := json.MarshalIndent(defaultProgramConfigValues(), "", "  ")
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(w, string(data))
+	return err
 }

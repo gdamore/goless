@@ -11,6 +11,31 @@ import (
 	"testing"
 )
 
+func TestDefaultProgramConfigValues(t *testing.T) {
+	got := defaultProgramConfigValues()
+	want := programConfigDefaults{
+		Theme:       programDefaultTheme,
+		Hidden:      false,
+		LineNumbers: false,
+		LiveLinks:   false,
+		Secure:      false,
+	}
+	if got != want {
+		t.Fatalf("defaultProgramConfigValues() = %+v, want %+v", got, want)
+	}
+}
+
+func TestWriteDefaultProgramConfig(t *testing.T) {
+	var out bytes.Buffer
+	if err := writeDefaultProgramConfig(&out); err != nil {
+		t.Fatalf("writeDefaultProgramConfig(...) failed: %v", err)
+	}
+	const want = "{\n  \"theme\": \"pretty\",\n  \"hidden\": false,\n  \"line-numbers\": false,\n  \"live-links\": false,\n  \"secure\": false\n}\n"
+	if got := out.String(); got != want {
+		t.Fatalf("writeDefaultProgramConfig(...) = %q, want %q", got, want)
+	}
+}
+
 func TestLoadProgramConfigMissing(t *testing.T) {
 	cfg, err := loadProgramConfigAtPath(filepath.Join(t.TempDir(), "missing.json"), true)
 	if err != nil {
@@ -297,6 +322,25 @@ func TestParseProgramFlagsVersionSkipsBrokenExplicitProgramConfig(t *testing.T) 
 	}
 }
 
+func TestParseProgramFlagsDefaultConfigSkipsBrokenExplicitProgramConfig(t *testing.T) {
+	setTestProgramConfigHome(t)
+	path := writeTestProgramConfig(t, `{"theme":"dark"`)
+
+	opts, args, err := parseProgramFlags([]string{"--default-config", "-config", path})
+	if err == nil {
+		t.Fatal("parseProgramFlags(--default-config, -config) = nil error, want exclusivity error")
+	}
+	if !strings.Contains(err.Error(), "--default-config must be used alone") {
+		t.Fatalf("parseProgramFlags(--default-config, -config) error = %q, want exclusivity detail", err)
+	}
+	if opts != (programOptions{}) {
+		t.Fatalf("parseProgramFlags(--default-config, -config) opts = %+v, want zero options on error", opts)
+	}
+	if args != nil {
+		t.Fatalf("parseProgramFlags(--default-config, -config) args = %v, want nil", args)
+	}
+}
+
 func TestProgramHasImmediateExitFlag(t *testing.T) {
 	tests := []struct {
 		name string
@@ -307,6 +351,9 @@ func TestProgramHasImmediateExitFlag(t *testing.T) {
 		{name: "help long", args: []string{"--help"}, want: true},
 		{name: "help short", args: []string{"-h"}, want: true},
 		{name: "help question", args: []string{"-?"}, want: true},
+		{name: "default config long", args: []string{"--default-config"}, want: true},
+		{name: "default config explicit true", args: []string{"--default-config=true"}, want: true},
+		{name: "default config explicit false", args: []string{"--default-config=false"}, want: false},
 		{name: "version long", args: []string{"--version"}, want: true},
 		{name: "version short", args: []string{"-version"}, want: true},
 		{name: "help explicit true", args: []string{"--help=true"}, want: true},
@@ -383,6 +430,16 @@ func TestWriteProgramUsageMentionsConfig(t *testing.T) {
 	}
 	if got := out.String(); !strings.Contains(got, "GOLESS_CONFIG") {
 		t.Fatalf("help output = %q, want config path note", got)
+	}
+	path, err := defaultProgramConfigPath()
+	if err != nil {
+		t.Fatalf("defaultProgramConfigPath() failed: %v", err)
+	}
+	if got := out.String(); !strings.Contains(got, path) {
+		t.Fatalf("help output = %q, want resolved default config path %q", got, path)
+	}
+	if got := out.String(); !strings.Contains(got, "--default-config") {
+		t.Fatalf("help output = %q, want default config flag", got)
 	}
 }
 

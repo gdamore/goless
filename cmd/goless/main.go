@@ -36,6 +36,7 @@ const (
 
 const programStdinInput = "-"
 const programFileFollowInterval = 250 * time.Millisecond
+const programDefaultTheme = "pretty"
 
 type programOptions struct {
 	chromeName        string
@@ -52,6 +53,7 @@ type programOptions struct {
 	renderName        string
 	searchCaseMode    goless.SearchCaseMode
 	secure            bool
+	showDefaultConfig bool
 	showHelp          bool
 	showLicense       bool
 	squeeze           bool
@@ -149,6 +151,9 @@ func run() error {
 	if opts.version {
 		fmt.Printf("goless version %s\n", version())
 		return nil
+	}
+	if opts.showDefaultConfig {
+		return writeDefaultProgramConfig(os.Stdout)
 	}
 
 	renderMode, err := programRenderMode(opts.renderName)
@@ -472,7 +477,7 @@ func run() error {
 
 func parseProgramFlags(args []string) (programOptions, []string, error) {
 	opts := programOptions{
-		presetName:     "pretty",
+		presetName:     programDefaultTheme,
 		chromeName:     "auto",
 		renderName:     "hybrid",
 		searchCaseMode: goless.SearchSmartCase,
@@ -502,6 +507,7 @@ func parseProgramFlags(args []string) (programOptions, []string, error) {
 	fs.BoolVar(&opts.showHelp, "?", opts.showHelp, "show help")
 	fs.BoolVar(&opts.showHelp, "help", opts.showHelp, "show help")
 	fs.BoolVar(&opts.showHelp, "h", opts.showHelp, "show help")
+	fs.BoolVar(&opts.showDefaultConfig, "default-config", opts.showDefaultConfig, "print the default JSON config and exit")
 	fs.BoolVar(&opts.showLicense, "license", opts.showLicense, "show the bundled Apache license")
 	fs.BoolVar(&opts.quitAtEOF, "e", opts.quitAtEOF, "quit on the first forward command at EOF")
 	fs.BoolVar(&opts.quitAtEOFFirst, "E", opts.quitAtEOFFirst, "quit when EOF is already visible on screen")
@@ -554,6 +560,14 @@ func parseProgramFlags(args []string) (programOptions, []string, error) {
 			return programOptions{}, nil, fmt.Errorf("--license cannot be combined with files")
 		}
 	}
+	if opts.showDefaultConfig {
+		if fs.NFlag() > 1 {
+			return programOptions{}, nil, fmt.Errorf("--default-config must be used alone")
+		}
+		if len(fs.Args()) > 0 {
+			return programOptions{}, nil, fmt.Errorf("--default-config cannot be combined with files")
+		}
+	}
 	return opts, fs.Args(), nil
 }
 
@@ -565,6 +579,8 @@ func programHasImmediateExitFlag(args []string) bool {
 		name, value, hasValue := strings.Cut(arg, "=")
 		switch name {
 		case "-?", "-h", "--help":
+			return !hasValue || value == "true"
+		case "-default-config", "--default-config":
 			return !hasValue || value == "true"
 		case "-version", "--version":
 			return !hasValue || value == "true"
@@ -582,6 +598,7 @@ type programFlagHelp struct {
 func programFlagHelps() []programFlagHelp {
 	return []programFlagHelp{
 		{names: []string{"-?", "-h", "--help"}, description: "Show help and exit."},
+		{names: []string{"--default-config"}, description: "Print the default JSON config to stdout and exit."},
 		{names: []string{"--license"}, description: "Print the bundled Apache license and exit."},
 		{names: []string{"--version"}, description: "Print the program version and exit."},
 		{names: []string{"-e", "--quit-at-eof"}, description: "Quit on the first forward command at end of input."},
@@ -630,6 +647,10 @@ func writeProgramUsage(w io.Writer) {
 	fmt.Fprintln(w, "Config:")
 	fmt.Fprintln(w, "  goless loads GOLESS_CONFIG when set, otherwise goless/config.json from the")
 	fmt.Fprintln(w, "  per-user config directory; --config overrides both.")
+	if path, err := defaultProgramConfigPath(); err == nil && path != "" {
+		fmt.Fprintf(w, "  Default config path: %s\n", path)
+	}
+	fmt.Fprintln(w, "  Use goless --default-config to print a starter config file to stdout.")
 }
 
 func programFormatFlagNames(names []string, value string) string {
@@ -689,6 +710,7 @@ func programOriginalUnknownFlag(args []string, normalized string) string {
 func programSuggestFlag(name string) string {
 	candidates := []string{
 		"--help",
+		"--default-config",
 		"--license",
 		"--version",
 		"--quit-at-eof",
