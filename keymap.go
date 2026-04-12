@@ -43,6 +43,10 @@ const (
 	KeyActionScrollUp
 	// KeyActionScrollDown scrolls down by one row.
 	KeyActionScrollDown
+	// KeyActionScrollUpStep scrolls up by a coarse vertical navigation step.
+	KeyActionScrollUpStep
+	// KeyActionScrollDownStep scrolls down by a coarse vertical navigation step.
+	KeyActionScrollDownStep
 	// KeyActionScrollLeft scrolls left by a horizontal navigation step.
 	KeyActionScrollLeft
 	// KeyActionScrollRight scrolls right by a horizontal navigation step.

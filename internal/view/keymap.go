@@ -40,6 +40,8 @@ const (
 	KeyActionQuit                 = actionQuit
 	KeyActionScrollUp             = actionScrollUp
 	KeyActionScrollDown           = actionScrollDown
+	KeyActionScrollUpStep         = actionScrollUpStep
+	KeyActionScrollDownStep       = actionScrollDownStep
 	KeyActionScrollLeft           = actionScrollLeft
 	KeyActionScrollRight          = actionScrollRight
 	KeyActionScrollLeftFine       = actionScrollLeftFine
@@ -115,8 +117,10 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyCtrlC, action: actionQuit},
 			{key: tcell.KeyCtrlL, action: actionRefresh},
 			{key: tcell.KeyEnter, action: actionScrollDown},
-			{key: tcell.KeyUp, action: actionScrollUp},
-			{key: tcell.KeyDown, action: actionScrollDown},
+			{key: tcell.KeyUp, action: actionScrollUpStep},
+			{key: tcell.KeyDown, action: actionScrollDownStep},
+			{key: tcell.KeyUp, mod: tcell.ModShift, action: actionScrollUp},
+			{key: tcell.KeyDown, mod: tcell.ModShift, action: actionScrollDown},
 			{key: tcell.KeyRune, rune: "y", mod: tcell.ModCtrl, action: actionScrollUp},
 			{key: tcell.KeyRune, rune: "k", mod: tcell.ModCtrl, action: actionScrollUp},
 			{key: tcell.KeyRune, rune: "p", mod: tcell.ModCtrl, action: actionScrollUp},
@@ -179,8 +183,10 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyCtrlC, action: actionQuit},
 			{key: tcell.KeyCtrlL, action: actionRefresh},
 			{key: tcell.KeyEnter, action: actionScrollDown},
-			{key: tcell.KeyUp, action: actionScrollUp},
-			{key: tcell.KeyDown, action: actionScrollDown},
+			{key: tcell.KeyUp, action: actionScrollUpStep},
+			{key: tcell.KeyDown, action: actionScrollDownStep},
+			{key: tcell.KeyUp, mod: tcell.ModShift, action: actionScrollUp},
+			{key: tcell.KeyDown, mod: tcell.ModShift, action: actionScrollDown},
 			{key: tcell.KeyRune, rune: "y", mod: tcell.ModCtrl, action: actionScrollUp},
 			{key: tcell.KeyRune, rune: "k", mod: tcell.ModCtrl, action: actionScrollUp},
 			{key: tcell.KeyRune, rune: "p", mod: tcell.ModCtrl, action: actionScrollUp},

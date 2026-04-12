@@ -544,6 +544,10 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 		v.ScrollUp(1)
 	case actionScrollDown:
 		v.ScrollDown(1)
+	case actionScrollUpStep:
+		v.ScrollUp(v.verticalScrollStep())
+	case actionScrollDownStep:
+		v.ScrollDown(v.verticalScrollStep())
 	case actionScrollLeft:
 		v.ScrollLeft(v.horizontalScrollStep())
 	case actionScrollRight:
@@ -710,6 +714,10 @@ func (v *Viewer) ScrollLeft(n int) {
 
 func (v *Viewer) horizontalScrollStep() int {
 	return max(1, min(8, v.bodyContentWidth()/4))
+}
+
+func (v *Viewer) verticalScrollStep() int {
+	return max(1, min(8, v.scrollBodyHeight()/8))
 }
 
 func (v *Viewer) halfHorizontalScrollStep() int {
@@ -2072,6 +2080,10 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 		v.helpOffset--
 	case actionScrollDown:
 		v.helpOffset++
+	case actionScrollUpStep:
+		v.helpOffset -= v.verticalScrollStep()
+	case actionScrollDownStep:
+		v.helpOffset += v.verticalScrollStep()
 	case actionScrollLeft:
 		v.helpColOffset -= v.horizontalScrollStep()
 	case actionScrollRight:

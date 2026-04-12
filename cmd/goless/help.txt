@@ -8,8 +8,10 @@
   F4                  cycle themes
 
 [1;4mNavigation[0m
-  ↓ e j Enter ^E ^N   move one line forward
-  ↑ k y ^Y ^K ^P      move one line backward
+  ↓                   move forward by a screen step
+  ↑                   move backward by a screen step
+  Shift+↓ e j Enter ^E ^N  move one line forward
+  Shift+↑ k y ^Y ^K ^P     move one line backward
   f Space PgDn ^F ^V  forward one page
   PgUp ^B b w         backward one page
   d ^D J              forward half page
