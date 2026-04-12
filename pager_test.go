@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	iview "github.com/gdamore/goless/internal/view"
 	"github.com/gdamore/tcell/v3"
 	"github.com/gdamore/tcell/v3/color"
 	"github.com/gdamore/tcell/v3/vt"
@@ -526,6 +527,27 @@ func TestPagerHandleMouseResultHelpContext(t *testing.T) {
 	}
 	if got, want := result.Context, HelpKeyContext; got != want {
 		t.Fatalf("HandleMouseResult(WheelDown).Context = %v, want %v", got, want)
+	}
+}
+
+func TestToInternalKeyActionMapsExtendedScrollActions(t *testing.T) {
+	tests := []struct {
+		name string
+		in   KeyAction
+		want iview.KeyAction
+	}{
+		{name: "scroll up step", in: KeyActionScrollUpStep, want: iview.KeyActionScrollUpStep},
+		{name: "scroll down step", in: KeyActionScrollDownStep, want: iview.KeyActionScrollDownStep},
+		{name: "half screen left", in: KeyActionHalfScreenLeft, want: iview.KeyActionHalfScreenLeft},
+		{name: "half screen right", in: KeyActionHalfScreenRight, want: iview.KeyActionHalfScreenRight},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := toInternalKeyAction(tt.in); got != tt.want {
+				t.Fatalf("toInternalKeyAction(%v) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
 	}
 }
 

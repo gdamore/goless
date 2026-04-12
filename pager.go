@@ -646,6 +646,10 @@ func toInternalKeyAction(a KeyAction) iview.KeyAction {
 		return iview.KeyActionScrollUp
 	case KeyActionScrollDown:
 		return iview.KeyActionScrollDown
+	case KeyActionScrollUpStep:
+		return iview.KeyActionScrollUpStep
+	case KeyActionScrollDownStep:
+		return iview.KeyActionScrollDownStep
 	case KeyActionScrollLeft:
 		return iview.KeyActionScrollLeft
 	case KeyActionScrollRight:
@@ -654,6 +658,10 @@ func toInternalKeyAction(a KeyAction) iview.KeyAction {
 		return iview.KeyActionScrollLeftFine
 	case KeyActionScrollRightFine:
 		return iview.KeyActionScrollRightFine
+	case KeyActionHalfScreenLeft:
+		return iview.KeyActionHalfScreenLeft
+	case KeyActionHalfScreenRight:
+		return iview.KeyActionHalfScreenRight
 	case KeyActionHalfPageUp:
 		return iview.KeyActionHalfPageUp
 	case KeyActionHalfPageDown:
