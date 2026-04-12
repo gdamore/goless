@@ -340,18 +340,18 @@ func (v *Viewer) SetSearchCaseMode(mode SearchCaseMode) {
 	v.search.CaseMode = mode
 	v.rebuildSearch()
 	if v.search.CompileError != "" {
-		v.message = v.search.CompileError
+		v.setTransientMessage(v.search.CompileError)
 		return
 	}
 	if len(v.search.Matches) == 0 {
-		v.message = v.text.SearchNotFound(v.search.Query)
+		v.setTransientMessage(v.text.SearchNotFound(v.search.Query))
 		return
 	}
 	if v.search.Current < 0 || v.search.Current >= len(v.search.Matches) {
 		v.search.Current = v.pickInitialMatch(v.search.Forward)
 	}
 	v.goToMatch(v.search.Current)
-	v.message = v.text.SearchMatchCount(v.search.Query, len(v.search.Matches))
+	v.setMessage(v.text.SearchMatchCount(v.search.Query, len(v.search.Matches)))
 }
 
 // SearchCaseMode reports the default case behavior for searches.
@@ -378,18 +378,18 @@ func (v *Viewer) SetSearchMode(mode SearchMode) {
 	v.search.Mode = mode
 	v.rebuildSearch()
 	if v.search.CompileError != "" {
-		v.message = v.search.CompileError
+		v.setTransientMessage(v.search.CompileError)
 		return
 	}
 	if len(v.search.Matches) == 0 {
-		v.message = v.text.SearchNotFound(v.search.Query)
+		v.setTransientMessage(v.text.SearchNotFound(v.search.Query))
 		return
 	}
 	if v.search.Current < 0 || v.search.Current >= len(v.search.Matches) {
 		v.search.Current = v.pickInitialMatch(v.search.Forward)
 	}
 	v.goToMatch(v.search.Current)
-	v.message = v.text.SearchMatchCount(v.search.Query, len(v.search.Matches))
+	v.setMessage(v.text.SearchMatchCount(v.search.Query, len(v.search.Matches)))
 }
 
 // SearchMode reports whether searches use substring, whole-word, or regex matching.
@@ -636,6 +636,16 @@ func (v *Viewer) consumeTransientMessage() {
 	}
 	v.message = ""
 	v.clearMessage = false
+}
+
+func (v *Viewer) setMessage(text string) {
+	v.message = text
+	v.clearMessage = false
+}
+
+func (v *Viewer) setTransientMessage(text string) {
+	v.message = text
+	v.clearMessage = text != ""
 }
 
 // ToggleWrap switches between horizontal scrolling and soft wrap modes.
@@ -2132,37 +2142,45 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 	case tcell.KeyEnter:
 		return v.commitPrompt()
 	case tcell.KeyLeft, tcell.KeyCtrlB:
+		v.clearPromptErrorOnEdit()
 		v.promptMoveLeft()
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyRight, tcell.KeyCtrlF:
+		v.clearPromptErrorOnEdit()
 		v.promptMoveRight()
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyHome, tcell.KeyCtrlA:
 		if v.prompt != nil {
+			v.clearPromptErrorOnEdit()
 			v.prompt.seeded = false
 			v.prompt.editor.MoveHome()
 		}
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyEnd, tcell.KeyCtrlE:
 		if v.prompt != nil {
+			v.clearPromptErrorOnEdit()
 			v.prompt.seeded = false
 			v.prompt.editor.MoveEnd()
 		}
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyUp:
+		v.clearPromptErrorOnEdit()
 		v.recallPromptHistory(-1)
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyDown:
+		v.clearPromptErrorOnEdit()
 		v.recallPromptHistory(1)
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyInsert:
 		if v.prompt != nil {
+			v.clearPromptErrorOnEdit()
 			v.prompt.seeded = false
 			v.prompt.editor.ToggleOverwrite()
 		}
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if v.prompt != nil {
+			v.clearPromptErrorOnEdit()
 			if v.prompt.seeded {
 				v.prompt.editor.Clear()
 				v.prompt.seeded = false
@@ -2174,6 +2192,7 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyDelete:
 		if v.prompt != nil {
+			v.clearPromptErrorOnEdit()
 			if v.prompt.seeded {
 				v.prompt.editor.Clear()
 				v.prompt.seeded = false
@@ -2185,6 +2204,7 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyCtrlK:
 		if v.prompt != nil {
+			v.clearPromptErrorOnEdit()
 			v.prompt.seeded = false
 			v.prompt.editor.DeleteToEnd()
 		}
@@ -2192,6 +2212,7 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyCtrlU:
 		if v.prompt != nil {
+			v.clearPromptErrorOnEdit()
 			v.prompt.seeded = false
 			v.prompt.editor.DeleteToStart()
 		}
@@ -2199,6 +2220,7 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyCtrlW:
 		if v.prompt != nil {
+			v.clearPromptErrorOnEdit()
 			v.prompt.seeded = false
 			v.prompt.editor.DeleteWordBackward()
 		}
@@ -2206,6 +2228,7 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	case tcell.KeyRune:
 		if v.prompt != nil {
+			v.clearPromptErrorOnEdit()
 			if v.prompt.seeded {
 				v.prompt.editor.SetText(ev.Str())
 				v.prompt.seeded = false
@@ -2217,6 +2240,15 @@ func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
 		return KeyResult{Handled: true, Context: KeyContextPrompt}
 	}
 	return KeyResult{Context: KeyContextPrompt}
+}
+
+func (v *Viewer) clearPromptErrorOnEdit() {
+	if v.prompt == nil {
+		return
+	}
+	if v.prompt.kind == promptSave {
+		v.prompt.errText = ""
+	}
 }
 
 func (v *Viewer) promptMoveLeft() {

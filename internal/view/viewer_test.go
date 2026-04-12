@@ -3554,6 +3554,80 @@ func TestTransientSaveSuccessMessageClearsOnNextKey(t *testing.T) {
 	}
 }
 
+func TestTransientSaveErrorMessageClearsOnNextKey(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		CommandHandler: func(cmd Command) CommandResult {
+			return CommandResult{Handled: true, Message: "save disabled in secure mode", Transient: true}
+		},
+	})
+	v.SetSize(36, 2)
+	if !v.BeginSavePrompt() {
+		t.Fatal("BeginSavePrompt() = false, want true")
+	}
+	v.prompt.editor.SetText("out.txt")
+	_ = v.commitPrompt()
+
+	if got, want := v.message, "save disabled in secure mode"; got != want {
+		t.Fatalf("message after save error = %q, want %q", got, want)
+	}
+	left, _ := v.statusText()
+	if got, want := left, "save disabled in secure mode"; got != want {
+		t.Fatalf("status left after save error = %q, want %q", got, want)
+	}
+
+	v.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "j", tcell.ModNone))
+	if got := v.message; got != "" {
+		t.Fatalf("message after next key = %q, want empty", got)
+	}
+	left, _ = v.statusText()
+	if got, want := left, "F1 Help"; got != want {
+		t.Fatalf("status left after next key = %q, want %q", got, want)
+	}
+}
+
+func TestSavePromptShowsKeepPromptErrorInline(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		CommandHandler: func(cmd Command) CommandResult {
+			return CommandResult{Handled: true, KeepPrompt: true, Message: "permission denied", Transient: true}
+		},
+	})
+	v.SetSize(40, 2)
+	if !v.BeginSavePrompt() {
+		t.Fatal("BeginSavePrompt() = false, want true")
+	}
+	v.prompt.editor.SetText("/root/out.txt")
+
+	result := v.commitPrompt()
+	if !result.Handled || result.Context != KeyContextPrompt {
+		t.Fatalf("commitPrompt() = %+v, want handled prompt result", result)
+	}
+	if v.prompt == nil {
+		t.Fatal("prompt after keep-prompt save error = nil, want open prompt")
+	}
+	if got, want := v.prompt.errText, "permission denied"; got != want {
+		t.Fatalf("prompt errText = %q, want %q", got, want)
+	}
+
+	_, screen := newMockScreen(t, 40, 2)
+	defer screen.Fini()
+	v.drawPrompt(screen, 1)
+	if got := screenRowString(screen, 1, 40); !strings.Contains(got, "permission denied") {
+		t.Fatalf("prompt row = %q, want inline error", got)
+	}
+
+	v.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "x", tcell.ModNone))
+	if got := v.prompt.errText; got != "" {
+		t.Fatalf("prompt errText after edit = %q, want empty", got)
+	}
+}
+
 func TestDrawPromptShowsTailWhenInputOverflows(t *testing.T) {
 	doc := model.NewDocument(4)
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})

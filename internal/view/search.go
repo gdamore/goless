@@ -317,7 +317,7 @@ func (v *Viewer) commitPromptSearch(text string, forward bool) bool {
 		return true
 	}
 	if v.prompt != nil && v.prompt.errText != "" {
-		v.message = v.prompt.errText
+		v.setTransientMessage(v.prompt.errText)
 		return false
 	}
 
@@ -332,18 +332,18 @@ func (v *Viewer) commitPromptSearch(text string, forward bool) bool {
 	}
 	v.rebuildSearch()
 	if v.search.CompileError != "" {
-		v.message = v.search.CompileError
+		v.setTransientMessage(v.search.CompileError)
 		return false
 	}
 	if len(v.search.Matches) == 0 {
-		v.message = v.text.SearchNotFound(text)
+		v.setTransientMessage(v.text.SearchNotFound(text))
 		return true
 	}
 	if v.search.Current < 0 || v.search.Current >= len(v.search.Matches) {
 		v.search.Current = v.pickInitialMatch(forward)
 	}
 	v.goToMatch(v.search.Current)
-	v.message = v.text.SearchMatchCount(text, len(v.search.Matches))
+	v.setMessage(v.text.SearchMatchCount(text, len(v.search.Matches)))
 	return true
 }
 
@@ -415,17 +415,17 @@ func (v *Viewer) startSearch(query string, forward bool, mode SearchCaseMode) {
 	v.search.Current = -1
 	v.rebuildSearch()
 	if v.search.CompileError != "" {
-		v.message = v.search.CompileError
+		v.setTransientMessage(v.search.CompileError)
 		return
 	}
 	if len(v.search.Matches) == 0 {
-		v.message = v.text.SearchNotFound(query)
+		v.setTransientMessage(v.text.SearchNotFound(query))
 		return
 	}
 
 	v.search.Current = v.pickInitialMatch(forward)
 	v.goToMatch(v.search.Current)
-	v.message = v.text.SearchMatchCount(query, len(v.search.Matches))
+	v.setMessage(v.text.SearchMatchCount(query, len(v.search.Matches)))
 }
 
 // SearchForward starts a forward search and reports whether any match exists.
@@ -454,7 +454,7 @@ func (v *Viewer) SearchBackwardWithCase(query string, mode SearchCaseMode) bool 
 
 func (v *Viewer) clearSearch() {
 	v.search = searchState{}
-	v.message = ""
+	v.setMessage("")
 }
 
 // ClearSearch removes any active search state.
@@ -465,10 +465,10 @@ func (v *Viewer) ClearSearch() {
 func (v *Viewer) repeatSearch(forward bool) {
 	if len(v.search.Matches) == 0 {
 		if v.search.CompileError != "" {
-			v.message = v.search.CompileError
+			v.setTransientMessage(v.search.CompileError)
 			return
 		}
-		v.message = v.text.SearchNone
+		v.setTransientMessage(v.text.SearchNone)
 		return
 	}
 	v.follow = false
@@ -581,13 +581,17 @@ func (v *Viewer) runCommand(text string) (commit bool, quit bool) {
 		result := v.cfg.CommandHandler(parseCommand(text))
 		if result.Handled {
 			if result.Message != "" {
-				v.message = result.Message
+				if result.Transient {
+					v.setTransientMessage(result.Message)
+				} else {
+					v.setMessage(result.Message)
+				}
 			}
 			return !result.KeepPrompt, result.Quit
 		}
 	}
 
-	v.message = v.text.CommandUnknown(text)
+	v.setTransientMessage(v.text.CommandUnknown(text))
 	return true, false
 }
 
@@ -730,11 +734,11 @@ func (v *Viewer) runSetCommand(text string) bool {
 			case "nocase", "insensitive":
 				mode = SearchCaseInsensitive
 			default:
-				v.message = v.text.CommandUnknown(text)
+				v.setTransientMessage(v.text.CommandUnknown(text))
 				return true
 			}
 			v.SetSearchCaseMode(mode)
-			v.message = ""
+			v.setMessage("")
 			return true
 		case "searchmode":
 			var mode SearchMode
@@ -746,47 +750,47 @@ func (v *Viewer) runSetCommand(text string) bool {
 			case "regex":
 				mode = SearchRegex
 			default:
-				v.message = v.text.CommandUnknown(text)
+				v.setTransientMessage(v.text.CommandUnknown(text))
 				return true
 			}
 			v.SetSearchMode(mode)
-			v.message = ""
+			v.setMessage("")
 			return true
 		case "tabstop":
 			width, err := strconv.Atoi(value)
 			if err != nil || width <= 0 {
-				v.message = v.text.CommandUnknown(text)
+				v.setTransientMessage(v.text.CommandUnknown(text))
 				return true
 			}
 			v.SetTabWidth(width)
-			v.message = ""
+			v.setMessage("")
 			return true
 		case "pinlines":
 			count, err := strconv.Atoi(value)
 			if err != nil || count < 0 {
-				v.message = v.text.CommandUnknown(text)
+				v.setTransientMessage(v.text.CommandUnknown(text))
 				return true
 			}
 			v.SetHeaderLines(count)
-			v.message = ""
+			v.setMessage("")
 			return true
 		case "pincols":
 			count, err := strconv.Atoi(value)
 			if err != nil || count < 0 {
-				v.message = v.text.CommandUnknown(text)
+				v.setTransientMessage(v.text.CommandUnknown(text))
 				return true
 			}
 			v.SetHeaderColumns(count)
-			v.message = ""
+			v.setMessage("")
 			return true
 		default:
-			v.message = v.text.CommandUnknown(text)
+			v.setTransientMessage(v.text.CommandUnknown(text))
 			return true
 		}
 	}
 
 	if len(fields) != 2 {
-		v.message = v.text.CommandUnknown(text)
+		v.setTransientMessage(v.text.CommandUnknown(text))
 		return true
 	}
 
@@ -829,20 +833,20 @@ func (v *Viewer) runSetCommand(text string) bool {
 		return false
 	}
 
-	v.message = ""
+	v.setMessage("")
 	return true
 }
 
 func (v *Viewer) goToLine(lineNumber int) {
 	if lineNumber <= 0 {
-		v.message = v.text.CommandLineStart
+		v.setTransientMessage(v.text.CommandLineStart)
 		return
 	}
 	v.follow = false
 	v.ensureLayout()
 	lineIndex := lineNumber - 1
 	if lineIndex >= len(v.sourceLines) {
-		v.message = v.text.CommandOutOfRange(lineNumber)
+		v.setTransientMessage(v.text.CommandOutOfRange(lineNumber))
 		return
 	}
 	if v.cfg.WrapMode == layout.NoWrap {
@@ -850,18 +854,18 @@ func (v *Viewer) goToLine(lineNumber int) {
 		v.relayout()
 	}
 	v.restoreSourceAnchor(layout.Anchor{LineIndex: lineIndex, GraphemeIndex: 0})
-	v.message = v.text.CommandLine(lineNumber)
+	v.setMessage(v.text.CommandLine(lineNumber))
 }
 
 func (v *Viewer) goToPercent(percent int) {
 	if percent < 0 || percent > 100 {
-		v.message = v.text.CommandUnknown(strconv.Itoa(percent) + "%")
+		v.setTransientMessage(v.text.CommandUnknown(strconv.Itoa(percent) + "%"))
 		return
 	}
 	if !v.GoPercent(percent) {
 		return
 	}
-	v.message = strconv.Itoa(percent) + "%"
+	v.setMessage(strconv.Itoa(percent) + "%")
 }
 
 // JumpToLine moves the viewport to the requested logical line number.
