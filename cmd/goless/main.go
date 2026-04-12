@@ -1179,21 +1179,24 @@ func (s *programSession) commandHandler(load func() error, reload func() error, 
 }
 
 func (s *programSession) commandHandlerWithSave(load func() error, reload func() error, showInformation func(title, body string), edit func() error, save func(goless.Command) (string, error)) func(goless.Command) goless.CommandResult {
+	errorResult := func(message string, keepPrompt bool) goless.CommandResult {
+		return goless.CommandResult{Handled: true, Message: message, KeepPrompt: keepPrompt, Transient: true}
+	}
 	return func(cmd goless.Command) goless.CommandResult {
 		switch cmd.Name {
 		case "q", "Q", "quit":
 			return goless.CommandResult{Handled: true, Quit: true}
 		case "v", "edit":
 			if edit == nil {
-				return goless.CommandResult{Handled: true, Message: "editor unavailable for current input"}
+				return errorResult("editor unavailable for current input", false)
 			}
 			if err := edit(); err != nil {
-				return goless.CommandResult{Handled: true, Message: err.Error()}
+				return errorResult(err.Error(), false)
 			}
 			return goless.CommandResult{Handled: true}
 		case "save", "write", "w":
 			if save == nil {
-				return goless.CommandResult{Handled: true, Message: errProgramSaveUnavailable.Error(), KeepPrompt: true}
+				return errorResult(errProgramSaveUnavailable.Error(), true)
 			}
 			path, err := save(cmd)
 			if err != nil {
@@ -1204,11 +1207,7 @@ func (s *programSession) commandHandlerWithSave(load func() error, reload func()
 						PromptText: fmt.Sprintf("File already exists. Overwrite? (yes/no) "),
 					}
 				}
-				return goless.CommandResult{
-					Handled:    true,
-					Message:    err.Error(),
-					KeepPrompt: shouldKeepProgramSavePrompt(err),
-				}
+				return errorResult(err.Error(), shouldKeepProgramSavePrompt(err))
 			}
 			return goless.CommandResult{Handled: true, Message: "saved " + path, Transient: true}
 		case "file", "f":
@@ -1222,66 +1221,66 @@ func (s *programSession) commandHandlerWithSave(load func() error, reload func()
 			return goless.CommandResult{Handled: true, Message: version()}
 		case "reload":
 			if reload == nil {
-				return goless.CommandResult{Handled: true, Message: "file reload unavailable"}
+				return errorResult("file reload unavailable", false)
 			}
 			if err := reload(); err != nil {
-				return goless.CommandResult{Handled: true, Message: err.Error()}
+				return errorResult(err.Error(), false)
 			}
 			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
 		case "next", "n":
 			if !s.canNext() {
-				return goless.CommandResult{Handled: true, Message: "already at last file"}
+				return errorResult("already at last file", false)
 			}
 			if load == nil {
-				return goless.CommandResult{Handled: true, Message: "file reload unavailable"}
+				return errorResult("file reload unavailable", false)
 			}
 			index := s.index
 			s.next()
 			if err := load(); err != nil {
 				s.index = index
-				return goless.CommandResult{Handled: true, Message: err.Error()}
+				return errorResult(err.Error(), false)
 			}
 			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
 		case "prev", "p", "previous":
 			if !s.canPrev() {
-				return goless.CommandResult{Handled: true, Message: "already at first file"}
+				return errorResult("already at first file", false)
 			}
 			if load == nil {
-				return goless.CommandResult{Handled: true, Message: "file reload unavailable"}
+				return errorResult("file reload unavailable", false)
 			}
 			index := s.index
 			s.prev()
 			if err := load(); err != nil {
 				s.index = index
-				return goless.CommandResult{Handled: true, Message: err.Error()}
+				return errorResult(err.Error(), false)
 			}
 			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
 		case "first", "rewind", "x":
 			if !s.hasFiles() || s.index == 0 {
-				return goless.CommandResult{Handled: true, Message: "already at first file"}
+				return errorResult("already at first file", false)
 			}
 			if load == nil {
-				return goless.CommandResult{Handled: true, Message: "file reload unavailable"}
+				return errorResult("file reload unavailable", false)
 			}
 			index := s.index
 			s.first()
 			if err := load(); err != nil {
 				s.index = index
-				return goless.CommandResult{Handled: true, Message: err.Error()}
+				return errorResult(err.Error(), false)
 			}
 			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
 		case "last":
 			if !s.hasFiles() || s.index == len(s.files)-1 {
-				return goless.CommandResult{Handled: true, Message: "already at last file"}
+				return errorResult("already at last file", false)
 			}
 			if load == nil {
-				return goless.CommandResult{Handled: true, Message: "file reload unavailable"}
+				return errorResult("file reload unavailable", false)
 			}
 			index := s.index
 			s.last()
 			if err := load(); err != nil {
 				s.index = index
-				return goless.CommandResult{Handled: true, Message: err.Error()}
+				return errorResult(err.Error(), false)
 			}
 			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
 		default:
