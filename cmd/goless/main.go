@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime/debug"
 	"slices"
 	"strconv"
@@ -1450,10 +1451,45 @@ func saveProgramContent(pager *goless.Pager, cmd goless.Command, secure bool) (s
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(req.path, data, 0o644); err != nil {
+	if err := writeProgramFileAtomically(req.path, data, 0o644); err != nil {
 		return "", err
 	}
 	return req.path, nil
+}
+
+func writeProgramFileAtomically(path string, data []byte, mode os.FileMode) (err error) {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".goless-save-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	removeTemp := true
+	defer func() {
+		if removeTemp {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if err := tmp.Chmod(mode); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := replaceProgramFile(tmpPath, path); err != nil {
+		return err
+	}
+	removeTemp = false
+	return nil
 }
 
 var errProgramSaveOverwrite = errors.New("overwrite confirmation required")
@@ -1470,7 +1506,7 @@ func checkProgramSaveOverwrite(path string, allowOverwrite bool) error {
 		return err
 	}
 	if info.Mode().IsRegular() {
-		return fmt.Errorf("%w: %s exists; press Enter again to overwrite", errProgramSaveOverwrite, path)
+		return fmt.Errorf("%w: %s exists", errProgramSaveOverwrite, path)
 	}
 	return nil
 }
