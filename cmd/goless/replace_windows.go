@@ -5,10 +5,23 @@
 
 package main
 
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 func replaceProgramFile(tempPath, path string) error {
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return os.Rename(tempPath, path)
+		}
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%s exists and is not a regular file", path)
+	}
+	if err := os.Remove(path); err != nil {
 		return err
 	}
 	return os.Rename(tempPath, path)
