@@ -5,6 +5,7 @@ package view
 
 import (
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -170,6 +171,44 @@ func TestLessKeyMapSingleLineAliases(t *testing.T) {
 				t.Fatalf("Position().Row after %s = %d, want %d", tt.name, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestLessKeyMapArrowKeysUseVerticalStepAndShiftForFineScroll(t *testing.T) {
+	doc := model.NewDocument(4)
+	var b strings.Builder
+	for i := 1; i <= 40; i++ {
+		b.WriteString("line")
+		b.WriteString(strconv.Itoa(i))
+		b.WriteByte('\n')
+	}
+	if err := doc.Append([]byte(b.String())); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 17)
+
+	step := v.verticalScrollStep()
+
+	v.HandleKey(keyKey(tcell.KeyDown))
+	if got, want := v.Position().Row, 1+step; got != want {
+		t.Fatalf("Position().Row after Down = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKeyMod(tcell.KeyDown, tcell.ModShift))
+	if got, want := v.Position().Row, 2+step; got != want {
+		t.Fatalf("Position().Row after Shift-Down = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyUp))
+	if got, want := v.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row after Up = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKeyMod(tcell.KeyUp, tcell.ModShift))
+	if got, want := v.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row after Shift-Up = %d, want %d", got, want)
 	}
 }
 
@@ -1107,9 +1146,32 @@ func TestGoLineStartAndEnd(t *testing.T) {
 		t.Fatalf("col offset after $ = %d, want %d", got, want)
 	}
 
+	v.HandleKey(keyRuneMod("$", tcell.ModShift))
+	if got, want := v.colOffset, 21; got != want {
+		t.Fatalf("col offset after shifted $ = %d, want %d", got, want)
+	}
+
 	v.HandleKey(keyRune("0"))
 	if got, want := v.colOffset, 0; got != want {
 		t.Fatalf("col offset after 0 = %d, want %d", got, want)
+	}
+}
+
+func TestHelpShiftedDollarStillGoesToLineEnd(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Text: Text{
+			HelpBody: "abcdefghijklmnopqrstuv\nabcdefghijklmnopqrstuvwxyz0123456789\n",
+		},
+	})
+	v.SetSize(20, 4)
+	v.mode = modeHelp
+
+	v.HandleKey(keyRuneMod("$", tcell.ModShift))
+	if got, want := v.helpColOffset, 2; got != want {
+		t.Fatalf("help col offset after shifted $ = %d, want %d", got, want)
 	}
 }
 

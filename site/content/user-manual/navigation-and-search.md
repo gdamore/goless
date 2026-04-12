@@ -8,7 +8,9 @@ The built-in less-like key group already gives the future user manual a strong o
 
 ## Core Navigation
 
-- `j` and `k` or the arrow keys to move line by line
+- `j` and `k` to move line by line
+- `Up` and `Down` to move by a coarse vertical screen step
+- `Shift-Up` and `Shift-Down` to move line by line with the cursor keys
 - `space` and `b` to page down and up
 - `w` also pages up in the built-in less-like key group
 - `g` and `G` to jump to the top or bottom

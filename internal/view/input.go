@@ -80,6 +80,8 @@ const (
 	actionQuit
 	actionScrollUp
 	actionScrollDown
+	actionScrollUpStep
+	actionScrollDownStep
 	actionScrollLeft
 	actionScrollRight
 	actionScrollLeftFine

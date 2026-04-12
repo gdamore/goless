@@ -392,7 +392,9 @@ standalone program to leave terminal text selection and native scrolling alone.
 The default key group is intentionally less-like. Common bindings include:
 
 - `q` or `Esc` to quit
-- `j`/`k` or arrow keys to scroll
+- `j`/`k` for one-line scrolling
+- `Up`/`Down` for coarse vertical step scrolling
+- `Shift-Up`/`Shift-Down` for fine one-line scrolling
 - `u`/`d` or `Ctrl-U`/`Ctrl-D` for half-page up/down
 - `space` for page down and `b`/`w` for page up, plus `Ctrl-B` and `Alt-V`
 - `g`/`G` for top/bottom
