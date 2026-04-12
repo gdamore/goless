@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/tabwriter"
 	"time"
 
 	"github.com/gdamore/goless"
@@ -91,6 +92,30 @@ var (
 	errProgramSaveUnavailable = errors.New("save unavailable")
 )
 
+type programDisplayedError struct {
+	err error
+}
+
+func (e programDisplayedError) Error() string {
+	return e.err.Error()
+}
+
+func (e programDisplayedError) Unwrap() error {
+	return e.err
+}
+
+type programFlagParseError struct {
+	err error
+}
+
+func (e *programFlagParseError) Error() string {
+	return e.err.Error()
+}
+
+func (e *programFlagParseError) Unwrap() error {
+	return e.err
+}
+
 type programSaveHandler struct {
 	pager  func() *goless.Pager
 	secure bool
@@ -98,17 +123,27 @@ type programSaveHandler struct {
 
 func main() {
 	if err := run(); err != nil {
+		var displayed programDisplayedError
+		if errors.As(err, &displayed) {
+			os.Exit(1)
+		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func run() error {
-	opts, args, err := parseProgramFlags(os.Args[1:], flag.CommandLine.Output())
+	opts, args, err := parseProgramFlags(os.Args[1:])
 	if err != nil {
+		var parseErr *programFlagParseError
+		if errors.As(err, &parseErr) {
+			writeProgramFlagParseError(flag.CommandLine.Output(), os.Args[1:], parseErr.err)
+			return programDisplayedError{err: err}
+		}
 		return err
 	}
 	if opts.showHelp {
+		writeProgramUsage(os.Stdout)
 		return nil
 	}
 	if opts.version {
@@ -435,7 +470,7 @@ func run() error {
 	}
 }
 
-func parseProgramFlags(args []string, output io.Writer) (programOptions, []string, error) {
+func parseProgramFlags(args []string) (programOptions, []string, error) {
 	opts := programOptions{
 		presetName:     "pretty",
 		chromeName:     "auto",
@@ -463,12 +498,7 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	}
 
 	fs := flag.NewFlagSet("goless", flag.ContinueOnError)
-	fs.SetOutput(output)
-	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "usage: goless [-?|-e|-E|-F|-N|-R|-S|-i|-I|-s|-secure] [-x n] [-config path] [-theme dark|light|plain|pretty] [-chrome auto|none|single|rounded] [-hidden] [-live-links] [-render hybrid|literal|presentation] [-squeeze] [-title text] [-license] [+line|+/pattern] [-version] [path ...]\n")
-		fmt.Fprintln(fs.Output(), "config: goless loads GOLESS_CONFIG when set, otherwise goless/config.json from the per-user config directory; -config overrides both")
-	}
-
+	fs.SetOutput(io.Discard)
 	fs.BoolVar(&opts.showHelp, "?", opts.showHelp, "show help")
 	fs.BoolVar(&opts.showHelp, "help", opts.showHelp, "show help")
 	fs.BoolVar(&opts.showHelp, "h", opts.showHelp, "show help")
@@ -500,10 +530,9 @@ func parseProgramFlags(args []string, output io.Writer) (programOptions, []strin
 	fs.BoolVar(&ignoreCase, "I", false, "case-insensitive search")
 
 	if err := fs.Parse(args); err != nil {
-		return programOptions{}, nil, err
+		return programOptions{}, nil, &programFlagParseError{err: err}
 	}
 	if opts.showHelp {
-		fs.Usage()
 		return opts, nil, nil
 	}
 	if ignoreSmartCase && ignoreCase {
@@ -542,6 +571,183 @@ func programHasImmediateExitFlag(args []string) bool {
 		}
 	}
 	return false
+}
+
+type programFlagHelp struct {
+	names       []string
+	value       string
+	description string
+}
+
+func programFlagHelps() []programFlagHelp {
+	return []programFlagHelp{
+		{names: []string{"-?", "-h", "--help"}, description: "Show help and exit."},
+		{names: []string{"--license"}, description: "Print the bundled Apache license and exit."},
+		{names: []string{"--version"}, description: "Print the program version and exit."},
+		{names: []string{"-e", "--quit-at-eof"}, description: "Quit on the first forward command at end of input."},
+		{names: []string{"-E", "--QUIT-AT-EOF"}, description: "Quit when EOF is already visible on screen."},
+		{names: []string{"-F"}, description: "Quit immediately if the entire input fits on one screen."},
+		{names: []string{"-N"}, description: "Show line numbers."},
+		{names: []string{"-R"}, description: "Accepted as a less-compatibility no-op."},
+		{names: []string{"-S"}, description: "Accepted as a less-compatibility no-op."},
+		{names: []string{"--hidden"}, description: "Show tabs, line endings, carriage returns, and EOF markers."},
+		{names: []string{"--live-links"}, description: "Enable live OSC 8 hyperlinks in the standalone program."},
+		{names: []string{"--secure"}, description: "Disable standalone commands that launch external programs."},
+		{names: []string{"-s", "--squeeze"}, description: "Collapse repeated blank lines in the current view."},
+		{names: []string{"--config"}, value: "<path>", description: "Load a JSON config file; overrides GOLESS_CONFIG and the default per-user path."},
+		{names: []string{"--theme"}, value: "<dark|light|plain|pretty>", description: "Select the visual theme."},
+		{names: []string{"--chrome"}, value: "<auto|none|single|rounded>", description: "Override the pager frame style."},
+		{names: []string{"--render"}, value: "<hybrid|literal|presentation>", description: "Choose how escape sequences are rendered."},
+		{names: []string{"--title"}, value: "<text>", description: "Set the frame title."},
+		{names: []string{"-x"}, value: "<n>", description: "Set the tab width."},
+		{names: []string{"-i"}, description: "Use smart-case search."},
+		{names: []string{"-I"}, description: "Use case-insensitive search."},
+	}
+}
+
+func writeProgramUsage(w io.Writer) {
+	if w == nil {
+		return
+	}
+
+	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintln(w, "  goless [options] [+line | +/pattern] [path ...]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Options:")
+
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "  Option\tDescription")
+	for _, item := range programFlagHelps() {
+		fmt.Fprintf(tw, "  %s\t%s\n", programFormatFlagNames(item.names, item.value), item.description)
+	}
+	_ = tw.Flush()
+
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Startup:")
+	fmt.Fprintln(w, "  +line       Jump to a 1-based line number before opening the viewer.")
+	fmt.Fprintln(w, "  +/pattern   Jump to the first match for pattern before opening the viewer.")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Config:")
+	fmt.Fprintln(w, "  goless loads GOLESS_CONFIG when set, otherwise goless/config.json from the")
+	fmt.Fprintln(w, "  per-user config directory; --config overrides both.")
+}
+
+func programFormatFlagNames(names []string, value string) string {
+	var formatted []string
+	for _, name := range names {
+		if value == "" {
+			formatted = append(formatted, name)
+			continue
+		}
+		formatted = append(formatted, name+" "+value)
+	}
+	return strings.Join(formatted, ", ")
+}
+
+func writeProgramFlagParseError(w io.Writer, args []string, err error) {
+	if w == nil {
+		return
+	}
+
+	fmt.Fprintln(w, programFormatFlagParseError(args, err))
+	fmt.Fprintf(w, "See %s --help for assistance.\n", programInvocationName())
+}
+
+func programFormatFlagParseError(args []string, err error) string {
+	msg := err.Error()
+	if bad, ok := strings.CutPrefix(msg, "flag provided but not defined: "); ok {
+		bad = programOriginalUnknownFlag(args, bad)
+		formatted := "unknown option " + bad
+		if suggestion := programSuggestFlag(bad); suggestion != "" {
+			formatted += "; did you mean " + suggestion + "?"
+		}
+		return formatted
+	}
+	return msg
+}
+
+func programInvocationName() string {
+	if len(os.Args) == 0 || os.Args[0] == "" {
+		return "goless"
+	}
+	return filepath.Base(os.Args[0])
+}
+
+func programOriginalUnknownFlag(args []string, normalized string) string {
+	for _, arg := range args {
+		name, _, _ := strings.Cut(arg, "=")
+		if name == normalized {
+			return name
+		}
+		if strings.HasPrefix(name, "--") && "-"+strings.TrimPrefix(name, "--") == normalized {
+			return name
+		}
+	}
+	return normalized
+}
+
+func programSuggestFlag(name string) string {
+	candidates := []string{
+		"--help",
+		"--license",
+		"--version",
+		"--quit-at-eof",
+		"--QUIT-AT-EOF",
+		"--hidden",
+		"--live-links",
+		"--secure",
+		"--squeeze",
+		"--config",
+		"--theme",
+		"--chrome",
+		"--render",
+		"--title",
+	}
+
+	best := ""
+	bestDistance := 3
+	for _, candidate := range candidates {
+		if distance := programEditDistance(name, candidate); distance < bestDistance {
+			best = candidate
+			bestDistance = distance
+		}
+	}
+	return best
+}
+
+func programEditDistance(a, b string) int {
+	if a == b {
+		return 0
+	}
+	if len(a) == 0 {
+		return len(b)
+	}
+	if len(b) == 0 {
+		return len(a)
+	}
+
+	prev := make([]int, len(b)+1)
+	curr := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+
+	for i := 1; i <= len(a); i++ {
+		curr[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 0
+			if a[i-1] != b[j-1] {
+				cost = 1
+			}
+			curr[j] = min(
+				prev[j]+1,
+				curr[j-1]+1,
+				prev[j-1]+cost,
+			)
+		}
+		prev, curr = curr, prev
+	}
+	return prev[len(b)]
 }
 
 func programConfigPathFromArgs(args []string) (string, bool, error) {

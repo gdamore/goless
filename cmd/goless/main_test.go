@@ -37,6 +37,81 @@ func runProgramForTest(t *testing.T, args []string, stdin string) (string, error
 	return runProgramForTestWithOptions(t, args, programRunTestOptions{stdin: stdin})
 }
 
+func runProgramForTestWithStreams(t *testing.T, args []string, stdin string) (string, string, error) {
+	t.Helper()
+
+	stdinPath := writeTempFile(t, t.TempDir(), testStdinFixtureFileName, stdin)
+	stdinFile, err := os.Open(stdinPath)
+	if err != nil {
+		t.Fatalf("Open(stdin) failed: %v", err)
+	}
+	defer stdinFile.Close()
+
+	stdoutReader, stdoutWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe(stdout) failed: %v", err)
+	}
+	stderrReader, stderrWriter, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("Pipe(stderr) failed: %v", err)
+	}
+	type streamResult struct {
+		data []byte
+		err  error
+	}
+	stdoutDone := make(chan streamResult, 1)
+	stderrDone := make(chan streamResult, 1)
+	go func() {
+		data, err := io.ReadAll(stdoutReader)
+		stdoutDone <- streamResult{data: data, err: err}
+	}()
+	go func() {
+		data, err := io.ReadAll(stderrReader)
+		stderrDone <- streamResult{data: data, err: err}
+	}()
+
+	oldArgs := os.Args
+	oldStdin := os.Stdin
+	oldStdout := os.Stdout
+	oldStderr := os.Stderr
+	oldFlagOutput := flag.CommandLine.Output()
+	os.Args = append([]string{"goless"}, args...)
+	os.Stdin = stdinFile
+	os.Stdout = stdoutWriter
+	os.Stderr = stderrWriter
+	flag.CommandLine.SetOutput(stderrWriter)
+
+	runErr := run()
+
+	flag.CommandLine.SetOutput(oldFlagOutput)
+	os.Args = oldArgs
+	os.Stdin = oldStdin
+	os.Stdout = oldStdout
+	os.Stderr = oldStderr
+
+	if err := stdoutWriter.Close(); err != nil {
+		t.Fatalf("Close(stdout writer) failed: %v", err)
+	}
+	if err := stderrWriter.Close(); err != nil {
+		t.Fatalf("Close(stderr writer) failed: %v", err)
+	}
+	stdoutResult := <-stdoutDone
+	if stdoutResult.err != nil {
+		t.Fatalf("ReadAll(stdout) failed: %v", stdoutResult.err)
+	}
+	stderrResult := <-stderrDone
+	if stderrResult.err != nil {
+		t.Fatalf("ReadAll(stderr) failed: %v", stderrResult.err)
+	}
+	if err := stdoutReader.Close(); err != nil {
+		t.Fatalf("Close(stdout reader) failed: %v", err)
+	}
+	if err := stderrReader.Close(); err != nil {
+		t.Fatalf("Close(stderr reader) failed: %v", err)
+	}
+	return string(stdoutResult.data), string(stderrResult.data), runErr
+}
+
 type programRunTestOptions struct {
 	stdin          string
 	stdinTerminal  *bool
@@ -831,8 +906,7 @@ func TestHandleProgramPostInputSkipsEOFPoliciesForLicenseView(t *testing.T) {
 }
 
 func TestParseProgramFlagsCompatibilityAliases(t *testing.T) {
-	var out bytes.Buffer
-	opts, args, err := parseProgramFlags([]string{"-F", "-S", "-N", "-s", "-x", "4", "-I", "sample.txt"}, &out)
+	opts, args, err := parseProgramFlags([]string{"-F", "-S", "-N", "-s", "-x", "4", "-I", "sample.txt"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
@@ -863,8 +937,7 @@ func TestParseProgramFlagsCompatibilityAliases(t *testing.T) {
 }
 
 func TestParseProgramFlagsSecure(t *testing.T) {
-	var out bytes.Buffer
-	opts, args, err := parseProgramFlags([]string{"-secure", "sample.txt"}, &out)
+	opts, args, err := parseProgramFlags([]string{"-secure", "sample.txt"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(-secure) failed: %v", err)
 	}
@@ -880,24 +953,19 @@ func TestParseProgramFlagsSecure(t *testing.T) {
 }
 
 func TestParseProgramFlagsRejectsConflictingSearchCaseFlags(t *testing.T) {
-	var out bytes.Buffer
-
-	if _, _, err := parseProgramFlags([]string{"-i", "-I"}, &out); err == nil {
+	if _, _, err := parseProgramFlags([]string{"-i", "-I"}); err == nil {
 		t.Fatal("parseProgramFlags(-i, -I) = nil error, want mutual exclusion error")
 	}
 }
 
 func TestParseProgramFlagsRejectsNonPositiveTabWidth(t *testing.T) {
-	var out bytes.Buffer
-
-	if _, _, err := parseProgramFlags([]string{"-x", "0"}, &out); err == nil {
+	if _, _, err := parseProgramFlags([]string{"-x", "0"}); err == nil {
 		t.Fatal("parseProgramFlags(-x 0) = nil error, want invalid tab width error")
 	}
 }
 
 func TestParseProgramFlagsVersion(t *testing.T) {
-	var out bytes.Buffer
-	opts, args, err := parseProgramFlags([]string{"-version"}, &out)
+	opts, args, err := parseProgramFlags([]string{"-version"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(-version) failed: %v", err)
 	}
@@ -920,8 +988,7 @@ func TestRunVersion(t *testing.T) {
 }
 
 func TestParseProgramFlagsHelp(t *testing.T) {
-	var out bytes.Buffer
-	opts, args, err := parseProgramFlags([]string{"--help"}, &out)
+	opts, args, err := parseProgramFlags([]string{"--help"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(--help) failed: %v", err)
 	}
@@ -931,12 +998,8 @@ func TestParseProgramFlagsHelp(t *testing.T) {
 	if len(args) != 0 {
 		t.Fatalf("len(args) after --help = %d, want 0", len(args))
 	}
-	if got := out.String(); !strings.Contains(got, "usage: goless") {
-		t.Fatalf("help output = %q, want usage text", got)
-	}
 
-	out.Reset()
-	opts, args, err = parseProgramFlags([]string{"-?"}, &out)
+	opts, args, err = parseProgramFlags([]string{"-?"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(-?) failed: %v", err)
 	}
@@ -946,12 +1009,8 @@ func TestParseProgramFlagsHelp(t *testing.T) {
 	if len(args) != 0 {
 		t.Fatalf("len(args) after -? = %d, want 0", len(args))
 	}
-	if got := out.String(); !strings.Contains(got, "usage: goless") {
-		t.Fatalf("help output for -? = %q, want usage text", got)
-	}
 
-	out.Reset()
-	opts, args, err = parseProgramFlags([]string{"-h"}, &out)
+	opts, args, err = parseProgramFlags([]string{"-h"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(-h) failed: %v", err)
 	}
@@ -961,9 +1020,6 @@ func TestParseProgramFlagsHelp(t *testing.T) {
 	if len(args) != 0 {
 		t.Fatalf("len(args) after -h = %d, want 0", len(args))
 	}
-	if got := out.String(); !strings.Contains(got, "usage: goless") {
-		t.Fatalf("help output for -h = %q, want usage text", got)
-	}
 }
 
 func TestRunHelp(t *testing.T) {
@@ -971,14 +1027,67 @@ func TestRunHelp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run(--help) failed: %v", err)
 	}
-	if !strings.Contains(output, "usage: goless") {
-		t.Fatalf("run(--help) output = %q, want usage text", output)
+	if !strings.Contains(output, "Options:") {
+		t.Fatalf("run(--help) output = %q, want options table", output)
+	}
+	if !strings.Contains(output, "Show help and exit.") {
+		t.Fatalf("run(--help) output = %q, want descriptive text", output)
+	}
+}
+
+func TestRunHelpWritesToStdout(t *testing.T) {
+	stdout, stderr, err := runProgramForTestWithStreams(t, []string{"--help"}, "")
+	if err != nil {
+		t.Fatalf("run(--help) failed: %v", err)
+	}
+	if !strings.Contains(stdout, "Options:") {
+		t.Fatalf("stdout = %q, want options table", stdout)
+	}
+	if !strings.Contains(stdout, "Show help and exit.") {
+		t.Fatalf("stdout = %q, want descriptive text", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q, want empty output", stderr)
+	}
+}
+
+func TestRunUnknownFlagShowsHelpHint(t *testing.T) {
+	output, err := runProgramForTest(t, []string{"--hep"}, "")
+	if err == nil {
+		t.Fatal("run(--hep) = nil error, want error")
+	}
+	if got := output; !strings.Contains(got, "unknown option --hep; did you mean --help?") {
+		t.Fatalf("run(--hep) output = %q, want suggestion", got)
+	}
+	if got := output; !strings.Contains(got, "See goless --help for assistance.") {
+		t.Fatalf("run(--hep) output = %q, want help hint", got)
+	}
+	if got := output; strings.Contains(got, "Options:") {
+		t.Fatalf("run(--hep) output = %q, do not want usage table", got)
+	}
+}
+
+func TestRunUnknownFlagWritesToStderr(t *testing.T) {
+	stdout, stderr, err := runProgramForTestWithStreams(t, []string{"--hep"}, "")
+	if err == nil {
+		t.Fatal("run(--hep) = nil error, want error")
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty output", stdout)
+	}
+	if !strings.Contains(stderr, "unknown option --hep; did you mean --help?") {
+		t.Fatalf("stderr = %q, want suggestion", stderr)
+	}
+	if !strings.Contains(stderr, "See goless --help for assistance.") {
+		t.Fatalf("stderr = %q, want help hint", stderr)
+	}
+	if strings.Contains(stderr, "Options:") {
+		t.Fatalf("stderr = %q, do not want usage table", stderr)
 	}
 }
 
 func TestParseProgramFlagsLicense(t *testing.T) {
-	var out bytes.Buffer
-	opts, args, err := parseProgramFlags([]string{"--license"}, &out)
+	opts, args, err := parseProgramFlags([]string{"--license"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(--license) failed: %v", err)
 	}
@@ -1094,13 +1203,11 @@ func TestRunPassThroughReportsOpenError(t *testing.T) {
 }
 
 func TestParseProgramFlagsLicenseExclusive(t *testing.T) {
-	var out bytes.Buffer
-	_, _, err := parseProgramFlags([]string{"--license", "-N"}, &out)
+	_, _, err := parseProgramFlags([]string{"--license", "-N"})
 	if err == nil {
 		t.Fatal("parseProgramFlags(--license -N) = nil error, want error")
 	}
-	out.Reset()
-	if _, _, err := parseProgramFlags([]string{"--license", "file.txt"}, &out); err == nil {
+	if _, _, err := parseProgramFlags([]string{"--license", "file.txt"}); err == nil {
 		t.Fatal("parseProgramFlags(--license file.txt) = nil error, want error")
 	}
 }

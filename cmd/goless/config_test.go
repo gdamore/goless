@@ -83,8 +83,7 @@ func TestParseProgramFlagsLoadsDefaultProgramConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
 	writeDefaultTestProgramConfig(t, `{"theme":"dark","hidden":true,"line-numbers":true,"live-links":true,"secure":true}`)
 
-	var out bytes.Buffer
-	opts, args, err := parseProgramFlags([]string{"sample.txt"}, &out)
+	opts, args, err := parseProgramFlags([]string{"sample.txt"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
@@ -112,8 +111,7 @@ func TestParseProgramFlagsCLIOverridesProgramConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
 	writeDefaultTestProgramConfig(t, `{"theme":"dark","hidden":true,"line-numbers":true,"live-links":true,"secure":true}`)
 
-	var out bytes.Buffer
-	opts, _, err := parseProgramFlags([]string{"-theme", "light", "-N=false", "-hidden=false", "-live-links=false", "-secure=false"}, &out)
+	opts, _, err := parseProgramFlags([]string{"-theme", "light", "-N=false", "-hidden=false", "-live-links=false", "-secure=false"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
@@ -139,8 +137,7 @@ func TestParseProgramFlagsExplicitConfigOverridesDefaultPath(t *testing.T) {
 	writeDefaultTestProgramConfig(t, `{"theme":"dark","line-numbers":true}`)
 	explicitPath := writeTestProgramConfig(t, `{"theme":"light","hidden":true}`)
 
-	var out bytes.Buffer
-	opts, _, err := parseProgramFlags([]string{"-config", explicitPath}, &out)
+	opts, _, err := parseProgramFlags([]string{"-config", explicitPath})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
@@ -163,8 +160,7 @@ func TestParseProgramFlagsLoadsEnvProgramConfig(t *testing.T) {
 	envPath := writeTestProgramConfig(t, `{"theme":"light","hidden":true,"line-numbers":true}`)
 	t.Setenv("GOLESS_CONFIG", envPath)
 
-	var out bytes.Buffer
-	opts, _, err := parseProgramFlags([]string{"sample.txt"}, &out)
+	opts, _, err := parseProgramFlags([]string{"sample.txt"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
@@ -188,8 +184,7 @@ func TestParseProgramFlagsEnvConfigOverridesDefaultPath(t *testing.T) {
 	envPath := writeTestProgramConfig(t, `{"theme":"light","hidden":true}`)
 	t.Setenv("GOLESS_CONFIG", envPath)
 
-	var out bytes.Buffer
-	opts, _, err := parseProgramFlags([]string{"sample.txt"}, &out)
+	opts, _, err := parseProgramFlags([]string{"sample.txt"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
@@ -207,8 +202,7 @@ func TestParseProgramFlagsExplicitConfigOverridesEnvConfig(t *testing.T) {
 	explicitPath := writeTestProgramConfigAtPath(t, filepath.Join(t.TempDir(), "explicit.json"), `{"theme":"light","hidden":false,"line-numbers":true}`)
 	t.Setenv("GOLESS_CONFIG", envPath)
 
-	var out bytes.Buffer
-	opts, _, err := parseProgramFlags([]string{"-config", explicitPath}, &out)
+	opts, _, err := parseProgramFlags([]string{"-config", explicitPath})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
@@ -229,8 +223,7 @@ func TestParseProgramFlagsExplicitConfigOverridesEnvConfig(t *testing.T) {
 func TestParseProgramFlagsRejectsMissingExplicitConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
 
-	var out bytes.Buffer
-	_, _, err := parseProgramFlags([]string{"-config", filepath.Join(t.TempDir(), "missing.json")}, &out)
+	_, _, err := parseProgramFlags([]string{"-config", filepath.Join(t.TempDir(), "missing.json")})
 	if err == nil {
 		t.Fatal("parseProgramFlags(-config missing) = nil error, want error")
 	}
@@ -243,8 +236,7 @@ func TestParseProgramFlagsHelpSkipsBrokenDefaultProgramConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
 	writeDefaultTestProgramConfig(t, `{"theme":"dark"`)
 
-	var out bytes.Buffer
-	opts, args, err := parseProgramFlags([]string{"--help"}, &out)
+	opts, args, err := parseProgramFlags([]string{"--help"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(--help) failed: %v", err)
 	}
@@ -261,8 +253,7 @@ func TestParseProgramFlagsVersionSkipsBrokenEnvProgramConfig(t *testing.T) {
 	path := writeTestProgramConfig(t, `{"theme":"dark"`)
 	t.Setenv("GOLESS_CONFIG", path)
 
-	var out bytes.Buffer
-	opts, args, err := parseProgramFlags([]string{"--version"}, &out)
+	opts, args, err := parseProgramFlags([]string{"--version"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(--version) failed: %v", err)
 	}
@@ -278,8 +269,7 @@ func TestParseProgramFlagsHelpSkipsBrokenExplicitProgramConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
 	path := writeTestProgramConfig(t, `{"theme":"dark"`)
 
-	var out bytes.Buffer
-	opts, args, err := parseProgramFlags([]string{"--help", "-config", path}, &out)
+	opts, args, err := parseProgramFlags([]string{"--help", "-config", path})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(--help, -config) failed: %v", err)
 	}
@@ -295,8 +285,7 @@ func TestParseProgramFlagsVersionSkipsBrokenExplicitProgramConfig(t *testing.T) 
 	setTestProgramConfigHome(t)
 	path := writeTestProgramConfig(t, `{"theme":"dark"`)
 
-	var out bytes.Buffer
-	opts, args, err := parseProgramFlags([]string{"--version", "-config", path}, &out)
+	opts, args, err := parseProgramFlags([]string{"--version", "-config", path})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(--version, -config) failed: %v", err)
 	}
@@ -384,19 +373,13 @@ func TestProgramConfigPathFromArgsStopsAtDoubleDash(t *testing.T) {
 	}
 }
 
-func TestParseProgramFlagsHelpMentionsConfig(t *testing.T) {
+func TestWriteProgramUsageMentionsConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
 
 	var out bytes.Buffer
-	opts, args, err := parseProgramFlags([]string{"--help"}, &out)
-	if err != nil {
-		t.Fatalf("parseProgramFlags(--help) failed: %v", err)
-	}
-	if !opts.showHelp {
-		t.Fatal("parseProgramFlags(--help) did not set showHelp")
-	}
-	if len(args) != 0 {
-		t.Fatalf("len(args) after --help = %d, want 0", len(args))
+	writeProgramUsage(&out)
+	if got := out.String(); !strings.Contains(got, "Config:") {
+		t.Fatalf("help output = %q, want config section", got)
 	}
 	if got := out.String(); !strings.Contains(got, "GOLESS_CONFIG") {
 		t.Fatalf("help output = %q, want config path note", got)
