@@ -33,7 +33,10 @@ The standalone save command is also disabled by `-secure`.
 
 If you want a default visual theme, `goless` also looks for a per-user JSON
 config at `goless/config.json` under the directory returned by
-`os.UserConfigDir()`.
+`os.UserConfigDir()`. On macOS that is typically
+`~/Library/Application Support/goless/config.json`. On Linux that is typically
+`$XDG_CONFIG_HOME/goless/config.json` or `~/.config/goless/config.json`. On
+Windows that is typically `%AppData%\goless\config.json`.
 
 Config selection precedence is:
 
@@ -52,6 +55,9 @@ The initial format is:
   "secure": false
 }
 ```
+
+Use `goless --default-config` to print the built-in JSON and redirect it into a
+starter config file.
 
 Command-line flags still win over config values for a single invocation.
 

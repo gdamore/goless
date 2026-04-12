@@ -340,6 +340,7 @@ Program flags:
 - `-i` for smart-case search behavior
 - `-I` for case-insensitive search behavior
 - `--license` to open the bundled Apache license, or print it when stdout is not a terminal
+- `--default-config` to print the built-in JSON config to stdout
 - `-config path` to load a specific JSON config file instead of the default per-user path
 - `-x n` to set tab width
 - `-theme dark|light|plain|pretty`
@@ -356,6 +357,8 @@ When present, `goless` also loads per-user configuration from
 `goless/config.json` under the OS config directory returned by
 `os.UserConfigDir()`; on most Linux systems that means
 `$XDG_CONFIG_HOME/goless/config.json` or `~/.config/goless/config.json`.
+On macOS that is typically `~/Library/Application Support/goless/config.json`.
+On Windows that is typically `%AppData%\goless\config.json`.
 
 Config selection precedence is:
 
@@ -374,6 +377,9 @@ The initial config schema is intentionally small:
   "secure": false
 }
 ```
+
+Use `goless --default-config` to print that built-in config and redirect it into
+`goless/config.json` or another starter file.
 
 CLI flags still take precedence over config values, so
 `goless -config ./alt.json -theme dark file.txt` overrides the selected config

@@ -977,6 +977,29 @@ func TestParseProgramFlagsVersion(t *testing.T) {
 	}
 }
 
+func TestParseProgramFlagsDefaultConfig(t *testing.T) {
+	opts, args, err := parseProgramFlags([]string{"--default-config"})
+	if err != nil {
+		t.Fatalf("parseProgramFlags(--default-config) failed: %v", err)
+	}
+	if !opts.showDefaultConfig {
+		t.Fatal("parseProgramFlags(--default-config) did not set showDefaultConfig")
+	}
+	if len(args) != 0 {
+		t.Fatalf("len(args) after --default-config = %d, want 0", len(args))
+	}
+}
+
+func TestRunDefaultConfig(t *testing.T) {
+	output, err := runProgramForTest(t, []string{"--default-config"}, "")
+	if err != nil {
+		t.Fatalf("run(--default-config) failed: %v", err)
+	}
+	if got, want := output, "{\n  \"theme\": \"pretty\",\n  \"hidden\": false,\n  \"line-numbers\": false,\n  \"live-links\": false,\n  \"secure\": false\n}\n"; got != want {
+		t.Fatalf("run(--default-config) output = %q, want %q", got, want)
+	}
+}
+
 func TestRunVersion(t *testing.T) {
 	output, err := runProgramForTest(t, []string{"--version"}, "")
 	if err != nil {
@@ -1209,6 +1232,16 @@ func TestParseProgramFlagsLicenseExclusive(t *testing.T) {
 	}
 	if _, _, err := parseProgramFlags([]string{"--license", "file.txt"}); err == nil {
 		t.Fatal("parseProgramFlags(--license file.txt) = nil error, want error")
+	}
+}
+
+func TestParseProgramFlagsDefaultConfigExclusive(t *testing.T) {
+	_, _, err := parseProgramFlags([]string{"--default-config", "-N"})
+	if err == nil {
+		t.Fatal("parseProgramFlags(--default-config -N) = nil error, want error")
+	}
+	if _, _, err := parseProgramFlags([]string{"--default-config", "file.txt"}); err == nil {
+		t.Fatal("parseProgramFlags(--default-config file.txt) = nil error, want error")
 	}
 }
 
