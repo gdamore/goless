@@ -1678,6 +1678,32 @@ func TestParseProgramSaveCommand(t *testing.T) {
 	}
 }
 
+func TestParseProgramSaveCommandDefaults(t *testing.T) {
+	req, err := parseProgramSaveCommand(goless.Command{
+		Name: "save",
+		Args: []string{"out.txt"},
+	})
+	if err != nil {
+		t.Fatalf("parseProgramSaveCommand(defaults) failed: %v", err)
+	}
+	if got, want := req.path, "out.txt"; got != want {
+		t.Fatalf("save path = %q, want %q", got, want)
+	}
+	if got, want := req.export.Scope, goless.ExportCurrentContent; got != want {
+		t.Fatalf("default save scope = %v, want %v", got, want)
+	}
+	if got, want := req.export.Format, goless.ExportANSI; got != want {
+		t.Fatalf("default save format = %v, want %v", got, want)
+	}
+}
+
+func TestParseProgramSaveCommandRequiresPath(t *testing.T) {
+	_, err := parseProgramSaveCommand(goless.Command{Name: "save"})
+	if !errors.Is(err, errProgramSavePath) {
+		t.Fatalf("parseProgramSaveCommand(no path) error = %v, want %v", err, errProgramSavePath)
+	}
+}
+
 func TestSaveProgramContentWritesRequestedExport(t *testing.T) {
 	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap})
 	pager.SetSize(20, 2)
@@ -1757,6 +1783,69 @@ func TestSaveProgramContentRequiresConfirmationBeforeOverwrite(t *testing.T) {
 	}
 	if got, want := string(data), "new\ncontent\n"; got != want {
 		t.Fatalf("file after confirmed overwrite = %q, want %q", got, want)
+	}
+}
+
+func TestSaveProgramContentRemovesTempFileOnReplaceError(t *testing.T) {
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("new\ncontent\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	root := t.TempDir()
+	path := filepath.Join(root, "existing-dir")
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatalf("Mkdir(existing-dir) failed: %v", err)
+	}
+
+	_, err := saveProgramContent(pager, goless.Command{
+		Name: "save",
+		Args: []string{path},
+	}, false)
+	if err == nil {
+		t.Fatal("saveProgramContent(directory path) = nil error, want failure")
+	}
+
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("ReadDir(root) failed: %v", err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".goless-save-") {
+			t.Fatalf("leftover temp file %q, want cleanup on save failure", entry.Name())
+		}
+	}
+}
+
+func TestProgramSaveHandlerNilReceiver(t *testing.T) {
+	var handler *programSaveHandler
+	_, err := handler.save(goless.Command{Name: "save", Args: []string{"out.txt"}})
+	if !errors.Is(err, errProgramSaveUnavailable) {
+		t.Fatalf("nil programSaveHandler save error = %v, want %v", err, errProgramSaveUnavailable)
+	}
+}
+
+func TestShouldKeepProgramSavePrompt(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil", err: nil, want: false},
+		{name: "disabled", err: errProgramSaveDisabled, want: false},
+		{name: "unavailable", err: errProgramSaveUnavailable, want: false},
+		{name: "overwrite", err: errProgramSaveOverwrite, want: false},
+		{name: "other", err: errors.New("permission denied"), want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldKeepProgramSavePrompt(tt.err); got != tt.want {
+				t.Fatalf("shouldKeepProgramSavePrompt(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
 	}
 }
 

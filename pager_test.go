@@ -116,6 +116,39 @@ func TestPagerExportViewportUsesVisibleContent(t *testing.T) {
 	}
 }
 
+func TestPagerBeginSavePromptRequiresHandler(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap})
+	if pager.BeginSavePrompt() {
+		t.Fatal("BeginSavePrompt() = true, want false without command handler")
+	}
+
+	var seen PromptKind
+	pager = New(Config{
+		TabWidth: 4,
+		WrapMode: NoWrap,
+		CommandHandler: func(cmd Command) CommandResult {
+			return CommandResult{Handled: true}
+		},
+		Text: Text{
+			PromptLine: func(info PromptInfo) string {
+				seen = info.Kind
+				return info.DefaultText
+			},
+		},
+	})
+	pager.SetSize(20, 2)
+	if !pager.BeginSavePrompt() {
+		t.Fatal("BeginSavePrompt() = false, want true with command handler")
+	}
+
+	screen := newPagerMockScreen(t, 20, 2)
+	defer screen.Fini()
+	pager.Draw(screen)
+	if got, want := seen, PromptSave; got != want {
+		t.Fatalf("save prompt kind = %v, want %v", got, want)
+	}
+}
+
 func TestPagerReloadFromReplacesContent(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap})
 	pager.SetSize(20, 4)
