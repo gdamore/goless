@@ -254,7 +254,7 @@ func (v *Viewer) rebuildSearchState(state *searchState) {
 
 func (v *Viewer) beginPrompt(kind promptKind) {
 	v.mode = modePrompt
-	v.prompt = &promptState{kind: kind}
+	v.prompt = &promptState{kind: kind, export: defaultSaveExportOptions()}
 	switch kind {
 	case promptSearchForward, promptSearchBackward:
 		if v.search.Query != "" {
@@ -286,6 +286,7 @@ func (v *Viewer) commitPrompt() KeyResult {
 
 	text := v.prompt.input()
 	seeded := v.prompt.seeded
+	saveConfirming := v.prompt.kind == promptSave && v.prompt.saveConfirm != nil
 	commit := true
 	quit := false
 	switch v.prompt.kind {
@@ -295,9 +296,13 @@ func (v *Viewer) commitPrompt() KeyResult {
 		commit = v.commitPromptSearch(text, false)
 	case promptCommand:
 		commit, quit = v.runCommand(text)
+	case promptSave:
+		commit, quit = v.runSavePrompt(text)
 	}
 	if commit {
-		v.recordPromptHistory(v.prompt.kind, text, seeded)
+		if !saveConfirming {
+			v.recordPromptHistory(v.prompt.kind, text, seeded)
+		}
 		v.cancelPrompt()
 	}
 	if quit {
@@ -353,6 +358,8 @@ func (v *Viewer) updatePromptPrefix() {
 		v.prompt.prefix = "?"
 	case promptCommand:
 		v.prompt.prefix = ":"
+	case promptSave:
+		v.prompt.prefix = "s "
 	}
 }
 
@@ -588,6 +595,8 @@ func historyKindForPrompt(kind promptKind) promptHistoryKind {
 	switch kind {
 	case promptCommand:
 		return promptHistoryCommand
+	case promptSave:
+		return promptHistorySave
 	default:
 		return promptHistorySearch
 	}

@@ -47,6 +47,75 @@ func TestPagerReadFrom(t *testing.T) {
 	}
 }
 
+func TestPagerExportCurrentContentStripsANSIInPlainMode(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap})
+	pager.SetSize(20, 4)
+	if err := pager.AppendString("\x1b[31mred\x1b[0m\nplain\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	got, err := pager.Export(ExportOptions{
+		Scope:  ExportCurrentContent,
+		Format: ExportPlain,
+	})
+	if err != nil {
+		t.Fatalf("Export(plain) failed: %v", err)
+	}
+	if got, want := string(got), "red\nplain\n"; got != want {
+		t.Fatalf("Export(plain) = %q, want %q", got, want)
+	}
+}
+
+func TestPagerExportCurrentContentReconstructsANSI(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap})
+	pager.SetSize(20, 4)
+	if err := pager.AppendString("\x1b[31mred\x1b[0m\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	got, err := pager.Export(ExportOptions{
+		Scope:  ExportCurrentContent,
+		Format: ExportANSI,
+	})
+	if err != nil {
+		t.Fatalf("Export(ansi) failed: %v", err)
+	}
+	text := string(got)
+	if !strings.Contains(text, "\x1b[") {
+		t.Fatalf("Export(ansi) = %q, want ANSI escape sequence", text)
+	}
+	if got, want := stripANSI(text), "red\n"; got != want {
+		t.Fatalf("stripANSI(Export(ansi)) = %q, want %q", got, want)
+	}
+}
+
+func TestPagerExportViewportUsesVisibleContent(t *testing.T) {
+	pager := New(Config{
+		TabWidth:      4,
+		WrapMode:      NoWrap,
+		HeaderColumns: 2,
+	})
+	pager.SetSize(6, 2)
+	if err := pager.AppendString("ABCDE12345\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.ScrollRight(2)
+
+	got, err := pager.Export(ExportOptions{
+		Scope:  ExportViewport,
+		Format: ExportPlain,
+	})
+	if err != nil {
+		t.Fatalf("Export(viewport) failed: %v", err)
+	}
+	if got, want := string(got), "ABE123"; got != want {
+		t.Fatalf("Export(viewport) = %q, want %q", got, want)
+	}
+}
+
 func TestPagerReloadFromReplacesContent(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap})
 	pager.SetSize(20, 4)
@@ -167,6 +236,31 @@ type failingReader struct {
 	text    string
 	read    bool
 	failErr error
+}
+
+func stripANSI(text string) string {
+	var out strings.Builder
+	inEscape := false
+	inCSI := false
+	for i := 0; i < len(text); i++ {
+		ch := text[i]
+		switch {
+		case !inEscape && ch == 0x1b:
+			inEscape = true
+		case inEscape && !inCSI && ch == '[':
+			inCSI = true
+		case inEscape && !inCSI:
+			inEscape = false
+		case inEscape && inCSI && ch >= '@' && ch <= '~':
+			inEscape = false
+			inCSI = false
+		case inEscape:
+			continue
+		default:
+			out.WriteByte(ch)
+		}
+	}
+	return out.String()
 }
 
 func (r *failingReader) Read(p []byte) (int, error) {

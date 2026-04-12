@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	_ "embed"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -83,7 +84,16 @@ var (
 	programDefaultScreenFactory  = tcell.NewScreen
 	programTerminfoScreenFactory = tcell.NewTerminfoScreen
 	programEditorLauncher        = launchProgramEditor
+
+	errProgramSaveDisabled    = errors.New("save disabled in secure mode")
+	errProgramSavePath        = errors.New("save path required")
+	errProgramSaveUnavailable = errors.New("save unavailable")
 )
+
+type programSaveHandler struct {
+	pager  func() *goless.Pager
+	secure bool
+}
 
 func main() {
 	if err := run(); err != nil {
@@ -186,6 +196,10 @@ func run() error {
 		}
 	}
 	defer stopProgramFileFollower()
+	saveHandler := &programSaveHandler{
+		pager:  func() *goless.Pager { return pager },
+		secure: opts.secure,
+	}
 	buildProgramPager = func() *goless.Pager {
 		return newProgramPager(
 			renderMode,
@@ -197,7 +211,7 @@ func run() error {
 			opts.searchCaseMode,
 			opts.squeeze,
 			opts.tabWidth,
-			session.commandHandler(
+			session.commandHandlerWithSave(
 				func() error {
 					if loadCurrent == nil {
 						return fmt.Errorf("file reload unavailable")
@@ -213,6 +227,9 @@ func run() error {
 				},
 				func() error {
 					return editProgramCurrentFile(screen, pager, session, opts.secure, reloadDisplayed)
+				},
+				func(cmd goless.Command) (string, error) {
+					return saveHandler.save(cmd)
 				},
 			),
 		)
@@ -316,6 +333,10 @@ func run() error {
 				break
 			}
 			if shouldHandleProgramEditKey(keyResult) && handleProgramEditKey(pager, event) {
+				pager.Draw(screen)
+				break
+			}
+			if shouldHandleProgramSaveKey(keyResult) && handleProgramSaveKey(pager, event, opts.secure) {
 				pager.Draw(screen)
 				break
 			}
@@ -1154,6 +1175,10 @@ func (s *programSession) last() bool {
 }
 
 func (s *programSession) commandHandler(load func() error, reload func() error, showInformation func(title, body string), edit func() error) func(goless.Command) goless.CommandResult {
+	return s.commandHandlerWithSave(load, reload, showInformation, edit, nil)
+}
+
+func (s *programSession) commandHandlerWithSave(load func() error, reload func() error, showInformation func(title, body string), edit func() error, save func(goless.Command) (string, error)) func(goless.Command) goless.CommandResult {
 	return func(cmd goless.Command) goless.CommandResult {
 		switch cmd.Name {
 		case "q", "Q", "quit":
@@ -1166,6 +1191,26 @@ func (s *programSession) commandHandler(load func() error, reload func() error, 
 				return goless.CommandResult{Handled: true, Message: err.Error()}
 			}
 			return goless.CommandResult{Handled: true}
+		case "save", "write", "w":
+			if save == nil {
+				return goless.CommandResult{Handled: true, Message: errProgramSaveUnavailable.Error(), KeepPrompt: true}
+			}
+			path, err := save(cmd)
+			if err != nil {
+				if errors.Is(err, errProgramSaveOverwrite) {
+					return goless.CommandResult{
+						Handled:    true,
+						KeepPrompt: true,
+						PromptText: fmt.Sprintf("File already exists. Overwrite? (yes/no) "),
+					}
+				}
+				return goless.CommandResult{
+					Handled:    true,
+					Message:    err.Error(),
+					KeepPrompt: shouldKeepProgramSavePrompt(err),
+				}
+			}
+			return goless.CommandResult{Handled: true, Message: "saved " + path, Transient: true}
 		case "file", "f":
 			return goless.CommandResult{Handled: true, Message: s.currentFileLabel()}
 		case "license":
@@ -1288,6 +1333,26 @@ func shouldHandleProgramEditKey(result goless.KeyResult) bool {
 	return !result.Handled && result.Context == goless.NormalKeyContext
 }
 
+func handleProgramSaveKey(pager *goless.Pager, ev *tcell.EventKey, secure bool) bool {
+	if pager == nil || ev == nil {
+		return false
+	}
+	if ev.Key() != tcell.KeyRune || ev.Str() != "s" || ev.Modifiers() != tcell.ModNone {
+		return false
+	}
+	if secure {
+		return runProgramCommand(pager, "save")
+	}
+	if pager.BeginSavePrompt() {
+		return true
+	}
+	return runProgramCommand(pager, "save")
+}
+
+func shouldHandleProgramSaveKey(result goless.KeyResult) bool {
+	return !result.Handled && result.Context == goless.NormalKeyContext
+}
+
 func runProgramCommand(pager *goless.Pager, command string) bool {
 	if pager == nil || command == "" {
 		return false
@@ -1326,6 +1391,96 @@ func editProgramCurrentFile(screen tcell.Screen, pager *goless.Pager, session *p
 		return reload()
 	}
 	return nil
+}
+
+type programSaveRequest struct {
+	path   string
+	export goless.ExportOptions
+}
+
+func parseProgramSaveCommand(cmd goless.Command) (programSaveRequest, error) {
+	req := programSaveRequest{
+		export: goless.ExportOptions{
+			Scope:  goless.ExportCurrentContent,
+			Format: goless.ExportANSI,
+		},
+	}
+	for i := 0; i < len(cmd.Args); i++ {
+		switch cmd.Args[i] {
+		case "--view", "--viewport":
+			req.export.Scope = goless.ExportViewport
+		case "--file", "--all", "--content":
+			req.export.Scope = goless.ExportCurrentContent
+		case "--mono", "--plain", "--text":
+			req.export.Format = goless.ExportPlain
+		case "--ansi", "--color":
+			req.export.Format = goless.ExportANSI
+		default:
+			req.path = strings.TrimSpace(strings.Join(cmd.Args[i:], " "))
+			i = len(cmd.Args)
+		}
+	}
+	if req.path == "" {
+		return programSaveRequest{}, errProgramSavePath
+	}
+	return req, nil
+}
+
+func (h *programSaveHandler) save(cmd goless.Command) (string, error) {
+	if h == nil {
+		return "", errProgramSaveUnavailable
+	}
+	return saveProgramContent(h.pager(), cmd, h.secure)
+}
+
+func saveProgramContent(pager *goless.Pager, cmd goless.Command, secure bool) (string, error) {
+	if secure {
+		return "", errProgramSaveDisabled
+	}
+	if pager == nil {
+		return "", errProgramSaveUnavailable
+	}
+	req, err := parseProgramSaveCommand(cmd)
+	if err != nil {
+		return "", err
+	}
+	if err := checkProgramSaveOverwrite(req.path, cmd.Confirmed); err != nil {
+		return "", err
+	}
+	data, err := pager.Export(req.export)
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(req.path, data, 0o644); err != nil {
+		return "", err
+	}
+	return req.path, nil
+}
+
+var errProgramSaveOverwrite = errors.New("overwrite confirmation required")
+
+func checkProgramSaveOverwrite(path string, allowOverwrite bool) error {
+	if allowOverwrite {
+		return nil
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if info.Mode().IsRegular() {
+		return fmt.Errorf("%w: %s exists; press Enter again to overwrite", errProgramSaveOverwrite, path)
+	}
+	return nil
+}
+
+func shouldKeepProgramSavePrompt(err error) bool {
+	return err != nil &&
+		!errors.Is(err, errProgramSaveDisabled) &&
+		!errors.Is(err, errProgramSaveUnavailable) &&
+		!errors.Is(err, errProgramSaveOverwrite)
 }
 
 func suspendProgramScreen(screen tcell.Screen, pager *goless.Pager, action func() error) error {

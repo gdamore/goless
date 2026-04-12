@@ -28,6 +28,9 @@ and writes the selected input unchanged instead of opening the full-screen UI.
 When you are viewing a regular file in the full-screen UI, `v` opens that file
 in `$EDITOR` at the current line. Use `-secure` to disable editor launch.
 
+Use `s` to save the current content set or just the visible viewport to a file.
+The standalone save command is also disabled by `-secure`.
+
 If you want a default visual theme, `goless` also looks for a per-user JSON
 config at `goless/config.json` under the directory returned by
 `os.UserConfigDir()`.

@@ -6,9 +6,10 @@ package view
 import "strings"
 
 type Command struct {
-	Raw  string
-	Name string
-	Args []string
+	Raw       string
+	Name      string
+	Args      []string
+	Confirmed bool
 }
 
 type CommandResult struct {
@@ -16,6 +17,8 @@ type CommandResult struct {
 	Quit       bool
 	Message    string
 	KeepPrompt bool
+	PromptText string
+	Transient  bool
 }
 
 type CommandHandler func(Command) CommandResult

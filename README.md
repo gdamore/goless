@@ -388,6 +388,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `g`/`G` for top/bottom
 - `W` to toggle wrap
 - `r` or `Ctrl-L` to repaint the screen
+- `s` to open the standalone save prompt for the current content set
 - `v` to open the current file in `$EDITOR` at the current line unless `-secure` is set
 - `/` and `?` to search forward/backward
 - `n` and `N` to repeat search
@@ -400,6 +401,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `:next` / `:prev` to move through a multi-file session
 - `:first`, `:last`, `:x`, and `:file` for file-session control
 - `R` or `:reload` to reload the current file/input while keeping the current viewport when possible
+- `:save <path>` / `:write <path>` / `:w <path>` to save either the full current content set or the visible viewport; `s` opens a prompt for the same modes, and `-secure` disables save
 - `:license` to show the bundled Apache license in an overlay
 - `:Q` as an additional quit command
 - `=` or `Ctrl-G` to show current file/session status in the standalone program

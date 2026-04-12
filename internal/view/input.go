@@ -22,16 +22,19 @@ const (
 	promptSearchForward promptKind = iota
 	promptSearchBackward
 	promptCommand
+	promptSave
 )
 
 type promptState struct {
-	kind    promptKind
-	prefix  string
-	editor  lineEditor
-	seeded  bool
-	preview *searchState
-	errText string
-	history promptHistoryState
+	kind        promptKind
+	prefix      string
+	editor      lineEditor
+	seeded      bool
+	preview     *searchState
+	export      ExportOptions
+	saveConfirm *saveConfirmState
+	errText     string
+	history     promptHistoryState
 }
 
 func (p *promptState) String() string {
@@ -60,6 +63,7 @@ type promptHistoryKind int
 const (
 	promptHistorySearch promptHistoryKind = iota
 	promptHistoryCommand
+	promptHistorySave
 	promptHistoryKindCount
 )
 
