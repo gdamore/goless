@@ -995,7 +995,7 @@ func TestRunDefaultConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run(--default-config) failed: %v", err)
 	}
-	if got, want := output, "{\n  \"theme\": \"pretty\",\n  \"hidden\": false,\n  \"line-numbers\": false,\n  \"live-links\": false,\n  \"secure\": false\n}\n"; got != want {
+	if got, want := output, "{\n  \"theme\": \"pretty\",\n  \"hidden\": false,\n  \"line-numbers\": false,\n  \"live-links\": false,\n  \"mouse\": true,\n  \"secure\": false\n}\n"; got != want {
 		t.Fatalf("run(--default-config) output = %q, want %q", got, want)
 	}
 }
@@ -2402,56 +2402,60 @@ func TestApplyStartupCommand(t *testing.T) {
 }
 
 func TestEditProgramCurrentFileUsesCurrentLineAndReloads(t *testing.T) {
-	previous := programEditorLauncher
-	t.Cleanup(func() {
-		programEditorLauncher = previous
-	})
+	for _, mouseCapture := range []bool{true, false} {
+		t.Run(fmt.Sprintf("mouseCapture=%v", mouseCapture), func(t *testing.T) {
+			previous := programEditorLauncher
+			t.Cleanup(func() {
+				programEditorLauncher = previous
+			})
 
-	var (
-		gotLine int
-		gotPath string
-	)
-	programEditorLauncher = func(line int, path string) error {
-		gotLine = line
-		gotPath = path
-		return nil
-	}
+			var (
+				gotLine int
+				gotPath string
+			)
+			programEditorLauncher = func(line int, path string) error {
+				gotLine = line
+				gotPath = path
+				return nil
+			}
 
-	term := vt.NewMockTerm(vt.MockOptSize{X: 80, Y: 24})
-	screen, err := tcell.NewTerminfoScreenFromTty(term)
-	if err != nil {
-		t.Fatalf("NewTerminfoScreenFromTty failed: %v", err)
-	}
-	if err := screen.Init(); err != nil {
-		t.Fatalf("screen.Init failed: %v", err)
-	}
-	defer screen.Fini()
+			term := vt.NewMockTerm(vt.MockOptSize{X: 80, Y: 24})
+			screen, err := tcell.NewTerminfoScreenFromTty(term)
+			if err != nil {
+				t.Fatalf("NewTerminfoScreenFromTty failed: %v", err)
+			}
+			if err := screen.Init(); err != nil {
+				t.Fatalf("screen.Init failed: %v", err)
+			}
+			defer screen.Fini()
 
-	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
-	pager.SetSize(20, 3)
-	if err := pager.AppendString("one\ntwo\nthree\nfour\n"); err != nil {
-		t.Fatalf("AppendString failed: %v", err)
-	}
-	pager.Flush()
-	pager.JumpToLine(3)
+			pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap, ShowStatus: true})
+			pager.SetSize(20, 3)
+			if err := pager.AppendString("one\ntwo\nthree\nfour\n"); err != nil {
+				t.Fatalf("AppendString failed: %v", err)
+			}
+			pager.Flush()
+			pager.JumpToLine(3)
 
-	path := filepath.Join(t.TempDir(), "sample.txt")
-	session := newProgramSession([]string{path}, programStartup{})
-	reloads := 0
-	if err := editProgramCurrentFile(screen, pager, session, false, true, func() error {
-		reloads++
-		return nil
-	}); err != nil {
-		t.Fatalf("editProgramCurrentFile(...) failed: %v", err)
-	}
-	if got, want := gotLine, 3; got != want {
-		t.Fatalf("editor line = %d, want %d", got, want)
-	}
-	if got, want := gotPath, path; got != want {
-		t.Fatalf("editor path = %q, want %q", got, want)
-	}
-	if got, want := reloads, 1; got != want {
-		t.Fatalf("reload count = %d, want %d", got, want)
+			path := filepath.Join(t.TempDir(), "sample.txt")
+			session := newProgramSession([]string{path}, programStartup{})
+			reloads := 0
+			if err := editProgramCurrentFile(screen, pager, session, false, mouseCapture, func() error {
+				reloads++
+				return nil
+			}); err != nil {
+				t.Fatalf("editProgramCurrentFile(...) failed: %v", err)
+			}
+			if got, want := gotLine, 3; got != want {
+				t.Fatalf("editor line = %d, want %d", got, want)
+			}
+			if got, want := gotPath, path; got != want {
+				t.Fatalf("editor path = %q, want %q", got, want)
+			}
+			if got, want := reloads, 1; got != want {
+				t.Fatalf("reload count = %d, want %d", got, want)
+			}
+		})
 	}
 }
 

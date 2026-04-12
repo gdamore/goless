@@ -18,6 +18,7 @@ func TestDefaultProgramConfigValues(t *testing.T) {
 		Hidden:      false,
 		LineNumbers: false,
 		LiveLinks:   false,
+		Mouse:       true,
 		Secure:      false,
 	}
 	if got != want {
@@ -30,7 +31,7 @@ func TestWriteDefaultProgramConfig(t *testing.T) {
 	if err := writeDefaultProgramConfig(&out); err != nil {
 		t.Fatalf("writeDefaultProgramConfig(...) failed: %v", err)
 	}
-	const want = "{\n  \"theme\": \"pretty\",\n  \"hidden\": false,\n  \"line-numbers\": false,\n  \"live-links\": false,\n  \"secure\": false\n}\n"
+	const want = "{\n  \"theme\": \"pretty\",\n  \"hidden\": false,\n  \"line-numbers\": false,\n  \"live-links\": false,\n  \"mouse\": true,\n  \"secure\": false\n}\n"
 	if got := out.String(); got != want {
 		t.Fatalf("writeDefaultProgramConfig(...) = %q, want %q", got, want)
 	}
@@ -160,6 +161,16 @@ func TestParseProgramFlagsCLIOverridesProgramConfig(t *testing.T) {
 	}
 	if opts.secure {
 		t.Fatal("secure = true, want CLI override false")
+	}
+}
+
+func TestParseProgramFlagsNoMouse(t *testing.T) {
+	opts, _, err := parseProgramFlags([]string{"--no-mouse"})
+	if err != nil {
+		t.Fatalf("parseProgramFlags(--no-mouse) failed: %v", err)
+	}
+	if opts.mouseCapture {
+		t.Fatal("mouseCapture = true, want false")
 	}
 }
 
@@ -446,6 +457,9 @@ func TestWriteProgramUsageMentionsConfig(t *testing.T) {
 	}
 	if got := out.String(); !strings.Contains(got, "--default-config") {
 		t.Fatalf("help output = %q, want default config flag", got)
+	}
+	if got := out.String(); !strings.Contains(got, "--mouse") {
+		t.Fatalf("help output = %q, want mouse option", got)
 	}
 	if got := out.String(); !strings.Contains(got, "--no-mouse") {
 		t.Fatalf("help output = %q, want no-mouse option", got)

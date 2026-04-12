@@ -27,6 +27,7 @@ type programConfigDefaults struct {
 	Hidden      bool   `json:"hidden"`
 	LineNumbers bool   `json:"line-numbers"`
 	LiveLinks   bool   `json:"live-links"`
+	Mouse       bool   `json:"mouse"`
 	Secure      bool   `json:"secure"`
 }
 
@@ -36,6 +37,7 @@ func defaultProgramConfigValues() programConfigDefaults {
 		Hidden:      false,
 		LineNumbers: false,
 		LiveLinks:   false,
+		Mouse:       true,
 		Secure:      false,
 	}
 }

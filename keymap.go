@@ -69,7 +69,7 @@ const (
 	KeyActionPageDown
 	// KeyActionGoLineStart jumps to the beginning of the current horizontal line.
 	KeyActionGoLineStart
-	// KeyActionGoLineEnd jumps to the end of the current horizontal line.
+	// KeyActionGoLineEnd jumps to the furthest reachable horizontal position.
 	KeyActionGoLineEnd
 	// KeyActionGoTop jumps to the top of the document.
 	KeyActionGoTop

@@ -341,6 +341,8 @@ Program flags:
 - `-I` for case-insensitive search behavior
 - `--license` to open the bundled Apache license, or print it when stdout is not a terminal
 - `--default-config` to print the built-in JSON config to stdout
+- `--mouse` to capture mouse button and wheel events in the standalone program
+- `--no-mouse` to disable mouse button and wheel capture in the standalone program
 - `-config path` to load a specific JSON config file instead of the default per-user path
 - `-x n` to set tab width
 - `-theme dark|light|plain|pretty`
@@ -384,7 +386,8 @@ Use `goless --default-config` to print that built-in config and redirect it into
 
 CLI flags still take precedence over config values, so
 `goless -config ./alt.json -theme dark file.txt` overrides the selected config
-file's `"theme"` value for that invocation.
+file's `"theme"` value for that invocation, and `goless --mouse file.txt`
+temporarily enables mouse capture even when the config sets `"mouse": false`.
 
 Set `"mouse": false` or pass `--no-mouse` if you want the
 standalone program to leave terminal text selection and native scrolling alone.

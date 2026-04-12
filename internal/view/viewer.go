@@ -609,7 +609,7 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 		return KeyResult{}
 	}
 
-	return KeyResult{Handled: true, Action: KeyAction(a), Context: KeyContextNormal}
+	return KeyResult{Handled: true, Action: actionToKeyAction(a), Context: KeyContextNormal}
 }
 
 // HandleMouseResult applies a mouse event and reports whether it was handled.
@@ -635,7 +635,7 @@ func (v *Viewer) HandleMouseResult(ev *tcell.EventMouse) MouseResult {
 		return MouseResult{Context: KeyContextNormal}
 	}
 
-	return MouseResult{Handled: true, Action: KeyAction(a), Context: KeyContextNormal}
+	return MouseResult{Handled: true, Action: actionToKeyAction(a), Context: KeyContextNormal}
 }
 
 func (v *Viewer) consumeTransientMessage() {
@@ -718,6 +718,10 @@ func (v *Viewer) horizontalScrollStep() int {
 
 func (v *Viewer) verticalScrollStep() int {
 	return max(1, min(8, v.scrollBodyHeight()/8))
+}
+
+func (v *Viewer) helpVerticalScrollStep() int {
+	return max(1, min(8, v.helpPageStep()/8))
 }
 
 func (v *Viewer) halfHorizontalScrollStep() int {
@@ -2081,9 +2085,9 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 	case actionScrollDown:
 		v.helpOffset++
 	case actionScrollUpStep:
-		v.helpOffset -= v.verticalScrollStep()
+		v.helpOffset -= v.helpVerticalScrollStep()
 	case actionScrollDownStep:
-		v.helpOffset += v.verticalScrollStep()
+		v.helpOffset += v.helpVerticalScrollStep()
 	case actionScrollLeft:
 		v.helpColOffset -= v.horizontalScrollStep()
 	case actionScrollRight:
@@ -2116,7 +2120,7 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 		return KeyResult{Context: KeyContextHelp}
 	}
 	v.clampHelpOffset()
-	return KeyResult{Handled: true, Action: KeyAction(a), Context: KeyContextHelp}
+	return KeyResult{Handled: true, Action: actionToKeyAction(a), Context: KeyContextHelp}
 }
 
 func (v *Viewer) handleHelpMouse(ev *tcell.EventMouse) MouseResult {
@@ -2134,7 +2138,7 @@ func (v *Viewer) handleHelpMouse(ev *tcell.EventMouse) MouseResult {
 		return MouseResult{Context: KeyContextHelp}
 	}
 	v.clampHelpOffset()
-	return MouseResult{Handled: true, Action: KeyAction(a), Context: KeyContextHelp}
+	return MouseResult{Handled: true, Action: actionToKeyAction(a), Context: KeyContextHelp}
 }
 
 func (v *Viewer) handlePromptKey(ev *tcell.EventKey) KeyResult {
