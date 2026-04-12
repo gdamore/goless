@@ -32,6 +32,8 @@ const (
 	PromptSearchBackward
 	// PromptCommand is the ":" command prompt.
 	PromptCommand
+	// PromptSave is the built-in save prompt.
+	PromptSave
 )
 
 // PromptInfo summarizes the built-in prompt state passed to Text.PromptLine.

@@ -3,6 +3,7 @@
  q Q Esc             quit
   r ^L                repaint
   R                   reload current file/input
+  s                   save to a file
   v                   edit current file using $EDITOR
   F4                  cycle themes
 
@@ -30,6 +31,10 @@
   F2                  cycle case mode (smart/case/nocase)
   F3                  cycle match mode (substring/word/regex)
 
+[1;4mSave Prompt[0m
+  F2                  toggle file/view save scope
+  F3                  toggle ansi/mono save format
+
 [1;4mPrompt Editing[0m
   ← ^B                move backward one character
   → ^F                move forward one character
@@ -56,4 +61,5 @@
   :set smartcase          search smart-case
   :set searchmode=[3mmode[0m    set match mode (sub|word|regex)
   :reload                 reload current file/input
+  :save [--view] [--mono] [3mpath[0m
   :license                show the bundled Apache license

@@ -3344,6 +3344,216 @@ func TestPromptLineFormatterOverridesBuiltInPromptText(t *testing.T) {
 	}
 }
 
+func TestSavePromptDisplaysAndCyclesModes(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		CommandHandler: func(cmd Command) CommandResult {
+			return CommandResult{Handled: true}
+		},
+	})
+	v.SetSize(24, 2)
+	if !v.BeginSavePrompt() {
+		t.Fatal("BeginSavePrompt() = false, want true")
+	}
+
+	_, screen := newMockScreen(t, 24, 2)
+	defer screen.Fini()
+	v.drawPrompt(screen, 1)
+	if got := screenRowString(screen, 1, 24); !strings.Contains(got, "F2:\U0001F4C4") || !strings.Contains(got, "F3:\U0001F3A8") {
+		t.Fatalf("save prompt row = %q, want page/palette hints", got)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyF2))
+	v.HandleKey(keyKey(tcell.KeyF3))
+	screen.Clear()
+	v.drawPrompt(screen, 1)
+	if got := screenRowString(screen, 1, 24); !strings.Contains(got, "F2:\U0001F50D") || !strings.Contains(got, "F3:\u26AB") {
+		t.Fatalf("save prompt row after toggles = %q, want magnifier/dot hints", got)
+	}
+}
+
+func TestSavePromptCommitBuildsSaveCommand(t *testing.T) {
+	doc := model.NewDocument(4)
+	var seen Command
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		CommandHandler: func(cmd Command) CommandResult {
+			seen = cmd
+			return CommandResult{Handled: true}
+		},
+	})
+	v.SetSize(20, 2)
+	if !v.BeginSavePrompt() {
+		t.Fatal("BeginSavePrompt() = false, want true")
+	}
+	v.prompt.editor.SetText("out.txt")
+	v.HandleKey(keyKey(tcell.KeyF2))
+	v.HandleKey(keyKey(tcell.KeyF3))
+
+	result := v.commitPrompt()
+	if !result.Handled || result.Context != KeyContextPrompt {
+		t.Fatalf("commitPrompt() = %+v, want handled prompt result", result)
+	}
+	if got, want := seen.Name, "save"; got != want {
+		t.Fatalf("save command name = %q, want %q", got, want)
+	}
+	if got, want := strings.Join(seen.Args, " "), "--view --mono out.txt"; got != want {
+		t.Fatalf("save command args = %q, want %q", got, want)
+	}
+}
+
+func TestSavePromptShowsOverwriteConfirmationAndRequiresYes(t *testing.T) {
+	doc := model.NewDocument(4)
+	calls := 0
+	var seen Command
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		CommandHandler: func(cmd Command) CommandResult {
+			seen = cmd
+			calls++
+			if !cmd.Confirmed {
+				return CommandResult{
+					Handled:    true,
+					KeepPrompt: true,
+					PromptText: "File already exists. Overwrite? (yes/no)",
+				}
+			}
+			return CommandResult{Handled: true}
+		},
+	})
+	v.SetSize(48, 2)
+	if !v.BeginSavePrompt() {
+		t.Fatal("BeginSavePrompt() = false, want true")
+	}
+	v.prompt.editor.SetText("out.txt")
+
+	result := v.commitPrompt()
+	if !result.Handled || result.Context != KeyContextPrompt {
+		t.Fatalf("first commitPrompt() = %+v, want handled prompt result", result)
+	}
+	if got, want := v.prompt.prefix, "File already exists. Overwrite? (yes/no)"; got != want {
+		t.Fatalf("overwrite prompt prefix = %q, want %q", got, want)
+	}
+	_, screen := newMockScreen(t, 48, 2)
+	defer screen.Fini()
+	v.drawPrompt(screen, 1)
+	if got := screenRowString(screen, 1, 48); !strings.Contains(got, "Overwrite? (yes/no)") {
+		t.Fatalf("overwrite prompt row = %q, want visible confirmation", got)
+	}
+
+	v.prompt.editor.SetText("no")
+	result = v.commitPrompt()
+	if !result.Handled || result.Context != KeyContextPrompt {
+		t.Fatalf("second commitPrompt() = %+v, want handled prompt result", result)
+	}
+	if v.prompt != nil {
+		t.Fatal("prompt after no confirmation = non-nil, want closed prompt")
+	}
+	if got, want := v.message, "save canceled"; got != want {
+		t.Fatalf("message after no confirmation = %q, want %q", got, want)
+	}
+
+	if !v.BeginSavePrompt() {
+		t.Fatal("BeginSavePrompt() second time = false, want true")
+	}
+	v.prompt.editor.SetText("out.txt")
+	result = v.commitPrompt()
+	if !result.Handled || result.Context != KeyContextPrompt || v.prompt == nil {
+		t.Fatalf("third commitPrompt() = %+v, want active confirmation prompt", result)
+	}
+	v.prompt.editor.SetText("yes")
+	result = v.commitPrompt()
+	if !result.Handled || result.Context != KeyContextPrompt {
+		t.Fatalf("confirmed commitPrompt() = %+v, want handled prompt result", result)
+	}
+	if !seen.Confirmed {
+		t.Fatal("confirmed save command did not set Confirmed")
+	}
+}
+
+func TestTransientSaveCanceledMessageClearsOnNextKey(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		CommandHandler: func(cmd Command) CommandResult {
+			if !cmd.Confirmed {
+				return CommandResult{
+					Handled:    true,
+					KeepPrompt: true,
+					PromptText: "File already exists. Overwrite? (yes/no)",
+				}
+			}
+			return CommandResult{Handled: true}
+		},
+	})
+	v.SetSize(32, 2)
+	if !v.BeginSavePrompt() {
+		t.Fatal("BeginSavePrompt() = false, want true")
+	}
+	v.prompt.editor.SetText("out.txt")
+	_ = v.commitPrompt()
+	v.prompt.editor.SetText("no")
+	_ = v.commitPrompt()
+
+	if got, want := v.message, "save canceled"; got != want {
+		t.Fatalf("message after cancel = %q, want %q", got, want)
+	}
+	left, _ := v.statusText()
+	if got, want := left, "save canceled"; got != want {
+		t.Fatalf("status left after cancel = %q, want %q", got, want)
+	}
+
+	v.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "j", tcell.ModNone))
+	if got := v.message; got != "" {
+		t.Fatalf("message after next key = %q, want empty", got)
+	}
+	left, _ = v.statusText()
+	if got, want := left, "F1 Help"; got != want {
+		t.Fatalf("status left after next key = %q, want %q", got, want)
+	}
+}
+
+func TestTransientSaveSuccessMessageClearsOnNextKey(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		CommandHandler: func(cmd Command) CommandResult {
+			return CommandResult{Handled: true, Message: "saved out.txt", Transient: true}
+		},
+	})
+	v.SetSize(32, 2)
+	if !v.BeginSavePrompt() {
+		t.Fatal("BeginSavePrompt() = false, want true")
+	}
+	v.prompt.editor.SetText("out.txt")
+	_ = v.commitPrompt()
+
+	if got, want := v.message, "saved out.txt"; got != want {
+		t.Fatalf("message after save = %q, want %q", got, want)
+	}
+	left, _ := v.statusText()
+	if got, want := left, "saved out.txt"; got != want {
+		t.Fatalf("status left after save = %q, want %q", got, want)
+	}
+
+	v.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, "j", tcell.ModNone))
+	if got := v.message; got != "" {
+		t.Fatalf("message after next key = %q, want empty", got)
+	}
+	left, _ = v.statusText()
+	if got, want := left, "F1 Help"; got != want {
+		t.Fatalf("status left after next key = %q, want %q", got, want)
+	}
+}
+
 func TestDrawPromptShowsTailWhenInputOverflows(t *testing.T) {
 	doc := model.NewDocument(4)
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})

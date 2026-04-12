@@ -46,6 +46,7 @@ type Viewer struct {
 	prompt        *promptState
 	history       [promptHistoryKindCount][]string
 	message       string
+	clearMessage  bool
 	search        searchState
 	text          Text
 	keys          keyMap
@@ -515,6 +516,8 @@ func (v *Viewer) HandleMouse(ev *tcell.EventMouse) bool {
 
 // HandleKeyResult applies a key event and reports whether it was handled and whether the viewer should exit.
 func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
+	v.consumeTransientMessage()
+
 	if v.follow && ev.Key() == tcell.KeyCtrlC {
 		ctx := KeyContextNormal
 		switch v.mode {
@@ -625,6 +628,14 @@ func (v *Viewer) HandleMouseResult(ev *tcell.EventMouse) MouseResult {
 	}
 
 	return MouseResult{Handled: true, Action: KeyAction(a), Context: KeyContextNormal}
+}
+
+func (v *Viewer) consumeTransientMessage() {
+	if !v.clearMessage {
+		return
+	}
+	v.message = ""
+	v.clearMessage = false
 }
 
 // ToggleWrap switches between horizontal scrolling and soft wrap modes.
@@ -1877,6 +1888,16 @@ func (v *Viewer) drawPrompt(screen tcell.Screen, y int) {
 				screen.PutStrStyled(start, y, right, style)
 				v.drawHintKeys(screen, start, y, right, v.cfg.Chrome.StatusHelpKeyStyle, "F2:", "F3:")
 			}
+		} else if left, right, leftCursorX, ok := v.builtInSavePromptDisplay(v.width); ok {
+			prompt = left
+			cursorX = leftCursorX
+			screen.PutStrStyled(0, y, truncateToWidth(left, v.width), style)
+			if right != "" {
+				right = truncateToWidth(right, v.width)
+				start := max(v.width-stringWidth(right), 0)
+				screen.PutStrStyled(start, y, right, style)
+				v.drawHintKeys(screen, start, y, right, v.cfg.Chrome.StatusHelpKeyStyle, "F2:", "F3:")
+			}
 		} else {
 			prompt, cursorX = v.promptDisplay(v.width)
 			screen.PutStrStyled(0, y, padRightToWidth(prompt, v.width), style)
@@ -1949,6 +1970,27 @@ func (v *Viewer) builtInSearchPromptLeft(width int, prefix string) (string, int)
 	return v.layoutPromptInput(prefix, width)
 }
 
+func (v *Viewer) builtInSavePromptDisplay(width int) (left, right string, cursorX int, ok bool) {
+	if v.prompt == nil || v.text.PromptLine != nil || v.prompt.kind != promptSave {
+		return "", "", -1, false
+	}
+	prefix := " " + v.prompt.prefix
+	left, cursorX = v.layoutPromptInput(prefix, width)
+	if v.prompt.errText != "" {
+		return left, "", cursorX, true
+	}
+	if hint := v.saveModeHintText(); hint != "" {
+		right = " " + hint + " "
+	}
+	rightWidth := stringWidth(right)
+	if rightWidth >= width {
+		right = ""
+	} else if stringWidth(left) > width-rightWidth {
+		left, cursorX = v.layoutPromptInput(prefix, width-rightWidth)
+	}
+	return left, right, cursorX, true
+}
+
 func (v *Viewer) displayPromptText(width int) string {
 	text, _ := v.promptDisplay(width)
 	return text
@@ -1972,6 +2014,8 @@ func toPromptKind(kind promptKind) PromptKind {
 		return PromptKindSearchBackward
 	case promptCommand:
 		return PromptKindCommand
+	case promptSave:
+		return PromptKindSave
 	default:
 		return PromptKindSearchForward
 	}
@@ -2257,9 +2301,17 @@ func (v *Viewer) handlePromptMappedAction(a action) (KeyResult, bool) {
 	case actionQuit:
 		return KeyResult{Handled: true, Quit: true, Action: KeyActionQuit, Context: KeyContextPrompt}, true
 	case actionCycleSearchCase:
+		if v.prompt != nil && v.prompt.kind == promptSave {
+			v.cycleSaveScope()
+			return KeyResult{Handled: true, Context: KeyContextPrompt}, true
+		}
 		v.CycleSearchCaseMode()
 		return KeyResult{Handled: true, Action: KeyActionCycleSearchCase, Context: KeyContextPrompt}, true
 	case actionCycleSearchMode:
+		if v.prompt != nil && v.prompt.kind == promptSave {
+			v.cycleSaveFormat()
+			return KeyResult{Handled: true, Context: KeyContextPrompt}, true
+		}
 		v.CycleSearchMode()
 		return KeyResult{Handled: true, Action: KeyActionCycleSearchMode, Context: KeyContextPrompt}, true
 	default:

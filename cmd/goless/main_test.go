@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -1582,6 +1583,61 @@ func TestHandleProgramEditKey(t *testing.T) {
 	}
 }
 
+func TestHandleProgramSaveKeyOpensSavePrompt(t *testing.T) {
+	var seen []goless.Command
+	pager := goless.New(goless.Config{
+		TabWidth: 4,
+		WrapMode: goless.NoWrap,
+		CommandHandler: func(cmd goless.Command) goless.CommandResult {
+			seen = append(seen, cmd)
+			return goless.CommandResult{Handled: true}
+		},
+	})
+	pager.SetSize(24, 2)
+	if err := pager.AppendString("one\ntwo\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	if !handleProgramSaveKey(pager, tcell.NewEventKey(tcell.KeyRune, "s", tcell.ModNone), false) {
+		t.Fatal("handleProgramSaveKey(s, secure=false) = false, want true")
+	}
+	for _, r := range "out.txt" {
+		pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyRune, string(r), tcell.ModNone))
+	}
+	pager.HandleKeyResult(tcell.NewEventKey(tcell.KeyEnter, "", tcell.ModNone))
+
+	if got, want := len(seen), 1; got != want {
+		t.Fatalf("save command count = %d, want %d", got, want)
+	}
+	if got, want := strings.Join(seen[0].Args, " "), "--file --ansi out.txt"; got != want {
+		t.Fatalf("save command args = %q, want %q", got, want)
+	}
+}
+
+func TestHandleProgramSaveKeyFallsBackToCommandInSecureMode(t *testing.T) {
+	var seen []goless.Command
+	pager := goless.New(goless.Config{
+		TabWidth: 4,
+		WrapMode: goless.NoWrap,
+		CommandHandler: func(cmd goless.Command) goless.CommandResult {
+			seen = append(seen, cmd)
+			return goless.CommandResult{Handled: true, Message: "save disabled in secure mode"}
+		},
+	})
+	pager.SetSize(20, 2)
+
+	if !handleProgramSaveKey(pager, tcell.NewEventKey(tcell.KeyRune, "s", tcell.ModNone), true) {
+		t.Fatal("handleProgramSaveKey(s, secure=true) = false, want true")
+	}
+	if got, want := len(seen), 1; got != want {
+		t.Fatalf("secure save command count = %d, want %d", got, want)
+	}
+	if got, want := seen[0].Name, "save"; got != want {
+		t.Fatalf("secure save command = %q, want %q", got, want)
+	}
+}
+
 func TestShouldHandleProgramReloadKey(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -1600,6 +1656,122 @@ func TestShouldHandleProgramReloadKey(t *testing.T) {
 				t.Fatalf("shouldHandleProgramReloadKey(%+v) = %v, want %v", tt.result, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestParseProgramSaveCommand(t *testing.T) {
+	req, err := parseProgramSaveCommand(goless.Command{
+		Name: "save",
+		Args: []string{"--view", "--mono", "tmp", "out.txt"},
+	})
+	if err != nil {
+		t.Fatalf("parseProgramSaveCommand(...) failed: %v", err)
+	}
+	if got, want := req.path, "tmp out.txt"; got != want {
+		t.Fatalf("save path = %q, want %q", got, want)
+	}
+	if got, want := req.export.Scope, goless.ExportViewport; got != want {
+		t.Fatalf("save scope = %v, want %v", got, want)
+	}
+	if got, want := req.export.Format, goless.ExportPlain; got != want {
+		t.Fatalf("save format = %v, want %v", got, want)
+	}
+}
+
+func TestSaveProgramContentWritesRequestedExport(t *testing.T) {
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("\x1b[31mred\x1b[0m\nplain\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	path := filepath.Join(t.TempDir(), "saved.txt")
+	gotPath, err := saveProgramContent(pager, goless.Command{
+		Name: "save",
+		Args: []string{"--mono", path},
+	}, false)
+	if err != nil {
+		t.Fatalf("saveProgramContent(...) failed: %v", err)
+	}
+	if got, want := gotPath, path; got != want {
+		t.Fatalf("saveProgramContent path = %q, want %q", got, want)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(saved.txt) failed: %v", err)
+	}
+	if got, want := string(data), "red\nplain\n"; got != want {
+		t.Fatalf("saved file = %q, want %q", got, want)
+	}
+}
+
+func TestSaveProgramContentSecureMode(t *testing.T) {
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap})
+	_, err := saveProgramContent(pager, goless.Command{
+		Name: "save",
+		Args: []string{"out.txt"},
+	}, true)
+	if !errors.Is(err, errProgramSaveDisabled) {
+		t.Fatalf("saveProgramContent(..., secure=true) error = %v, want %v", err, errProgramSaveDisabled)
+	}
+}
+
+func TestSaveProgramContentRequiresConfirmationBeforeOverwrite(t *testing.T) {
+	pager := goless.New(goless.Config{TabWidth: 4, WrapMode: goless.NoWrap})
+	pager.SetSize(20, 2)
+	if err := pager.AppendString("new\ncontent\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	path := filepath.Join(t.TempDir(), "saved.txt")
+	if err := os.WriteFile(path, []byte("old\ncontent\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(existing) failed: %v", err)
+	}
+	cmd := goless.Command{Name: "save", Args: []string{path}}
+
+	_, err := saveProgramContent(pager, cmd, false)
+	if !errors.Is(err, errProgramSaveOverwrite) {
+		t.Fatalf("first overwrite save error = %v, want %v", err, errProgramSaveOverwrite)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(existing) failed: %v", err)
+	}
+	if got, want := string(data), "old\ncontent\n"; got != want {
+		t.Fatalf("file after unconfirmed overwrite = %q, want %q", got, want)
+	}
+
+	cmd.Confirmed = true
+	gotPath, err := saveProgramContent(pager, cmd, false)
+	if err != nil {
+		t.Fatalf("confirmed overwrite save failed: %v", err)
+	}
+	if got, want := gotPath, path; got != want {
+		t.Fatalf("confirmed overwrite path = %q, want %q", got, want)
+	}
+	data, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(overwritten) failed: %v", err)
+	}
+	if got, want := string(data), "new\ncontent\n"; got != want {
+		t.Fatalf("file after confirmed overwrite = %q, want %q", got, want)
+	}
+}
+
+func TestDemoSessionSaveCommandRequestsConfirmationPrompt(t *testing.T) {
+	session := newProgramSession([]string{"one.txt"}, programStartup{})
+	handler := session.commandHandlerWithSave(nil, nil, nil, nil, func(cmd goless.Command) (string, error) {
+		return "", errProgramSaveOverwrite
+	})
+
+	result := handler(goless.Command{Name: "save", Args: []string{"out.txt"}})
+	if !result.Handled || !result.KeepPrompt {
+		t.Fatalf("save overwrite result = %+v, want handled keep-prompt result", result)
+	}
+	if got, want := result.PromptText, "File already exists. Overwrite? (yes/no) "; got != want {
+		t.Fatalf("overwrite prompt text = %q, want %q", got, want)
 	}
 }
 

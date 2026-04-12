@@ -21,6 +21,7 @@ const (
 	PromptKindSearchForward PromptKind = iota
 	PromptKindSearchBackward
 	PromptKindCommand
+	PromptKindSave
 )
 
 // PromptInfo summarizes the built-in prompt state passed to Text.PromptLine.

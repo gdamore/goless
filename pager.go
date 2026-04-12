@@ -73,9 +73,10 @@ type MouseResult struct {
 
 // Command describes a ':' command entered through the built-in prompt.
 type Command struct {
-	Raw  string
-	Name string
-	Args []string
+	Raw       string
+	Name      string
+	Args      []string
+	Confirmed bool
 }
 
 // CommandResult describes how an embedder handled a ':' command.
@@ -84,6 +85,8 @@ type CommandResult struct {
 	Quit       bool
 	Message    string
 	KeepPrompt bool
+	PromptText string
+	Transient  bool
 }
 
 // Position summarizes the current logical pager viewport.
@@ -237,6 +240,11 @@ func (p *Pager) Len() int64 {
 	return p.doc.Len()
 }
 
+// Export returns the current pager content or visible viewport as plain or ANSI-styled text.
+func (p *Pager) Export(opts ExportOptions) ([]byte, error) {
+	return p.viewer.Export(toInternalExportOptions(opts))
+}
+
 // SetSize updates the pager viewport size.
 func (p *Pager) SetSize(width, height int) {
 	p.viewer.SetSize(width, height)
@@ -250,6 +258,11 @@ func (p *Pager) Draw(screen tcell.Screen) {
 // Refresh rebuilds the pager layout against the current document contents.
 func (p *Pager) Refresh() {
 	p.viewer.Refresh()
+}
+
+// BeginSavePrompt opens the built-in save prompt when a command handler is configured.
+func (p *Pager) BeginSavePrompt() bool {
+	return p.viewer.BeginSavePrompt()
 }
 
 // SetTheme updates how document content colors are rendered.
@@ -755,15 +768,18 @@ func toInternalCommandHandler(handler func(Command) CommandResult) iview.Command
 	}
 	return func(cmd iview.Command) iview.CommandResult {
 		result := handler(Command{
-			Raw:  cmd.Raw,
-			Name: cmd.Name,
-			Args: append([]string(nil), cmd.Args...),
+			Raw:       cmd.Raw,
+			Name:      cmd.Name,
+			Args:      append([]string(nil), cmd.Args...),
+			Confirmed: cmd.Confirmed,
 		})
 		return iview.CommandResult{
 			Handled:    result.Handled,
 			Quit:       result.Quit,
 			Message:    result.Message,
 			KeepPrompt: result.KeepPrompt,
+			PromptText: result.PromptText,
+			Transient:  result.Transient,
 		}
 	}
 }
@@ -971,6 +987,8 @@ func toPublicPromptKind(kind iview.PromptKind) PromptKind {
 		return PromptSearchBackward
 	case iview.PromptKindCommand:
 		return PromptCommand
+	case iview.PromptKindSave:
+		return PromptSave
 	default:
 		return PromptSearchForward
 	}
