@@ -421,7 +421,7 @@ func (p *Pager) GoLineStart() {
 	p.viewer.GoLineStart()
 }
 
-// GoLineEnd moves to the end of the current horizontal line in no-wrap mode.
+// GoLineEnd moves to the furthest reachable horizontal position in no-wrap mode.
 func (p *Pager) GoLineEnd() {
 	p.viewer.GoLineEnd()
 }

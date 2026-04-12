@@ -2438,7 +2438,7 @@ func TestEditProgramCurrentFileUsesCurrentLineAndReloads(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sample.txt")
 	session := newProgramSession([]string{path}, programStartup{})
 	reloads := 0
-	if err := editProgramCurrentFile(screen, pager, session, false, func() error {
+	if err := editProgramCurrentFile(screen, pager, session, false, true, func() error {
 		reloads++
 		return nil
 	}); err != nil {
@@ -2457,7 +2457,7 @@ func TestEditProgramCurrentFileUsesCurrentLineAndReloads(t *testing.T) {
 
 func TestEditProgramCurrentFileSecureMode(t *testing.T) {
 	session := newProgramSession([]string{"sample.txt"}, programStartup{})
-	err := editProgramCurrentFile(nil, nil, session, true, nil)
+	err := editProgramCurrentFile(nil, nil, session, true, true, nil)
 	if err == nil {
 		t.Fatal("editProgramCurrentFile(..., secure=true, ...) = nil error, want error")
 	}
@@ -2475,7 +2475,7 @@ func TestEditProgramCurrentFileRejectsCurrentInputWithoutFile(t *testing.T) {
 		{name: "stdin session", session: newProgramSession([]string{"-"}, programStartup{})},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			err := editProgramCurrentFile(nil, nil, tt.session, false, nil)
+			err := editProgramCurrentFile(nil, nil, tt.session, false, true, nil)
 			if err == nil {
 				t.Fatal("editProgramCurrentFile(...) = nil error, want error")
 			}

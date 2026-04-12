@@ -17,6 +17,7 @@ type programConfig struct {
 	Hidden      *bool  `json:"hidden"`
 	LineNumbers *bool  `json:"line-numbers"`
 	LiveLinks   *bool  `json:"live-links"`
+	Mouse       *bool  `json:"mouse"`
 	Secure      *bool  `json:"secure"`
 	Theme       string `json:"theme"`
 }
@@ -119,6 +120,9 @@ func applyProgramConfig(opts programOptions, cfg programConfig) programOptions {
 	}
 	if cfg.LiveLinks != nil {
 		opts.liveLinks = *cfg.LiveLinks
+	}
+	if cfg.Mouse != nil {
+		opts.mouseCapture = *cfg.Mouse
 	}
 	if cfg.Secure != nil {
 		opts.secure = *cfg.Secure

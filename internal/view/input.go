@@ -84,6 +84,8 @@ const (
 	actionScrollRight
 	actionScrollLeftFine
 	actionScrollRightFine
+	actionHalfScreenLeft
+	actionHalfScreenRight
 	actionHalfPageUp
 	actionHalfPageDown
 	actionPageUp
