@@ -110,6 +110,75 @@ const (
 	actionCycleSearchMode
 )
 
+func actionToKeyAction(a action) KeyAction {
+	switch a {
+	case actionQuit:
+		return KeyActionQuit
+	case actionScrollUp:
+		return KeyActionScrollUp
+	case actionScrollDown:
+		return KeyActionScrollDown
+	case actionScrollUpStep:
+		return KeyActionScrollUpStep
+	case actionScrollDownStep:
+		return KeyActionScrollDownStep
+	case actionScrollLeft:
+		return KeyActionScrollLeft
+	case actionScrollRight:
+		return KeyActionScrollRight
+	case actionScrollLeftFine:
+		return KeyActionScrollLeftFine
+	case actionScrollRightFine:
+		return KeyActionScrollRightFine
+	case actionHalfScreenLeft:
+		return KeyActionHalfScreenLeft
+	case actionHalfScreenRight:
+		return KeyActionHalfScreenRight
+	case actionHalfPageUp:
+		return KeyActionHalfPageUp
+	case actionHalfPageDown:
+		return KeyActionHalfPageDown
+	case actionPageUp:
+		return KeyActionPageUp
+	case actionPageDown:
+		return KeyActionPageDown
+	case actionGoLineStart:
+		return KeyActionGoLineStart
+	case actionGoLineEnd:
+		return KeyActionGoLineEnd
+	case actionGoTop:
+		return KeyActionGoTop
+	case actionGoBottom:
+		return KeyActionGoBottom
+	case actionToggleWrap:
+		return KeyActionToggleWrap
+	case actionPromptSearchForward:
+		return KeyActionPromptSearchForward
+	case actionPromptSearchBackward:
+		return KeyActionPromptSearchBackward
+	case actionPromptCommand:
+		return KeyActionPromptCommand
+	case actionSearchNext:
+		return KeyActionSearchNext
+	case actionSearchPrev:
+		return KeyActionSearchPrev
+	case actionRefresh:
+		return KeyActionRefresh
+	case actionToggleHelp:
+		return KeyActionToggleHelp
+	case actionFollow:
+		return KeyActionFollow
+	case actionStopFollow:
+		return KeyActionStopFollow
+	case actionCycleSearchCase:
+		return KeyActionCycleSearchCase
+	case actionCycleSearchMode:
+		return KeyActionCycleSearchMode
+	default:
+		return KeyActionNone
+	}
+}
+
 // MouseResult summarizes how the viewer handled a mouse event.
 type MouseResult struct {
 	Handled bool

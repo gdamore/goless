@@ -60,7 +60,9 @@ The initial format is:
 Use `goless --default-config` to print the built-in JSON and redirect it into a
 starter config file.
 
-Command-line flags still win over config values for a single invocation.
+Command-line flags still win over config values for a single invocation, so
+`goless --mouse file.txt` temporarily enables mouse capture even when the config
+sets `"mouse": false`.
 
 Set `"mouse": false` or pass `--no-mouse` if you want the
 standalone program to leave terminal text selection and native scrolling alone.

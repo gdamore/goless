@@ -617,6 +617,7 @@ func programFlagHelps() []programFlagHelp {
 		{names: []string{"-S"}, description: "Accepted as a less-compatibility no-op."},
 		{names: []string{"--hidden"}, description: "Show tabs, line endings, carriage returns, and EOF markers."},
 		{names: []string{"--live-links"}, description: "Enable live OSC 8 hyperlinks in the standalone program."},
+		{names: []string{"--mouse"}, description: "Capture mouse button and wheel events in the standalone program."},
 		{names: []string{"--no-mouse"}, description: "Disable mouse button and wheel capture in the standalone program."},
 		{names: []string{"--secure"}, description: "Disable standalone commands that launch external programs."},
 		{names: []string{"-s", "--squeeze"}, description: "Collapse repeated blank lines in the current view."},

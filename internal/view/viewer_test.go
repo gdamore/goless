@@ -189,15 +189,13 @@ func TestLessKeyMapArrowKeysUseVerticalStepAndShiftForFineScroll(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 17)
 
-	step := v.verticalScrollStep()
-
 	v.HandleKey(keyKey(tcell.KeyDown))
-	if got, want := v.Position().Row, 1+step; got != want {
+	if got, want := v.Position().Row, 3; got != want {
 		t.Fatalf("Position().Row after Down = %d, want %d", got, want)
 	}
 
 	v.HandleKey(keyKeyMod(tcell.KeyDown, tcell.ModShift))
-	if got, want := v.Position().Row, 2+step; got != want {
+	if got, want := v.Position().Row, 4; got != want {
 		t.Fatalf("Position().Row after Shift-Down = %d, want %d", got, want)
 	}
 
@@ -302,11 +300,14 @@ func TestLessKeyMapRefreshAliases(t *testing.T) {
 
 func TestLessKeyMapHelpScrollsLeftAndCloses(t *testing.T) {
 	doc := model.NewDocument(4)
-	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyz\n")); err != nil {
-		t.Fatalf("Append failed: %v", err)
-	}
-
-	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		Text: Text{
+			HelpBody: "abcdefghijklmnopqrstuvwxyz\n",
+		},
+	})
 	v.SetSize(20, 4)
 	v.mode = modeHelp
 
@@ -323,6 +324,36 @@ func TestLessKeyMapHelpScrollsLeftAndCloses(t *testing.T) {
 	v.HandleKey(keyKey(tcell.KeyF1))
 	if got, want := v.mode, modeNormal; got != want {
 		t.Fatalf("mode after F1 = %v, want %v", got, want)
+	}
+}
+
+func TestLessKeyMapHelpArrowKeysIgnoreDocumentHeaderLines(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("header\nbody\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+	var help strings.Builder
+	for i := 1; i <= 30; i++ {
+		help.WriteString("line")
+		help.WriteString(strconv.Itoa(i))
+		help.WriteByte('\n')
+	}
+
+	v := New(doc, Config{
+		TabWidth:    4,
+		WrapMode:    layout.NoWrap,
+		ShowStatus:  true,
+		HeaderLines: 6,
+		Text: Text{
+			HelpBody: help.String(),
+		},
+	})
+	v.SetSize(20, 17)
+	v.mode = modeHelp
+
+	v.HandleKey(keyKey(tcell.KeyDown))
+	if got, want := v.helpOffset, 2; got != want {
+		t.Fatalf("help offset after Down = %d, want %d", got, want)
 	}
 }
 
