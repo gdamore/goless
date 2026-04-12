@@ -111,6 +111,16 @@ func TestLessKeyMapHalfPageMoves(t *testing.T) {
 		t.Fatalf("Position().Row after Ctrl-U = %d, want %d", got, want)
 	}
 
+	v.HandleKey(keyRune("J"))
+	if got, want := v.Position().Row, 2; got != want {
+		t.Fatalf("Position().Row after J = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("K"))
+	if got, want := v.Position().Row, 1; got != want {
+		t.Fatalf("Position().Row after K = %d, want %d", got, want)
+	}
+
 	v.HandleKey(keyKey(tcell.KeyCtrlD))
 	if got, want := v.Position().Row, 2; got != want {
 		t.Fatalf("Position().Row after KeyCtrlD = %d, want %d", got, want)
@@ -251,9 +261,9 @@ func TestLessKeyMapRefreshAliases(t *testing.T) {
 	}
 }
 
-func TestLessKeyMapHelpScrollsAndCloses(t *testing.T) {
+func TestLessKeyMapHelpScrollsLeftAndCloses(t *testing.T) {
 	doc := model.NewDocument(4)
-	if err := doc.Append([]byte("hello\nworld\n")); err != nil {
+	if err := doc.Append([]byte("abcdefghijklmnopqrstuvwxyz\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
 	}
 
@@ -261,14 +271,19 @@ func TestLessKeyMapHelpScrollsAndCloses(t *testing.T) {
 	v.SetSize(20, 4)
 	v.mode = modeHelp
 
-	v.HandleKey(keyKey(tcell.KeyDown))
-	if got, want := v.helpOffset, 1; got != want {
-		t.Fatalf("help offset after down = %d, want %d", got, want)
+	v.HandleKey(keyKey(tcell.KeyRight))
+	if got, want := v.helpColOffset, 5; got != want {
+		t.Fatalf("help col offset after Right = %d, want %d", got, want)
 	}
 
 	v.HandleKey(keyRune("h"))
+	if got, want := v.helpColOffset, 0; got != want {
+		t.Fatalf("help col offset after h = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyKey(tcell.KeyF1))
 	if got, want := v.mode, modeNormal; got != want {
-		t.Fatalf("mode after h = %v, want %v", got, want)
+		t.Fatalf("mode after F1 = %v, want %v", got, want)
 	}
 }
 
@@ -538,9 +553,29 @@ func TestLessKeyMapHelpUsesHorizontalNavigationKeys(t *testing.T) {
 		t.Fatalf("help col offset after Right = %d, want %d", got, want)
 	}
 
+	v.HandleKey(keyRune("h"))
+	if got, want := v.helpColOffset, 0; got != want {
+		t.Fatalf("help col offset after h = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("l"))
+	if got, want := v.helpColOffset, 5; got != want {
+		t.Fatalf("help col offset after l = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("L"))
+	if got, want := v.helpColOffset, 6; got != want {
+		t.Fatalf("help col offset after L = %d, want %d", got, want)
+	}
+
 	v.HandleKey(keyKeyMod(tcell.KeyLeft, tcell.ModShift))
-	if got, want := v.helpColOffset, 4; got != want {
+	if got, want := v.helpColOffset, 5; got != want {
 		t.Fatalf("help col offset after Shift-Left = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("H"))
+	if got, want := v.helpColOffset, 0; got != want {
+		t.Fatalf("help col offset after H = %d, want %d", got, want)
 	}
 }
 
@@ -940,6 +975,27 @@ func TestHorizontalScrollStepUsesQuarterWidthCappedAtEight(t *testing.T) {
 	if got, want := v.colOffset, 0; got != want {
 		t.Fatalf("col offset after Left = %d, want %d", got, want)
 	}
+
+	v.HandleKey(keyKey(tcell.KeyRight))
+	v.HandleKey(keyRune("h"))
+	if got, want := v.colOffset, 0; got != want {
+		t.Fatalf("col offset after h = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("l"))
+	if got, want := v.colOffset, 5; got != want {
+		t.Fatalf("col offset after l = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("L"))
+	if got, want := v.colOffset, 6; got != want {
+		t.Fatalf("col offset after L = %d, want %d", got, want)
+	}
+
+	v.HandleKey(keyRune("H"))
+	if got, want := v.colOffset, 0; got != want {
+		t.Fatalf("col offset after H = %d, want %d", got, want)
+	}
 }
 
 func TestScrollRightDoesNotMoveWhenLineFullyVisible(t *testing.T) {
@@ -1019,7 +1075,7 @@ func TestShiftArrowKeysRemainFineHorizontalScroll(t *testing.T) {
 
 func TestGoLineStartAndEnd(t *testing.T) {
 	doc := model.NewDocument(4)
-	if err := doc.Append([]byte("abcdefghij\n")); err != nil {
+	if err := doc.Append([]byte("abc\nabcdefghijklmnopqrstuvwxyz\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
 	}
 
@@ -1027,7 +1083,7 @@ func TestGoLineStartAndEnd(t *testing.T) {
 	v.SetSize(5, 4)
 
 	v.GoLineEnd()
-	if got, want := v.colOffset, 5; got != want {
+	if got, want := v.colOffset, 21; got != want {
 		t.Fatalf("col offset after GoLineEnd = %d, want %d", got, want)
 	}
 
@@ -1037,7 +1093,7 @@ func TestGoLineStartAndEnd(t *testing.T) {
 	}
 
 	v.HandleKey(keyKey(tcell.KeyEnd))
-	if got, want := v.colOffset, 5; got != want {
+	if got, want := v.colOffset, 21; got != want {
 		t.Fatalf("col offset after End = %d, want %d", got, want)
 	}
 
@@ -1047,7 +1103,7 @@ func TestGoLineStartAndEnd(t *testing.T) {
 	}
 
 	v.HandleKey(keyRune("$"))
-	if got, want := v.colOffset, 5; got != want {
+	if got, want := v.colOffset, 21; got != want {
 		t.Fatalf("col offset after $ = %d, want %d", got, want)
 	}
 
@@ -2497,9 +2553,9 @@ func TestToggleHelpMode(t *testing.T) {
 	if got, want := v.mode, modeNormal; got != want {
 		t.Fatalf("initial mode = %v, want %v", got, want)
 	}
-	v.HandleKey(keyRune("h"))
+	v.HandleKey(keyKey(tcell.KeyF1))
 	if got, want := v.mode, modeHelp; got != want {
-		t.Fatalf("mode after h = %v, want %v", got, want)
+		t.Fatalf("mode after F1 = %v, want %v", got, want)
 	}
 	v.HandleKey(keyKey(tcell.KeyEscape))
 	if got, want := v.mode, modeNormal; got != want {
@@ -2520,6 +2576,15 @@ func TestViewerUsesCustomTextBundle(t *testing.T) {
 
 	if got, want := v.text.HelpTitle, "Ayuda"; got != want {
 		t.Fatalf("help title = %q, want %q", got, want)
+	}
+}
+
+func TestViewerDefaultHelpCloseUsesF1(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+
+	if got, want := v.text.HelpClose, "Esc/q/F1 close"; got != want {
+		t.Fatalf("help close = %q, want %q", got, want)
 	}
 }
 

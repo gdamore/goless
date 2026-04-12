@@ -52,6 +52,7 @@ The initial format is:
   "hidden": false,
   "line-numbers": false,
   "live-links": false,
+  "mouse": true,
   "secure": false
 }
 ```
@@ -60,6 +61,9 @@ Use `goless --default-config` to print the built-in JSON and redirect it into a
 starter config file.
 
 Command-line flags still win over config values for a single invocation.
+
+Set `"mouse": false` or pass `--no-mouse` if you want the
+standalone program to leave terminal text selection and native scrolling alone.
 
 ## What Users Need First
 

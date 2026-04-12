@@ -1,5 +1,5 @@
 [1;4mGeneral[0m
-  h F1                help
+  F1                  help
   q Q Esc             quit
   r ^L                repaint
 
@@ -8,13 +8,16 @@
   ↑ k y ^Y ^K ^P      move one line backward
   f Space PgDn ^F ^V  forward one page
   PgUp ^B b w         backward one page
-  d ^D                forward half page
-  u ^U                backward half page
+  d ^D J              forward half page
+  u ^U K              backward half page
   Home 0              jump to line start
-  End $               jump to line end
+  End $               jump to far right
   g <                 jump to top
   G >                 jump to bottom
-  ← → l               scroll horizontally faster
+  ← h                 scroll horizontally left
+  → l                 scroll horizontally right
+  H                   scroll left half screen
+  L                   scroll right half screen
   Shift+← Shift+→     scroll horizontally by 1
   W                   toggle wrap
   F                   follow the end of the document

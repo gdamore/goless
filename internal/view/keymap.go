@@ -44,6 +44,8 @@ const (
 	KeyActionScrollRight          = actionScrollRight
 	KeyActionScrollLeftFine       = actionScrollLeftFine
 	KeyActionScrollRightFine      = actionScrollRightFine
+	KeyActionHalfScreenLeft       = actionHalfScreenLeft
+	KeyActionHalfScreenRight      = actionHalfScreenRight
 	KeyActionHalfPageUp           = actionHalfPageUp
 	KeyActionHalfPageDown         = actionHalfPageDown
 	KeyActionPageUp               = actionPageUp
@@ -142,8 +144,12 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyRune, rune: "e", action: actionScrollDown},
 			{key: tcell.KeyRune, rune: "j", action: actionScrollDown},
 			{key: tcell.KeyRune, rune: "k", action: actionScrollUp},
-			{key: tcell.KeyRune, rune: "h", action: actionToggleHelp},
+			{key: tcell.KeyRune, rune: "h", action: actionScrollLeft},
 			{key: tcell.KeyRune, rune: "l", action: actionScrollRight},
+			{key: tcell.KeyRune, rune: "H", mod: tcell.ModShift, action: actionHalfScreenLeft},
+			{key: tcell.KeyRune, rune: "L", mod: tcell.ModShift, action: actionHalfScreenRight},
+			{key: tcell.KeyRune, rune: "K", mod: tcell.ModShift, action: actionHalfPageUp},
+			{key: tcell.KeyRune, rune: "J", mod: tcell.ModShift, action: actionHalfPageDown},
 			{key: tcell.KeyRune, rune: "u", mod: tcell.ModCtrl, action: actionHalfPageUp},
 			{key: tcell.KeyRune, rune: "d", mod: tcell.ModCtrl, action: actionHalfPageDown},
 			{key: tcell.KeyRune, rune: "u", action: actionHalfPageUp},
@@ -195,8 +201,12 @@ func lessKeyMap() keyMap {
 			{key: tcell.KeyRune, rune: "e", action: actionScrollDown},
 			{key: tcell.KeyRune, rune: "j", action: actionScrollDown},
 			{key: tcell.KeyRune, rune: "k", action: actionScrollUp},
-			{key: tcell.KeyRune, rune: "h", action: actionToggleHelp},
+			{key: tcell.KeyRune, rune: "h", action: actionScrollLeft},
 			{key: tcell.KeyRune, rune: "l", action: actionScrollRight},
+			{key: tcell.KeyRune, rune: "H", mod: tcell.ModShift, action: actionHalfScreenLeft},
+			{key: tcell.KeyRune, rune: "L", mod: tcell.ModShift, action: actionHalfScreenRight},
+			{key: tcell.KeyRune, rune: "K", mod: tcell.ModShift, action: actionHalfPageUp},
+			{key: tcell.KeyRune, rune: "J", mod: tcell.ModShift, action: actionHalfPageDown},
 			{key: tcell.KeyRune, rune: "u", mod: tcell.ModCtrl, action: actionHalfPageUp},
 			{key: tcell.KeyRune, rune: "d", mod: tcell.ModCtrl, action: actionHalfPageDown},
 			{key: tcell.KeyRune, rune: "u", action: actionHalfPageUp},

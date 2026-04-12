@@ -46,6 +46,7 @@ type programOptions struct {
 	ignoredRawControl bool
 	lineNumbers       bool
 	liveLinks         bool
+	mouseCapture      bool
 	presetName        string
 	quitAtEOF         bool
 	quitAtEOFFirst    bool
@@ -196,7 +197,7 @@ func run() error {
 		return err
 	}
 	defer screen.Fini()
-	screen.EnableMouse()
+	programConfigureMouse(screen, opts.mouseCapture)
 
 	width, height := screen.Size()
 	if width <= 0 || height <= 0 {
@@ -267,7 +268,7 @@ func run() error {
 					}
 				},
 				func() error {
-					return editProgramCurrentFile(screen, pager, session, opts.secure, reloadDisplayed)
+					return editProgramCurrentFile(screen, pager, session, opts.secure, opts.mouseCapture, reloadDisplayed)
 				},
 				func(cmd goless.Command) (string, error) {
 					return saveHandler.save(cmd)
@@ -481,6 +482,7 @@ func parseProgramFlags(args []string) (programOptions, []string, error) {
 		chromeName:     "auto",
 		renderName:     "hybrid",
 		searchCaseMode: goless.SearchSmartCase,
+		mouseCapture:   true,
 		tabWidth:       8,
 	}
 	if !programHasImmediateExitFlag(args) {
@@ -517,6 +519,7 @@ func parseProgramFlags(args []string) (programOptions, []string, error) {
 	fs.BoolVar(&opts.ignoredChopLines, "S", opts.ignoredChopLines, "accepted as a less compatibility no-op")
 	fs.BoolVar(&opts.hidden, "hidden", opts.hidden, "show tabs, line endings, carriage returns, and EOF markers")
 	fs.BoolVar(&opts.liveLinks, "live-links", opts.liveLinks, "enable live OSC 8 hyperlinks in the program")
+	fs.BoolVar(&opts.mouseCapture, "mouse", opts.mouseCapture, "capture mouse button and wheel events in the program")
 	fs.BoolVar(&opts.quitAtEOF, "quit-at-eof", opts.quitAtEOF, "long form of -e")
 	fs.BoolVar(&opts.quitAtEOFFirst, "QUIT-AT-EOF", opts.quitAtEOFFirst, "long form of -E")
 	fs.BoolVar(&opts.secure, "secure", opts.secure, "disable standalone commands that launch external programs")
@@ -532,11 +535,16 @@ func parseProgramFlags(args []string) (programOptions, []string, error) {
 
 	var ignoreSmartCase bool
 	var ignoreCase bool
+	var noMouse bool
 	fs.BoolVar(&ignoreSmartCase, "i", false, "smart-case search")
 	fs.BoolVar(&ignoreCase, "I", false, "case-insensitive search")
+	fs.BoolVar(&noMouse, "no-mouse", false, "disable mouse capture in the program")
 
 	if err := fs.Parse(args); err != nil {
 		return programOptions{}, nil, &programFlagParseError{err: err}
+	}
+	if noMouse {
+		opts.mouseCapture = false
 	}
 	if opts.showHelp {
 		return opts, nil, nil
@@ -609,6 +617,7 @@ func programFlagHelps() []programFlagHelp {
 		{names: []string{"-S"}, description: "Accepted as a less-compatibility no-op."},
 		{names: []string{"--hidden"}, description: "Show tabs, line endings, carriage returns, and EOF markers."},
 		{names: []string{"--live-links"}, description: "Enable live OSC 8 hyperlinks in the standalone program."},
+		{names: []string{"--no-mouse"}, description: "Disable mouse button and wheel capture in the standalone program."},
 		{names: []string{"--secure"}, description: "Disable standalone commands that launch external programs."},
 		{names: []string{"-s", "--squeeze"}, description: "Collapse repeated blank lines in the current view."},
 		{names: []string{"--config"}, value: "<path>", description: "Load a JSON config file; overrides GOLESS_CONFIG and the default per-user path."},
@@ -717,6 +726,8 @@ func programSuggestFlag(name string) string {
 		"--QUIT-AT-EOF",
 		"--hidden",
 		"--live-links",
+		"--mouse",
+		"--no-mouse",
 		"--secure",
 		"--squeeze",
 		"--config",
@@ -1593,7 +1604,7 @@ func runProgramCommand(pager *goless.Pager, command string) bool {
 	return true
 }
 
-func editProgramCurrentFile(screen tcell.Screen, pager *goless.Pager, session *programSession, secure bool, reload func() error) error {
+func editProgramCurrentFile(screen tcell.Screen, pager *goless.Pager, session *programSession, secure bool, mouseCapture bool, reload func() error) error {
 	if secure {
 		return fmt.Errorf("editor disabled in secure mode")
 	}
@@ -1610,7 +1621,7 @@ func editProgramCurrentFile(screen tcell.Screen, pager *goless.Pager, session *p
 			line = row
 		}
 	}
-	if err := suspendProgramScreen(screen, pager, func() error {
+	if err := suspendProgramScreen(screen, pager, mouseCapture, func() error {
 		return programEditorLauncher(line, path)
 	}); err != nil {
 		return err
@@ -1746,7 +1757,7 @@ func shouldKeepProgramSavePrompt(err error) bool {
 		!errors.Is(err, errProgramSaveOverwrite)
 }
 
-func suspendProgramScreen(screen tcell.Screen, pager *goless.Pager, action func() error) error {
+func suspendProgramScreen(screen tcell.Screen, pager *goless.Pager, mouseCapture bool, action func() error) error {
 	if action == nil {
 		return nil
 	}
@@ -1757,7 +1768,7 @@ func suspendProgramScreen(screen tcell.Screen, pager *goless.Pager, action func(
 	actionErr := action()
 	initErr := screen.Init()
 	if initErr == nil {
-		screen.EnableMouse()
+		programConfigureMouse(screen, mouseCapture)
 		if pager != nil {
 			width, height := screen.Size()
 			pager.SetSize(width, height)
@@ -1771,6 +1782,17 @@ func suspendProgramScreen(screen tcell.Screen, pager *goless.Pager, action func(
 		return actionErr
 	}
 	return initErr
+}
+
+func programConfigureMouse(screen tcell.Screen, capture bool) {
+	if screen == nil {
+		return
+	}
+	if capture {
+		screen.EnableMouse(tcell.MouseButtonEvents)
+		return
+	}
+	screen.DisableMouse()
 }
 
 func launchProgramEditor(line int, path string) error {

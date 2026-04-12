@@ -151,7 +151,7 @@ func main() {
 		return
 	}
 	defer screen.Fini()
-	screen.EnableMouse()
+	screen.EnableMouse(tcell.MouseButtonEvents)
 
 	pager.Draw(screen)
 	_ = pager.SearchForward("world")
@@ -168,7 +168,7 @@ The normal embedding model is:
    finalized.
 4. Size with `SetSize`.
 5. Render with `Draw`.
-6. If you want wheel input, call `screen.EnableMouse()`.
+6. If you want wheel input without taking over click-drag selection, call `screen.EnableMouse(tcell.MouseButtonEvents)`.
 7. Drive interaction through `HandleKey`, `HandleMouse`, or direct method calls.
 
 ## Public API Shape
@@ -374,6 +374,7 @@ The initial config schema is intentionally small:
   "hidden": false,
   "line-numbers": false,
   "live-links": false,
+  "mouse": true,
   "secure": false
 }
 ```
@@ -384,6 +385,9 @@ Use `goless --default-config` to print that built-in config and redirect it into
 CLI flags still take precedence over config values, so
 `goless -config ./alt.json -theme dark file.txt` overrides the selected config
 file's `"theme"` value for that invocation.
+
+Set `"mouse": false` or pass `--no-mouse` if you want the
+standalone program to leave terminal text selection and native scrolling alone.
 
 The default key group is intentionally less-like. Common bindings include:
 
@@ -417,7 +421,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `:set searchcase=smart|case|nocase` and `:set searchmode=sub|word|regex`
 - `F` to enable follow mode
 - `Ctrl-X` or `Ctrl-C` to stop following without quitting
-- `h` or `F1` to toggle help
+- `F1` to toggle help
 
 ## Hardening and Performance
 

@@ -552,6 +552,10 @@ func (v *Viewer) HandleKeyResult(ev *tcell.EventKey) KeyResult {
 		v.ScrollLeft(1)
 	case actionScrollRightFine:
 		v.ScrollRight(1)
+	case actionHalfScreenLeft:
+		v.ScrollLeft(v.halfHorizontalScrollStep())
+	case actionHalfScreenRight:
+		v.ScrollRight(v.halfHorizontalScrollStep())
 	case actionHalfPageUp:
 		v.HalfPageUp()
 	case actionHalfPageDown:
@@ -708,6 +712,10 @@ func (v *Viewer) horizontalScrollStep() int {
 	return max(1, min(8, v.bodyContentWidth()/4))
 }
 
+func (v *Viewer) halfHorizontalScrollStep() int {
+	return max(v.bodyContentWidth()/2, 1)
+}
+
 // GoLineStart moves to the beginning of the current horizontal line in no-wrap mode.
 func (v *Viewer) GoLineStart() {
 	if v.cfg.WrapMode != layout.NoWrap {
@@ -717,30 +725,13 @@ func (v *Viewer) GoLineStart() {
 	v.relayout()
 }
 
-// GoLineEnd moves to the end of the current horizontal line in no-wrap mode.
+// GoLineEnd moves to the furthest reachable horizontal position in no-wrap mode.
 func (v *Viewer) GoLineEnd() {
 	if v.cfg.WrapMode != layout.NoWrap {
 		return
 	}
 	v.ensureLayout()
-	rowIndex := v.scrollableRowStartIndex() + v.rowOffset
-	if rowIndex < 0 || rowIndex >= len(v.layout.Rows) {
-		v.colOffset = v.maxColOffset()
-		v.relayout()
-		return
-	}
-	lineIndex := v.layout.Rows[rowIndex].LineIndex
-	if lineIndex < 0 || lineIndex >= len(v.layout.Lines) {
-		v.colOffset = v.maxColOffset()
-		v.relayout()
-		return
-	}
-	totalCells := v.layout.Lines[lineIndex].TotalCells + v.trailingMarkerCellWidth(lineIndex)
-	frozen := v.headerColumnWidth(v.rawContentWidth())
-	v.colOffset = max(totalCells-frozen-max(v.bodyContentWidth(), 1), 0)
-	if maxOffset := v.maxColOffset(); v.colOffset > maxOffset {
-		v.colOffset = maxOffset
-	}
+	v.colOffset = v.maxColOffset()
 	v.relayout()
 }
 
@@ -2089,6 +2080,10 @@ func (v *Viewer) handleHelpKey(ev *tcell.EventKey) KeyResult {
 		v.helpColOffset--
 	case actionScrollRightFine:
 		v.helpColOffset++
+	case actionHalfScreenLeft:
+		v.helpColOffset -= v.halfHorizontalScrollStep()
+	case actionHalfScreenRight:
+		v.helpColOffset += v.halfHorizontalScrollStep()
 	case actionPageUp:
 		v.helpOffset -= v.helpPageStep()
 	case actionPageDown:

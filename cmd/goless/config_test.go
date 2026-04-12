@@ -106,7 +106,7 @@ func TestLoadProgramConfigRejectsTrailingContent(t *testing.T) {
 
 func TestParseProgramFlagsLoadsDefaultProgramConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
-	writeDefaultTestProgramConfig(t, `{"theme":"dark","hidden":true,"line-numbers":true,"live-links":true,"secure":true}`)
+	writeDefaultTestProgramConfig(t, `{"theme":"dark","hidden":true,"line-numbers":true,"live-links":true,"mouse":false,"secure":true}`)
 
 	opts, args, err := parseProgramFlags([]string{"sample.txt"})
 	if err != nil {
@@ -124,6 +124,9 @@ func TestParseProgramFlagsLoadsDefaultProgramConfig(t *testing.T) {
 	if !opts.liveLinks {
 		t.Fatal("liveLinks = false, want true from config")
 	}
+	if opts.mouseCapture {
+		t.Fatal("mouseCapture = true, want false from config")
+	}
 	if !opts.secure {
 		t.Fatal("secure = false, want true from config")
 	}
@@ -134,9 +137,9 @@ func TestParseProgramFlagsLoadsDefaultProgramConfig(t *testing.T) {
 
 func TestParseProgramFlagsCLIOverridesProgramConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
-	writeDefaultTestProgramConfig(t, `{"theme":"dark","hidden":true,"line-numbers":true,"live-links":true,"secure":true}`)
+	writeDefaultTestProgramConfig(t, `{"theme":"dark","hidden":true,"line-numbers":true,"live-links":true,"mouse":false,"secure":true}`)
 
-	opts, _, err := parseProgramFlags([]string{"-theme", "light", "-N=false", "-hidden=false", "-live-links=false", "-secure=false"})
+	opts, _, err := parseProgramFlags([]string{"-theme", "light", "-N=false", "-hidden=false", "-live-links=false", "-mouse=true", "-secure=false"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
@@ -151,6 +154,9 @@ func TestParseProgramFlagsCLIOverridesProgramConfig(t *testing.T) {
 	}
 	if opts.liveLinks {
 		t.Fatal("liveLinks = true, want CLI override false")
+	}
+	if !opts.mouseCapture {
+		t.Fatal("mouseCapture = false, want CLI override true")
 	}
 	if opts.secure {
 		t.Fatal("secure = true, want CLI override false")
@@ -440,6 +446,9 @@ func TestWriteProgramUsageMentionsConfig(t *testing.T) {
 	}
 	if got := out.String(); !strings.Contains(got, "--default-config") {
 		t.Fatalf("help output = %q, want default config flag", got)
+	}
+	if got := out.String(); !strings.Contains(got, "--no-mouse") {
+		t.Fatalf("help output = %q, want no-mouse option", got)
 	}
 }
 

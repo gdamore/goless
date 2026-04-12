@@ -118,7 +118,7 @@ Implemented:
 - `Q` as an additional quit key
 - `<` goes to top of file
 - `>` goes to bottom of file
-- `h` opens and closes help
+- `F1` opens and closes help
 - `W` toggles wrap so `w` can stay less-compatible
 - `R` reloads the current file/input in place
 
