@@ -4,8 +4,8 @@
 {{ $cols := .Get "cols" | default 100 | int }}
 {{ if not $src }}
   <div class="cast-placeholder">
-    <strong>Asciinema placeholder</strong>
-    <p>Add a <code>src</code> path once a <code>.cast</code> recording exists in <code>site/static/casts/</code>.</p>
+    <strong>Asciinema recording slot</strong>
+    <p>Drop in a <code>src</code> path once the <code>.cast</code> file exists in <code>site/static/casts/</code>.</p>
   </div>
 {{ else }}
   {{ $id := printf "asciinema-%s" (md5 $src) }}
