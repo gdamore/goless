@@ -4,7 +4,8 @@ summary = "Where screenshots and terminal recordings fit into the user docs."
 weight = 30
 +++
 
-This page exists to keep screenshots and terminal recordings in scope while the docs are still being written.
+This page keeps screenshots and terminal recordings in scope while the user
+manual is still being filled out.
 
 ## Asset Locations
 
@@ -25,3 +26,6 @@ This page exists to keep screenshots and terminal recordings in scope while the 
 - searching, repeating, and clearing search
 - toggling wrap and hidden-character visualization
 - moving across multiple files in one session
+
+When the first Asciinema files are ready, link them from the relevant guide page
+and keep the filenames stable so the documentation can point at them directly.
