@@ -2,6 +2,7 @@
   F1                  help
   q Q Esc             quit
   r ^L                repaint
+  ^Z                  suspend and resume the terminal session
   R                   reload current file/input
   s                   save to a file
   v                   edit current file using $EDITOR

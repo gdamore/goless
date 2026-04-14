@@ -343,6 +343,12 @@ func run() error {
 			pager.SetSize(width, height)
 			screen.Sync()
 		case *tcell.EventKey:
+			if event.Key() == tcell.KeyCtrlZ {
+				if err := suspendProgramScreen(screen, pager, opts.mouseCapture, programSuspendSelf); err != nil {
+					return err
+				}
+				break
+			}
 			if event.Key() == tcell.KeyF4 {
 				opts.presetName = nextProgramPresetName(opts.presetName)
 				preset, err = programPreset(opts.presetName)
@@ -1765,10 +1771,12 @@ func suspendProgramScreen(screen tcell.Screen, pager *goless.Pager, mouseCapture
 	if screen == nil {
 		return action()
 	}
-	screen.Fini()
+	if err := screen.Suspend(); err != nil {
+		return err
+	}
 	actionErr := action()
-	initErr := screen.Init()
-	if initErr == nil {
+	resumeErr := screen.Resume()
+	if resumeErr == nil {
 		programConfigureMouse(screen, mouseCapture)
 		if pager != nil {
 			width, height := screen.Size()
@@ -1777,12 +1785,12 @@ func suspendProgramScreen(screen tcell.Screen, pager *goless.Pager, mouseCapture
 		screen.Sync()
 	}
 	if actionErr != nil {
-		if initErr != nil {
-			return fmt.Errorf("%v; screen restore failed: %w", actionErr, initErr)
+		if resumeErr != nil {
+			return fmt.Errorf("%v; screen resume failed: %w", actionErr, resumeErr)
 		}
 		return actionErr
 	}
-	return initErr
+	return resumeErr
 }
 
 func programConfigureMouse(screen tcell.Screen, capture bool) {

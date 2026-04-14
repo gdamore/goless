@@ -403,6 +403,7 @@ The default key group is intentionally less-like. Common bindings include:
 - `g`/`G` for top/bottom
 - `W` to toggle wrap
 - `r` or `Ctrl-L` to repaint the screen
+- `Ctrl-Z` to suspend and resume the terminal session
 - `s` to open the standalone save prompt for the current content set
 - `v` to open the current file in `$EDITOR` at the current line unless `-secure` is set
 - `/` and `?` to search forward/backward
