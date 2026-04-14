@@ -33,7 +33,7 @@ This recording shows `goless` running inside a third-party terminal program,
 `wekactl`, so readers can see how the pager behaves when embedded in another
 application instead of launched on its own.
 
-{{< asciinema src="/casts/wc.cast" poster="npt:0:02" rows="30" cols="100" >}}
+{{< iframe src="/demos/wc.html" title="goless running inside wekactl" height="520" >}}
 
 Keep the filename stable so the documentation can point at it directly from
 other guide pages.

@@ -395,6 +395,16 @@ img {
   margin: 20px 0;
 }
 
+.cast-frame {
+  display: block;
+  width: 100%;
+  min-height: 460px;
+  margin: 20px 0;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #0d141d;
+}
+
 .site-footer {
   margin-top: 20px;
   color: var(--muted);
