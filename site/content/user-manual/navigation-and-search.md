@@ -21,6 +21,16 @@ is open.
 
 Use wrap mode when long lines matter more than preserving exact horizontal
 position. Leave it off when you are comparing aligned text or reading tables.
+- `j` and `k` to move line by line
+- `Up` and `Down` to move by a coarse vertical screen step
+- `Shift-Up` and `Shift-Down` to move line by line with the cursor keys
+- `space` and `b` to page down and up
+- `w` also pages up in the built-in less-like key group
+- `g` and `G` to jump to the top or bottom
+- `W` to toggle wrap mode
+- `F` to enable follow mode
+- `Ctrl-X` or `Ctrl-C` to stop following without quitting
+- `Ctrl-Z` to suspend and resume the terminal session
 
 ## Search
 
