@@ -27,5 +27,13 @@ manual is still being filled out.
 - toggling wrap and hidden-character visualization
 - moving across multiple files in one session
 
-When the first Asciinema files are ready, link them from the relevant guide page
-and keep the filenames stable so the documentation can point at them directly.
+## WEKActl Demo
+
+This recording shows `goless` running inside a third-party terminal program,
+`wekactl`, so readers can see how the pager behaves when embedded in another
+application instead of launched on its own.
+
+{{< asciinema src="/casts/wc.cast" poster="npt:0:02" rows="30" cols="100" >}}
+
+Keep the filename stable so the documentation can point at it directly from
+other guide pages.
