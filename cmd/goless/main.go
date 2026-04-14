@@ -345,7 +345,7 @@ func run() error {
 		case *tcell.EventKey:
 			if event.Key() == tcell.KeyCtrlZ {
 				if err := suspendProgramScreen(screen, pager, opts.mouseCapture, programSuspendSelf); err != nil {
-					return err
+					pager.ShowInformation("Suspend failed", err.Error())
 				}
 				break
 			}

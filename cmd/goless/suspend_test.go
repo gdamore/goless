@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/gdamore/tcell/v3"
@@ -11,17 +12,19 @@ import (
 
 type recordingSuspendScreen struct {
 	tcell.Screen
-	calls []string
+	calls      []string
+	suspendErr error
+	resumeErr  error
 }
 
 func (s *recordingSuspendScreen) Suspend() error {
 	s.calls = append(s.calls, "suspend")
-	return nil
+	return s.suspendErr
 }
 
 func (s *recordingSuspendScreen) Resume() error {
 	s.calls = append(s.calls, "resume")
-	return nil
+	return s.resumeErr
 }
 
 func (s *recordingSuspendScreen) EnableMouse(flags ...tcell.MouseFlags) {
@@ -84,6 +87,74 @@ func TestSuspendProgramScreenUsesScreenMouseState(t *testing.T) {
 	for i := range want {
 		if screen.calls[i] != want[i] {
 			t.Fatalf("call sequence = %v, want %v", screen.calls, want)
+		}
+	}
+}
+
+func TestSuspendProgramScreenSuspendFailure(t *testing.T) {
+	_, base := newMockProgramScreen(t, 80, 24)
+
+	wantErr := errors.New("suspend failed")
+	screen := &recordingSuspendScreen{Screen: base, suspendErr: wantErr}
+	actionCalled := false
+	err := suspendProgramScreen(screen, nil, true, func() error {
+		actionCalled = true
+		screen.calls = append(screen.calls, "action")
+		return nil
+	})
+	if err != wantErr {
+		t.Fatalf("suspendProgramScreen(...) error = %v, want %v", err, wantErr)
+	}
+	if actionCalled {
+		t.Fatal("action was called after suspend failure")
+	}
+	if got, want := screen.calls, []string{"suspend"}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("call sequence = %v, want %v", got, want)
+	}
+}
+
+func TestSuspendProgramScreenActionFailure(t *testing.T) {
+	_, base := newMockProgramScreen(t, 80, 24)
+
+	wantErr := errors.New("action failed")
+	screen := &recordingSuspendScreen{Screen: base}
+	err := suspendProgramScreen(screen, nil, true, func() error {
+		screen.calls = append(screen.calls, "action")
+		return wantErr
+	})
+	if err != wantErr {
+		t.Fatalf("suspendProgramScreen(...) error = %v, want %v", err, wantErr)
+	}
+	wantCalls := []string{"suspend", "action", "resume", "enable-mouse", "sync"}
+	if got := screen.calls; len(got) != len(wantCalls) {
+		t.Fatalf("call sequence = %v, want %v", got, wantCalls)
+	}
+	for i := range wantCalls {
+		if screen.calls[i] != wantCalls[i] {
+			t.Fatalf("call sequence = %v, want %v", screen.calls, wantCalls)
+		}
+	}
+}
+
+func TestSuspendProgramScreenResumeFailure(t *testing.T) {
+	_, base := newMockProgramScreen(t, 80, 24)
+
+	wantErr := errors.New("resume failed")
+	screen := &recordingSuspendScreen{Screen: base, resumeErr: wantErr}
+	err := suspendProgramScreen(screen, nil, false, func() error {
+		screen.calls = append(screen.calls, "action")
+		return nil
+	})
+	if err != wantErr {
+		t.Fatalf("suspendProgramScreen(...) error = %v, want %v", err, wantErr)
+	}
+	wantCalls := []string{"suspend", "action", "resume"}
+	if got := screen.calls; len(got) != len(wantCalls) {
+		t.Fatalf("call sequence = %v, want %v", got, wantCalls)
+	}
+	for i := range wantCalls {
+		if screen.calls[i] != wantCalls[i] {
+			t.Fatalf("call sequence = %v, want %v", screen.calls, wantCalls)
 		}
 	}
 }
