@@ -1,4 +1,5 @@
 {{ $src := .Get "src" }}
+{{ $srcURL := $src | relURL }}
 {{ $poster := .Get "poster" | default "" }}
 {{ $rows := .Get "rows" | default 26 | int }}
 {{ $cols := .Get "cols" | default 100 | int }}
@@ -12,25 +13,19 @@
   {{ if not (.Page.Scratch.Get "asciinemaAssetsIncluded") }}
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/asciinema-player@3.15.1/dist/bundle/asciinema-player.css"
-      integrity="sha384-WljTqqSFGa+XcQgQ12VCbL7IN5nR9cirosOWTxSSNN+zV0BIR5+/NfEarkEb/+5a"
-      crossorigin="anonymous"
+      href="{{ "vendor/asciinema-player/asciinema-player.css" | relURL }}"
     >
     <script
-      src="https://cdn.jsdelivr.net/npm/asciinema-player@3.15.1/dist/bundle/asciinema-player.min.js"
-      integrity="sha384-wdj+bHCUz/HDxfUSgsGjyE8XcARMnrTYcDvGLmEOkPuYetBuPn3ylhg4A36Wa+DU"
-      crossorigin="anonymous"
+      src="{{ "vendor/asciinema-player/asciinema-player.min.js" | relURL }}"
     ></script>
     {{ .Page.Scratch.Set "asciinemaAssetsIncluded" true }}
   {{ end }}
   <div id="{{ $id }}" class="cast-player"></div>
   <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      AsciinemaPlayer.create({{ $src | safeJSStr }}, document.getElementById({{ $id | safeJSStr }}), {
-        cols: {{ $cols }},
-        rows: {{ $rows }},
-        poster: {{ $poster | safeJSStr }}
-      });
+    AsciinemaPlayer.create({{ $srcURL | safeJSStr }}, document.getElementById({{ $id | safeJSStr }}), {
+      cols: {{ $cols }},
+      rows: {{ $rows }},
+      poster: {{ $poster | safeJSStr }}
     });
   </script>
 {{ end }}

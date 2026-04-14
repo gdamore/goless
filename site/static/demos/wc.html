@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>goless in wekactl</title>
+        <link
+            rel="stylesheet"
+            href="../vendor/asciinema-player/asciinema-player.css"
+        />
+        <style>
+            html,
+            body {
+                margin: 0;
+                background: #0d141d;
+            }
+
+            body {
+                padding: 12px;
+            }
+
+            .demo-shell {
+                max-width: 100%;
+            }
+        </style>
+    </head>
+    <body>
+        <div
+            id="wc-player"
+            class="cast-player demo-shell"
+            data-src="../casts/wekactl.cast"
+            data-poster="npt:0:02"
+            data-cols="100"
+            data-rows="30"
+        ></div>
+        <script src="../vendor/asciinema-player/asciinema-player.min.js"></script>
+        <script src="../vendor/asciinema-player/init.js"></script>
+    </body>
+</html>

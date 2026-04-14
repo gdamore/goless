@@ -1,0 +1,12 @@
+{{ $src := .Get "src" }}
+{{ $title := .Get "title" | default "Embedded demo" }}
+{{ $height := .Get "height" | default 520 | int }}
+{{ if $src }}
+  <iframe
+    class="cast-frame"
+    src="{{ $src | relURL }}"
+    title="{{ $title }}"
+    loading="lazy"
+    style="min-height: {{ $height }}px;"
+  ></iframe>
+{{ end }}
