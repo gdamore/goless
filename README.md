@@ -212,7 +212,7 @@ Common options are:
 - `KeyGroup`: `LessKeyGroup` or `EmptyKeyGroup`
 - `UnbindKeys` and `KeyBindings`: remove or prepend bindings in normal, help,
   or prompt contexts
-- `Chrome`: optional frame/title styling plus title alignment and status/prompt style slots
+- `Chrome`: optional frame/title styling plus title alignment and status/prompt style slots; frame glyphs are rendered exactly as configured, including intentional empty strings
 - `Chrome.LineNumberStyle`: optional style for the adaptive line-number gutter
 - `Chrome.HeaderStyle`: optional style for fixed header rows and columns
 - `Text`: override help text, status text, prompt text, and UI strings
