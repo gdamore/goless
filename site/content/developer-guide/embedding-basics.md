@@ -31,6 +31,9 @@ func runPager(screen tcell.Screen, input io.Reader) error {
 }
 ```
 
+Frame glyphs are rendered exactly as configured, so you can leave a side or
+corner blank by setting that field to `""` instead of relying on a fallback.
+
 The simplest useful embedding loop has four steps:
 
 - load the document content
