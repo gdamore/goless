@@ -26,6 +26,9 @@ pager := goless.New(
 Use the preset as a starting point, not as a shared mutable singleton. Copy it
 before changing any fields.
 
+Frame glyphs are rendered exactly as configured, so if you want an empty side
+or corner, set that field to `""` explicitly.
+
 ## How Do I Keep Hyperlinks Inert Until I Trust Them?
 
 Return a decision with `Live: false` by default and opt in only for URLs your
