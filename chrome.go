@@ -18,7 +18,8 @@ const (
 )
 
 // Frame defines the glyphs used to draw an optional border around the pager
-// body. An all-zero Frame disables border drawing.
+// body. An all-zero Frame disables border drawing. When a frame is enabled,
+// each field is rendered exactly as configured; empty strings remain empty.
 type Frame struct {
 	// Horizontal is the glyph repeated across the top and bottom frame edges.
 	Horizontal string
@@ -35,6 +36,8 @@ type Frame struct {
 }
 
 // Chrome configures optional decorative chrome around the pager body.
+// Frame glyphs are drawn exactly as configured, so embedders can intentionally
+// leave pieces blank when that suits the design.
 type Chrome struct {
 	// Title is rendered into the top border area when a frame is enabled.
 	Title string

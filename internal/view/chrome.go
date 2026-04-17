@@ -18,7 +18,8 @@ const (
 )
 
 // Frame defines the glyphs used to draw an optional border around the viewer
-// body. An all-zero Frame disables border drawing.
+// body. An all-zero Frame disables border drawing. When a frame is enabled,
+// each field is rendered exactly as configured.
 type Frame struct {
 	Horizontal  string
 	Vertical    string

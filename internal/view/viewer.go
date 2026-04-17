@@ -1342,9 +1342,9 @@ func (v *Viewer) drawFrame(screen tcell.Screen, title string) {
 	borderStyle := v.cfg.Chrome.BorderStyle
 	titleStyle := v.cfg.Chrome.TitleStyle
 	if v.width == 1 {
-		screen.PutStrStyled(0, topY, fallback(frame.TopLeft, frame.Horizontal, frame.Vertical), borderStyle)
+		screen.PutStrStyled(0, topY, frame.TopLeft, borderStyle)
 		if bottomY != topY {
-			screen.PutStrStyled(0, bottomY, fallback(frame.BottomLeft, frame.Horizontal, frame.Vertical), borderStyle)
+			screen.PutStrStyled(0, bottomY, frame.BottomLeft, borderStyle)
 		}
 		return
 	}
@@ -1357,7 +1357,7 @@ func (v *Viewer) drawFrame(screen tcell.Screen, title string) {
 		screen.PutStrStyled(x, topY, label, titleStyle)
 	}
 
-	side := fallback(frame.Vertical, "│")
+	side := frame.Vertical
 	for y := topY + 1; y < bottomY; y++ {
 		screen.PutStrStyled(0, y, side, borderStyle)
 		screen.PutStrStyled(v.width-1, y, side, borderStyle)
@@ -2553,22 +2553,10 @@ func frameLine(width int, left, fill, right string) string {
 		return ""
 	}
 	if width == 1 {
-		return fallback(left, fill, right)
+		return left
 	}
 
-	left = fallback(left, fill, " ")
-	fill = fallback(fill, " ")
-	right = fallback(right, fill, " ")
 	return left + strings.Repeat(fill, width-2) + right
-}
-
-func fallback(values ...string) string {
-	for _, v := range values {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
 }
 
 func frameTitleLabel(title string, width int, align TitleAlign) (label string, x int) {

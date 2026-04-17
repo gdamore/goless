@@ -4173,6 +4173,48 @@ func TestDrawFrameInsetsContentAndRendersTitle(t *testing.T) {
 	}
 }
 
+func TestDrawFramePreservesExplicitEmptySides(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("hi\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		Chrome: Chrome{
+			Title: "Doc",
+			Frame: Frame{
+				Horizontal:  "─",
+				Vertical:    "",
+				TopLeft:     "╭",
+				TopRight:    "╮",
+				BottomLeft:  "╰",
+				BottomRight: "╯",
+			},
+		},
+	})
+	v.SetSize(10, 4)
+
+	_, screen := newMockScreen(t, 10, 4)
+	defer screen.Fini()
+
+	v.Draw(screen)
+
+	if got := cellRune(screen, 0, 0); got != '╭' {
+		t.Fatalf("top-left border rune = %q, want %q", got, '╭')
+	}
+	if got := cellRune(screen, 0, 1); got != ' ' {
+		t.Fatalf("left border rune = %q, want empty", got)
+	}
+	if got := cellRune(screen, 1, 1); got != 'h' {
+		t.Fatalf("content rune = %q, want %q", got, 'h')
+	}
+	if got := cellRune(screen, 0, 2); got != ' ' {
+		t.Fatalf("left border rune on second body row = %q, want empty", got)
+	}
+}
+
 func TestDrawFrameUsesBorderAndTitleStyles(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("hi\n")); err != nil {
