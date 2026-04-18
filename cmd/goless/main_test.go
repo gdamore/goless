@@ -252,33 +252,22 @@ func TestProgramPresetDefaultPretty(t *testing.T) {
 	}
 }
 
-func TestProgramRenderMode(t *testing.T) {
-	tests := []struct {
-		name    string
-		want    goless.RenderMode
-		wantErr bool
-	}{
-		{name: "literal", want: goless.RenderLiteral},
-		{name: "presentation", want: goless.RenderPresentation},
-		{name: "hybrid", want: goless.RenderHybrid},
-		{name: "", want: goless.RenderHybrid},
-		{name: "bogus", want: goless.RenderHybrid, wantErr: true},
+func TestParseProgramFlagsMarkersAndLiteral(t *testing.T) {
+	opts, args, err := parseProgramFlags([]string{"--markers", "--literal", "sample.txt"})
+	if err != nil {
+		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := programRenderMode(tt.name)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("programRenderMode(%q) = nil error, want error", tt.name)
-				}
-			} else if err != nil {
-				t.Fatalf("programRenderMode(%q) failed: %v", tt.name, err)
-			}
-			if got != tt.want {
-				t.Fatalf("programRenderMode(%q) = %v, want %v", tt.name, got, tt.want)
-			}
-		})
+	if !opts.markers {
+		t.Fatal("parseProgramFlags(...) did not enable markers")
+	}
+	if !opts.literal {
+		t.Fatal("parseProgramFlags(...) did not enable literal mode")
+	}
+	if got, want := len(args), 1; got != want {
+		t.Fatalf("len(args) = %d, want %d", got, want)
+	}
+	if got, want := args[0], "sample.txt"; got != want {
+		t.Fatalf("args[0] = %q, want %q", got, want)
 	}
 }
 
@@ -1109,6 +1098,21 @@ func TestRunUnknownFlagWritesToStderr(t *testing.T) {
 	}
 }
 
+func TestRunRejectsLegacyHiddenAndRenderFlags(t *testing.T) {
+	for _, flagName := range []string{"--hidden", "--render"} {
+		t.Run(flagName, func(t *testing.T) {
+			_, err := runProgramForTest(t, []string{flagName}, "")
+			if err == nil {
+				t.Fatalf("run(%s) = nil error, want unknown option error", flagName)
+			}
+			want := strings.TrimPrefix(flagName, "--")
+			if got := err.Error(); !strings.Contains(got, "flag provided but not defined: -"+want) {
+				t.Fatalf("run(%s) error = %q, want unknown option detail", flagName, got)
+			}
+		})
+	}
+}
+
 func TestParseProgramFlagsLicense(t *testing.T) {
 	opts, args, err := parseProgramFlags([]string{"--license"})
 	if err != nil {
@@ -1139,16 +1143,6 @@ func TestRunPassesThroughStdinToPipe(t *testing.T) {
 	}
 	if got, want := output, "alpha\nbeta\n"; got != want {
 		t.Fatalf("run(stdin passthrough) output = %q, want %q", got, want)
-	}
-}
-
-func TestRunRejectsUnknownRenderMode(t *testing.T) {
-	_, err := runProgramForTest(t, []string{"--render", "bogus"}, "")
-	if err == nil {
-		t.Fatal("run(--render bogus) = nil error, want error")
-	}
-	if got := err.Error(); !strings.Contains(got, "unknown render mode") {
-		t.Fatalf("run(--render bogus) error = %q, want unknown render mode", got)
 	}
 }
 

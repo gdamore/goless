@@ -115,7 +115,7 @@ func loadProgramConfigAtPath(path string, optional bool) (programConfig, error) 
 
 func applyProgramConfig(opts programOptions, cfg programConfig) programOptions {
 	if cfg.Hidden != nil {
-		opts.hidden = *cfg.Hidden
+		opts.markers = *cfg.Hidden
 	}
 	if cfg.LineNumbers != nil {
 		opts.lineNumbers = *cfg.LineNumbers

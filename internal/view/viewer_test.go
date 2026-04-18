@@ -734,7 +734,7 @@ func runViewerCommand(v *Viewer, command string) {
 	v.HandleKey(keyKey(tcell.KeyEnter))
 }
 
-func TestSetNumbersCommand(t *testing.T) {
+func TestNumberCommands(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -743,16 +743,16 @@ func TestSetNumbersCommand(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 4)
 
-	for _, command := range []string{"set number", "set invnumber"} {
+	for _, command := range []string{"number", "nonumber"} {
 		runViewerCommand(v, command)
 	}
 
 	if got, want := v.LineNumbers(), false; got != want {
-		t.Fatalf("LineNumbers after :set number + :set invnumber = %v, want %v", got, want)
+		t.Fatalf("LineNumbers after number + nonumber = %v, want %v", got, want)
 	}
 }
 
-func TestSetPinLinesCommand(t *testing.T) {
+func TestPinRowsCommand(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -761,14 +761,14 @@ func TestSetPinLinesCommand(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 4)
 
-	runViewerCommand(v, "set pinlines=1")
+	runViewerCommand(v, "pin rows=1")
 
 	if got, want := v.HeaderLines(), 1; got != want {
-		t.Fatalf("HeaderLines after :set pinlines=1 = %d, want %d", got, want)
+		t.Fatalf("HeaderLines after pin rows=1 = %d, want %d", got, want)
 	}
 }
 
-func TestSetPinLinesCommandClearsPriorInvalidMessage(t *testing.T) {
+func TestPinRowsCommandClearsPriorInvalidMessage(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -777,22 +777,22 @@ func TestSetPinLinesCommandClearsPriorInvalidMessage(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 4)
 
-	runViewerCommand(v, "set pinline=1")
-	if !strings.Contains(v.message, "set pinline=1") {
+	runViewerCommand(v, "pin rows=1 extra")
+	if !strings.Contains(v.message, "pin rows=1 extra") {
 		t.Fatalf("message after invalid command = %q, want it to mention invalid command", v.message)
 	}
 
-	runViewerCommand(v, "set pinlines=1")
+	runViewerCommand(v, "pin rows=1")
 
 	if got, want := v.HeaderLines(), 1; got != want {
-		t.Fatalf("HeaderLines after :set pinlines=1 = %d, want %d", got, want)
+		t.Fatalf("HeaderLines after pin rows=1 = %d, want %d", got, want)
 	}
 	if v.message != "" {
 		t.Fatalf("message after valid command = %q, want empty", v.message)
 	}
 }
 
-func TestSetSqueezeCommand(t *testing.T) {
+func TestSqueezeCommands(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\n\n\nthree\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -801,16 +801,16 @@ func TestSetSqueezeCommand(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 4)
 
-	for _, command := range []string{"set squeeze", "set invsqueeze"} {
+	for _, command := range []string{"squeeze", "nosqueeze"} {
 		runViewerCommand(v, command)
 	}
 
 	if got, want := v.SqueezeBlankLines(), false; got != want {
-		t.Fatalf("SqueezeBlankLines after :set squeeze + :set invsqueeze = %v, want %v", got, want)
+		t.Fatalf("SqueezeBlankLines after squeeze + nosqueeze = %v, want %v", got, want)
 	}
 }
 
-func TestSetPinColumnsCommand(t *testing.T) {
+func TestPinColumnsCommand(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -819,14 +819,33 @@ func TestSetPinColumnsCommand(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 4)
 
-	runViewerCommand(v, "set pincols=2")
+	runViewerCommand(v, "pin cols=2")
 
 	if got, want := v.HeaderColumns(), 2; got != want {
-		t.Fatalf("HeaderColumns after :set pincols=2 = %d, want %d", got, want)
+		t.Fatalf("HeaderColumns after pin cols=2 = %d, want %d", got, want)
 	}
 }
 
-func TestSetDisplayCommands(t *testing.T) {
+func TestPinRowsAndColumnsCommand(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	runViewerCommand(v, "pin rows=1 cols=2")
+
+	if got, want := v.HeaderLines(), 1; got != want {
+		t.Fatalf("HeaderLines after pin rows=1 cols=2 = %d, want %d", got, want)
+	}
+	if got, want := v.HeaderColumns(), 2; got != want {
+		t.Fatalf("HeaderColumns after pin rows=1 cols=2 = %d, want %d", got, want)
+	}
+}
+
+func TestDisplayCommands(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ttwo\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -835,25 +854,25 @@ func TestSetDisplayCommands(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 4)
 
-	for _, command := range []string{"set wrap", "set list", "set tabstop=2"} {
+	for _, command := range []string{"wrap", "markers", "tabs 2"} {
 		runViewerCommand(v, command)
 	}
 
 	if got, want := v.WrapMode(), layout.SoftWrap; got != want {
-		t.Fatalf("WrapMode after :set wrap = %v, want %v", got, want)
+		t.Fatalf("WrapMode after wrap = %v, want %v", got, want)
 	}
 	if got, want := v.cfg.Visualization.ShowTabs, true; got != want {
-		t.Fatalf("Visualization.ShowTabs after :set list = %v, want %v", got, want)
+		t.Fatalf("Visualization.ShowTabs after markers = %v, want %v", got, want)
 	}
 	if got, want := v.cfg.Visualization.ShowNewlines, true; got != want {
-		t.Fatalf("Visualization.ShowNewlines after :set list = %v, want %v", got, want)
+		t.Fatalf("Visualization.ShowNewlines after markers = %v, want %v", got, want)
 	}
 	if got, want := v.cfg.TabWidth, 2; got != want {
-		t.Fatalf("TabWidth after :set tabstop=2 = %d, want %d", got, want)
+		t.Fatalf("TabWidth after tabs 2 = %d, want %d", got, want)
 	}
 }
 
-func TestSetDisplayToggleCommands(t *testing.T) {
+func TestDisplayReverseCommands(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ttwo\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -862,27 +881,20 @@ func TestSetDisplayToggleCommands(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 4)
 
-	runViewerCommand(v, "set invwrap")
-	if got, want := v.WrapMode(), layout.SoftWrap; got != want {
-		t.Fatalf("WrapMode after first :set invwrap = %v, want %v", got, want)
-	}
-	runViewerCommand(v, "set invwrap")
+	runViewerCommand(v, "wrap")
+	runViewerCommand(v, "nowrap")
 	if got, want := v.WrapMode(), layout.NoWrap; got != want {
-		t.Fatalf("WrapMode after second :set invwrap = %v, want %v", got, want)
+		t.Fatalf("WrapMode after wrap + nowrap = %v, want %v", got, want)
 	}
 
-	runViewerCommand(v, "set list")
-	runViewerCommand(v, "set nolist")
+	runViewerCommand(v, "markers")
+	runViewerCommand(v, "nomarkers")
 	if got, want := v.cfg.Visualization.ShowTabs, false; got != want {
-		t.Fatalf("Visualization.ShowTabs after :set nolist = %v, want %v", got, want)
-	}
-	runViewerCommand(v, "set invlist")
-	if got, want := v.cfg.Visualization.ShowTabs, true; got != want {
-		t.Fatalf("Visualization.ShowTabs after :set invlist = %v, want %v", got, want)
+		t.Fatalf("Visualization.ShowTabs after markers + nomarkers = %v, want %v", got, want)
 	}
 }
 
-func TestSetInvalidCommandsLeaveStateUnchanged(t *testing.T) {
+func TestInvalidCommandsLeaveStateUnchanged(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ttwo\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -891,20 +903,64 @@ func TestSetInvalidCommandsLeaveStateUnchanged(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 4)
 
-	runViewerCommand(v, "set tabstop=0")
+	runViewerCommand(v, "tabs 0")
 	if got, want := v.cfg.TabWidth, 4; got != want {
-		t.Fatalf("TabWidth after invalid :set tabstop=0 = %d, want %d", got, want)
+		t.Fatalf("TabWidth after invalid tabs 0 = %d, want %d", got, want)
 	}
-	if !strings.Contains(v.message, "set tabstop=0") {
-		t.Fatalf("message after invalid tabstop = %q, want invalid command text", v.message)
+	if !strings.Contains(v.message, "tabs 0") {
+		t.Fatalf("message after invalid tabs command = %q, want invalid command text", v.message)
 	}
 
-	runViewerCommand(v, "set pinlines=1 extra")
+	runViewerCommand(v, "pin rows=1 extra")
 	if got, want := v.HeaderLines(), 0; got != want {
 		t.Fatalf("HeaderLines after malformed assignment = %d, want %d", got, want)
 	}
-	if !strings.Contains(v.message, "set pinlines=1 extra") {
+	if !strings.Contains(v.message, "pin rows=1 extra") {
 		t.Fatalf("message after malformed assignment = %q, want invalid command text", v.message)
+	}
+}
+
+func TestHelpCommandShowsHelpOverlay(t *testing.T) {
+	doc := model.NewDocument(4)
+	v := New(doc, Config{
+		TabWidth:   4,
+		WrapMode:   layout.NoWrap,
+		ShowStatus: true,
+		Text: Text{
+			HelpTitle: "Ayuda",
+			HelpBody:  "contenido",
+		},
+	})
+
+	runViewerCommand(v, "help")
+
+	if got, want := v.mode, modeHelp; got != want {
+		t.Fatalf("mode after help = %v, want %v", got, want)
+	}
+	if got, want := v.informationTitle(), "Ayuda"; got != want {
+		t.Fatalf("help title after help = %q, want %q", got, want)
+	}
+	if got, want := v.informationBody(), "contenido"; got != want {
+		t.Fatalf("help body after help = %q, want %q", got, want)
+	}
+}
+
+func TestMatchCommandWithoutArgumentsShowsHelpfulMessage(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	runViewerCommand(v, "match")
+
+	if got, want := v.message, "match requires a case or mode argument"; got != want {
+		t.Fatalf("message after bare match = %q, want %q", got, want)
+	}
+	if got, want := v.mode, modeNormal; got != want {
+		t.Fatalf("mode after bare match = %v, want %v", got, want)
 	}
 }
 
@@ -1674,7 +1730,7 @@ func TestPromptHistoryDownRestoresDraft(t *testing.T) {
 	}
 }
 
-func TestSetSearchCaseCommand(t *testing.T) {
+func TestSearchCaseCommands(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("Alpha\nbeta\nALPHA\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -1684,38 +1740,19 @@ func TestSetSearchCaseCommand(t *testing.T) {
 	v.SetSize(20, 2)
 
 	for _, command := range []string{
-		"set ignorecase",
-		"set noignorecase",
-		"set smartcase",
-		"set nosmartcase",
-		"set searchcase=smart",
+		"match nocase",
+		"match case",
+		"match auto",
 	} {
 		runViewerCommand(v, command)
 	}
 
 	if got, want := v.SearchCaseMode(), SearchSmartCase; got != want {
-		t.Fatalf("SearchCaseMode after :set commands = %v, want %v", got, want)
+		t.Fatalf("SearchCaseMode after case commands = %v, want %v", got, want)
 	}
 }
 
-func TestSetNoSmartCasePreservesCaseSensitiveMode(t *testing.T) {
-	doc := model.NewDocument(4)
-	if err := doc.Append([]byte("Alpha\nbeta\nALPHA\n")); err != nil {
-		t.Fatalf("Append failed: %v", err)
-	}
-
-	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
-	v.SetSize(20, 2)
-
-	runViewerCommand(v, "set noignorecase")
-	runViewerCommand(v, "set nosmartcase")
-
-	if got, want := v.SearchCaseMode(), SearchCaseSensitive; got != want {
-		t.Fatalf("SearchCaseMode after :set noignorecase + :set nosmartcase = %v, want %v", got, want)
-	}
-}
-
-func TestSetSearchModeCommand(t *testing.T) {
+func TestSearchModeCommands(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("alphabet alpha\n")); err != nil {
 		t.Fatalf("Append failed: %v", err)
@@ -1724,12 +1761,101 @@ func TestSetSearchModeCommand(t *testing.T) {
 	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
 	v.SetSize(20, 2)
 
-	for _, command := range []string{"set searchmode=word", "set searchmode=regex", "set searchmode=sub"} {
+	for _, command := range []string{"match word", "match regex", "match sub"} {
 		runViewerCommand(v, command)
 	}
 
 	if got, want := v.SearchMode(), SearchSubstring; got != want {
-		t.Fatalf("SearchMode after :set commands = %v, want %v", got, want)
+		t.Fatalf("SearchMode after search mode commands = %v, want %v", got, want)
+	}
+}
+
+func TestSearchCommandSetsMultipleOptions(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alphabet alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	runViewerCommand(v, "match nocase regex")
+
+	if got, want := v.SearchCaseMode(), SearchCaseInsensitive; got != want {
+		t.Fatalf("SearchCaseMode after search command = %v, want %v", got, want)
+	}
+	if got, want := v.SearchMode(), SearchRegex; got != want {
+		t.Fatalf("SearchMode after search command = %v, want %v", got, want)
+	}
+}
+
+func TestSearchCommandRejectsInvalidAssignments(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alphabet alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	runViewerCommand(v, "match maybe")
+	if got, want := v.SearchCaseMode(), SearchSmartCase; got != want {
+		t.Fatalf("SearchCaseMode after invalid search command = %v, want %v", got, want)
+	}
+}
+
+func TestSearchModeCommandRejectsInvalidAssignments(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alphabet alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	runViewerCommand(v, "mode invalid")
+	if got, want := v.SearchMode(), SearchSubstring; got != want {
+		t.Fatalf("SearchMode after invalid mode command = %v, want %v", got, want)
+	}
+}
+
+func TestSearchCommandCanSetSearchMode(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alphabet alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	for _, command := range []string{"match word", "match regex", "match sub"} {
+		runViewerCommand(v, command)
+	}
+
+	if got, want := v.SearchMode(), SearchSubstring; got != want {
+		t.Fatalf("SearchMode after search commands = %v, want %v", got, want)
+	}
+}
+
+func TestPinEmptyCommandIsNoop(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	runViewerCommand(v, "pin")
+
+	if got, want := v.HeaderLines(), 0; got != want {
+		t.Fatalf("HeaderLines after empty pin = %d, want %d", got, want)
+	}
+	if got, want := v.HeaderColumns(), 0; got != want {
+		t.Fatalf("HeaderColumns after empty pin = %d, want %d", got, want)
+	}
+	if v.message != "" {
+		t.Fatalf("message after empty pin = %q, want empty", v.message)
 	}
 }
 
