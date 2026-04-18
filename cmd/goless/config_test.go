@@ -116,8 +116,8 @@ func TestParseProgramFlagsLoadsDefaultProgramConfig(t *testing.T) {
 	if got, want := opts.presetName, "dark"; got != want {
 		t.Fatalf("theme = %q, want %q", got, want)
 	}
-	if !opts.hidden {
-		t.Fatal("hidden = false, want true from config")
+	if !opts.markers {
+		t.Fatal("markers = false, want true from config")
 	}
 	if !opts.lineNumbers {
 		t.Fatal("lineNumbers = false, want true from config")
@@ -140,15 +140,15 @@ func TestParseProgramFlagsCLIOverridesProgramConfig(t *testing.T) {
 	setTestProgramConfigHome(t)
 	writeDefaultTestProgramConfig(t, `{"theme":"dark","hidden":true,"line-numbers":true,"live-links":true,"mouse":false,"secure":true}`)
 
-	opts, _, err := parseProgramFlags([]string{"-theme", "light", "-N=false", "-hidden=false", "-live-links=false", "-mouse=true", "-secure=false"})
+	opts, _, err := parseProgramFlags([]string{"-theme", "light", "-N=false", "-markers=false", "-live-links=false", "-mouse=true", "-secure=false"})
 	if err != nil {
 		t.Fatalf("parseProgramFlags(...) failed: %v", err)
 	}
 	if got, want := opts.presetName, "light"; got != want {
 		t.Fatalf("theme = %q, want %q", got, want)
 	}
-	if opts.hidden {
-		t.Fatal("hidden = true, want CLI override false")
+	if opts.markers {
+		t.Fatal("markers = true, want CLI override false")
 	}
 	if opts.lineNumbers {
 		t.Fatal("lineNumbers = true, want CLI override false")
@@ -189,8 +189,8 @@ func TestParseProgramFlagsExplicitConfigOverridesDefaultPath(t *testing.T) {
 	if got, want := opts.presetName, "light"; got != want {
 		t.Fatalf("theme = %q, want %q", got, want)
 	}
-	if !opts.hidden {
-		t.Fatal("hidden = false, want true from explicit config")
+	if !opts.markers {
+		t.Fatal("markers = false, want true from explicit config")
 	}
 	if opts.lineNumbers {
 		t.Fatal("lineNumbers = true, want false because explicit config replaces default config source")
@@ -212,8 +212,8 @@ func TestParseProgramFlagsLoadsEnvProgramConfig(t *testing.T) {
 	if got, want := opts.presetName, "light"; got != want {
 		t.Fatalf("theme = %q, want %q", got, want)
 	}
-	if !opts.hidden {
-		t.Fatal("hidden = false, want true from GOLESS_CONFIG")
+	if !opts.markers {
+		t.Fatal("markers = false, want true from GOLESS_CONFIG")
 	}
 	if !opts.lineNumbers {
 		t.Fatal("lineNumbers = false, want true from GOLESS_CONFIG")
@@ -233,8 +233,8 @@ func TestParseProgramFlagsEnvConfigOverridesDefaultPath(t *testing.T) {
 	if got, want := opts.presetName, "light"; got != want {
 		t.Fatalf("theme = %q, want %q", got, want)
 	}
-	if !opts.hidden {
-		t.Fatal("hidden = false, want true from GOLESS_CONFIG")
+	if !opts.markers {
+		t.Fatal("markers = false, want true from GOLESS_CONFIG")
 	}
 }
 
@@ -254,8 +254,8 @@ func TestParseProgramFlagsExplicitConfigOverridesEnvConfig(t *testing.T) {
 	if got, want := opts.presetName, "light"; got != want {
 		t.Fatalf("theme = %q, want %q", got, want)
 	}
-	if opts.hidden {
-		t.Fatal("hidden = true, want false from explicit config")
+	if opts.markers {
+		t.Fatal("markers = true, want false from explicit config")
 	}
 	if !opts.lineNumbers {
 		t.Fatal("lineNumbers = false, want true from explicit config")

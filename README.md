@@ -235,7 +235,7 @@ By default, literal search uses smart-case behavior:
 
 The built-in pager UI exposes search mode controls directly:
 
-- `F2` in the bundled less-like key group cycles `smart -> case -> nocase`
+- `F2` in the bundled less-like key group cycles `auto -> case -> nocase`
 - `F3` in the bundled less-like key group cycles `sub -> word -> regex`
 - the search prompt always shows the current search mode
 - the status bar shows search mode when a search is active or the search settings are non-default
@@ -245,13 +245,14 @@ The built-in pager UI exposes search mode controls directly:
   These are 1-based logical coordinates rather than wrapped visual row numbers
 - the built-in status bar reserves an EOF slot and shows `∎` when the end of the document is visible
 - the right side of the status bar adds contextual wrap/scroll glyphs such as `↪` and `⇆`
-- `:set number|nonumber|invnumber` is available as a fallback
-- `:set wrap|nowrap|invwrap` is available as a fallback
-- `:set list|nolist|invlist` is available as a fallback
-- `:set squeeze|nosqueeze|invsqueeze` is available as a fallback
-- `:set tabstop=<n>`, `:set pinlines=<n>`, and `:set pincols=<n>` are available as fallbacks
-- `:set ignorecase`, `:set noignorecase`, `:set smartcase`, and `:set nosmartcase` control search case
-- `:set searchcase=smart|case|nocase` and `:set searchmode=sub|word|regex` are available as explicit fallbacks
+- `:number` / `:nonumber` control line numbers
+- `:wrap` / `:nowrap` control soft wrapping
+- `:markers` / `:nomarkers` control hidden-character markers
+- `:squeeze` / `:nosqueeze` control adjacent blank-line collapsing
+- `:tabs <n>` sets tab width
+- `:pin [rows=<n>] [cols=<n>]` pins the top rows and/or left columns
+- `:match [auto|nocase|case] [sub|word|regex]` controls search case and matching
+- `:help` opens the built-in help overlay
 - invalid regexes stay in the search prompt and are marked visibly until fixed
 
 `SqueezeBlankLines` is a view-time policy: raw input stays unchanged and
@@ -347,9 +348,9 @@ Program flags:
 - `-x n` to set tab width
 - `-theme dark|light|plain|pretty`
 - `-chrome auto|none|single|rounded`
-- `-hidden`
-- `-live-links`
-- `-render hybrid|literal|presentation`
+- `--markers` / `--no-markers` to show or hide hidden-character markers
+- `--live-links`
+- `--literal` / `--no-literal` to show escape sequences literally or interpret supported escapes
 - `-s` or `-squeeze` to collapse repeated blank lines in the current view
 - `-title text`
 - optional `+line` or `+/pattern` startup directive before paths
@@ -380,6 +381,9 @@ The initial config schema is intentionally small:
   "secure": false
 }
 ```
+
+The JSON config still uses the `"hidden"` field name; the CLI exposes the same
+setting as `--markers` / `--no-markers`.
 
 Use `goless --default-config` to print that built-in config and redirect it into
 `goless/config.json` or another starter file.
@@ -421,10 +425,18 @@ The default key group is intentionally less-like. Common bindings include:
 - `:license` to show the bundled Apache license in an overlay
 - `:Q` as an additional quit command
 - `=` or `Ctrl-G` to show current file/session status in the standalone program
-- `:set number`, `:set wrap`, `:set list`, and `:set squeeze` plus `no...` and `inv...` forms
-- `:set tabstop=<n>`, `:set pinlines=<n>`, and `:set pincols=<n>`
-- `:set ignorecase`, `:set noignorecase`, `:set smartcase`, and `:set nosmartcase`
-- `:set searchcase=smart|case|nocase` and `:set searchmode=sub|word|regex`
+- `:number`                              show line numbers
+- `:nonumber`                            hide line numbers
+- `:wrap`                                soft-wrap long lines
+- `:nowrap`                              disable soft wrapping
+- `:markers`                             show hidden-character markers
+- `:nomarkers`                           hide hidden-character markers
+- `:squeeze`                             collapse adjacent blank lines
+- `:nosqueeze`                           keep blank lines
+- `:tabs <n>`                           set tab width
+- `:pin [rows=<n>] [cols=<n>]`          pin the top rows and/or left columns
+- `:match [auto|nocase|case] [sub|word|regex]`  control search case and matching
+- `:help`                               show the built-in help overlay
 - `F` to enable follow mode
 - `Ctrl-X` or `Ctrl-C` to stop following without quitting
 - `F1` to toggle help

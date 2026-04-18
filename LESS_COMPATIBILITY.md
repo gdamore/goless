@@ -36,8 +36,8 @@ Already compatible or close enough:
 
 Useful, but intentionally different:
 
-- `:set ...` commands are custom pager commands, not `less` option toggles
-- search mode and case mode are exposed directly with `F2`, `F3`, and `:set`
+- direct pager commands such as `:wrap`, `:nowrap`, `:number`, `:nonumber`, `:markers`, `:nomarkers`, and `:match [auto|nocase|case] [sub|word|regex]` replace `:set ...` style option toggles
+- search mode and case mode are exposed directly with `F2`, `F3`, and the command language
 
 Notable gaps:
 
@@ -92,8 +92,8 @@ Compatible today:
 - `+/pattern`
 - multiple files plus explicit `-` for stdin
 
-Custom flags such as `-preset`, `-chrome`, `-hidden`, `-render`, and
-`-live-links` are fine; they do not block familiarity as long as common `less`
+Custom flags such as `-preset`, `-chrome`, `--markers`, `--literal`, and
+`--live-links` are fine; they do not block familiarity as long as common `less`
 habits also work.
 
 ## Recommended Changes

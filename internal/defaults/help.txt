@@ -29,7 +29,7 @@
   /                   search forward
   ?                   search backward
   n N                 next/previous match
-  F2                  cycle case mode (smart/case/nocase)
+  F2                  cycle case mode (auto/case/nocase)
   F3                  cycle match mode (substring/word/regex)
 
 [1;4mPrompt Editing[0m
@@ -47,13 +47,16 @@
 [1;4mCommands[0m
   :123                    jump to line 123
   :50%                    jump to 50%
-  :set number             show line numbers
-  :set wrap               soft-wrap long lines
-  :set list               show hidden-character markers
-  :set squeeze            collapse adjacent blank lines
-  :set tabstop=[3mnum[0m        set tab width
-  :set pinlines=[3mnum[0m       pin top lines
-  :set pincols=[3mnum[0m        pin left columns
-  :set ignorecase         search without case sensitivity
-  :set smartcase          search smart-case
-  :set searchmode=[3mmode[0m    set match mode (sub|word|regex)
+  :number                 show line numbers
+  :nonumber               hide line numbers
+  :wrap                   soft-wrap long lines
+  :nowrap                 disable soft wrapping
+  :markers                show hidden-character markers
+  :nomarkers              hide hidden-character markers
+  :squeeze                collapse adjacent blank lines
+  :nosqueeze              keep blank lines
+  :tabs [3mnum[0m              set tab width
+  :pin [rows=[3mnum[0m] [cols=[3mnum[0m]  pin top rows and/or left columns
+  :match [auto|nocase|case] [sub|word|regex]  control search case and matching
+  :help                   show the built-in help overlay
+  :reload                 reload current file/input

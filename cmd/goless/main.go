@@ -41,17 +41,17 @@ const programDefaultTheme = "pretty"
 type programOptions struct {
 	chromeName        string
 	configPath        string
-	hidden            bool
 	ignoredChopLines  bool
 	ignoredRawControl bool
 	lineNumbers       bool
 	liveLinks         bool
 	mouseCapture      bool
+	markers           bool
 	presetName        string
 	quitAtEOF         bool
 	quitAtEOFFirst    bool
 	quitIfOneScreen   bool
-	renderName        string
+	literal           bool
 	searchCaseMode    goless.SearchCaseMode
 	secure            bool
 	showDefaultConfig bool
@@ -157,9 +157,9 @@ func run() error {
 		return writeDefaultProgramConfig(os.Stdout)
 	}
 
-	renderMode, err := programRenderMode(opts.renderName)
-	if err != nil {
-		return err
+	renderMode := goless.RenderHybrid
+	if opts.literal {
+		renderMode = goless.RenderLiteral
 	}
 	preset, err := programPreset(opts.presetName)
 	if err != nil {
@@ -247,7 +247,7 @@ func run() error {
 			renderMode,
 			preset,
 			session.chrome(chromeCfg),
-			opts.hidden,
+			opts.markers,
 			opts.liveLinks,
 			opts.lineNumbers,
 			opts.searchCaseMode,
@@ -364,8 +364,8 @@ func run() error {
 				break
 			}
 			if event.Key() == tcell.KeyF5 {
-				opts.hidden = !opts.hidden
-				pager.SetVisualization(programVisualization(opts.hidden))
+				opts.markers = !opts.markers
+				pager.SetVisualization(programVisualization(opts.markers))
 				break
 			}
 			before := pager.Position()
@@ -486,7 +486,6 @@ func parseProgramFlags(args []string) (programOptions, []string, error) {
 	opts := programOptions{
 		presetName:     programDefaultTheme,
 		chromeName:     "auto",
-		renderName:     "hybrid",
 		searchCaseMode: goless.SearchSmartCase,
 		mouseCapture:   true,
 		tabWidth:       8,
@@ -523,27 +522,31 @@ func parseProgramFlags(args []string) (programOptions, []string, error) {
 	fs.BoolVar(&opts.lineNumbers, "N", opts.lineNumbers, "show line numbers")
 	fs.BoolVar(&opts.ignoredRawControl, "R", opts.ignoredRawControl, "accepted as a less compatibility no-op")
 	fs.BoolVar(&opts.ignoredChopLines, "S", opts.ignoredChopLines, "accepted as a less compatibility no-op")
-	fs.BoolVar(&opts.hidden, "hidden", opts.hidden, "show tabs, line endings, carriage returns, and EOF markers")
+	fs.BoolVar(&opts.markers, "markers", opts.markers, "show tabs, line endings, carriage returns, and EOF markers")
 	fs.BoolVar(&opts.liveLinks, "live-links", opts.liveLinks, "enable live OSC 8 hyperlinks in the program")
 	fs.BoolVar(&opts.mouseCapture, "mouse", opts.mouseCapture, "capture mouse button and wheel events in the program")
 	fs.BoolVar(&opts.quitAtEOF, "quit-at-eof", opts.quitAtEOF, "long form of -e")
 	fs.BoolVar(&opts.quitAtEOFFirst, "QUIT-AT-EOF", opts.quitAtEOFFirst, "long form of -E")
+	fs.BoolVar(&opts.literal, "literal", opts.literal, "show escape sequences literally instead of interpreting them")
 	fs.BoolVar(&opts.secure, "secure", opts.secure, "disable standalone commands that launch external programs")
 	fs.BoolVar(&opts.squeeze, "s", opts.squeeze, "collapse repeated blank lines in the current view")
 	fs.BoolVar(&opts.squeeze, "squeeze", opts.squeeze, "collapse repeated blank lines in the current view")
 	fs.StringVar(&opts.configPath, "config", opts.configPath, "path to a JSON config file")
 	fs.StringVar(&opts.presetName, "theme", opts.presetName, "visual theme: dark, light, plain, pretty")
 	fs.StringVar(&opts.chromeName, "chrome", opts.chromeName, "chrome override: auto, none, single, rounded")
-	fs.StringVar(&opts.renderName, "render", opts.renderName, "render mode: hybrid, literal, presentation")
 	fs.StringVar(&opts.title, "title", opts.title, "frame title")
 	fs.IntVar(&opts.tabWidth, "x", opts.tabWidth, "tab width")
 	fs.BoolVar(&opts.version, "version", opts.version, "display program version and exit")
 
 	var ignoreSmartCase bool
 	var ignoreCase bool
+	var noMarkers bool
+	var noLiteral bool
 	var noMouse bool
 	fs.BoolVar(&ignoreSmartCase, "i", false, "smart-case search")
 	fs.BoolVar(&ignoreCase, "I", false, "case-insensitive search")
+	fs.BoolVar(&noMarkers, "no-markers", false, "hide tabs, line endings, carriage returns, and EOF markers")
+	fs.BoolVar(&noLiteral, "no-literal", false, "interpret supported escapes as styles instead of showing them literally")
 	fs.BoolVar(&noMouse, "no-mouse", false, "disable mouse capture in the program")
 
 	if err := fs.Parse(args); err != nil {
@@ -551,6 +554,12 @@ func parseProgramFlags(args []string) (programOptions, []string, error) {
 	}
 	if noMouse {
 		opts.mouseCapture = false
+	}
+	if noMarkers {
+		opts.markers = false
+	}
+	if noLiteral {
+		opts.literal = false
 	}
 	if opts.showHelp {
 		return opts, nil, nil
@@ -621,7 +630,10 @@ func programFlagHelps() []programFlagHelp {
 		{names: []string{"-N"}, description: "Show line numbers."},
 		{names: []string{"-R"}, description: "Accepted as a less-compatibility no-op."},
 		{names: []string{"-S"}, description: "Accepted as a less-compatibility no-op."},
-		{names: []string{"--hidden"}, description: "Show tabs, line endings, carriage returns, and EOF markers."},
+		{names: []string{"--markers"}, description: "Show tabs, line endings, carriage returns, and EOF markers."},
+		{names: []string{"--no-markers"}, description: "Hide tabs, line endings, carriage returns, and EOF markers."},
+		{names: []string{"--literal"}, description: "Show escape sequences literally instead of interpreting them."},
+		{names: []string{"--no-literal"}, description: "Interpret supported escapes as styles instead of showing them literally."},
 		{names: []string{"--live-links"}, description: "Enable live OSC 8 hyperlinks in the standalone program."},
 		{names: []string{"--mouse"}, description: "Capture mouse button and wheel events in the standalone program."},
 		{names: []string{"--no-mouse"}, description: "Disable mouse button and wheel capture in the standalone program."},
@@ -630,7 +642,6 @@ func programFlagHelps() []programFlagHelp {
 		{names: []string{"--config"}, value: "<path>", description: "Load a JSON config file; overrides GOLESS_CONFIG and the default per-user path."},
 		{names: []string{"--theme"}, value: "<dark|light|plain|pretty>", description: "Select the visual theme."},
 		{names: []string{"--chrome"}, value: "<auto|none|single|rounded>", description: "Override the pager frame style."},
-		{names: []string{"--render"}, value: "<hybrid|literal|presentation>", description: "Choose how escape sequences are rendered."},
 		{names: []string{"--title"}, value: "<text>", description: "Set the frame title."},
 		{names: []string{"-x"}, value: "<n>", description: "Set the tab width."},
 		{names: []string{"-i"}, description: "Use smart-case search."},
@@ -731,7 +742,10 @@ func programSuggestFlag(name string) string {
 		"--version",
 		"--quit-at-eof",
 		"--QUIT-AT-EOF",
-		"--hidden",
+		"--markers",
+		"--no-markers",
+		"--literal",
+		"--no-literal",
 		"--live-links",
 		"--mouse",
 		"--no-mouse",
@@ -740,7 +754,6 @@ func programSuggestFlag(name string) string {
 		"--config",
 		"--theme",
 		"--chrome",
-		"--render",
 		"--title",
 	}
 
@@ -2125,7 +2138,7 @@ func newProgramPager(
 	renderMode goless.RenderMode,
 	preset goless.Preset,
 	chrome goless.Chrome,
-	hidden bool,
+	markers bool,
 	liveLinks bool,
 	lineNumbers bool,
 	searchCaseMode goless.SearchCaseMode,
@@ -2142,7 +2155,7 @@ func newProgramPager(
 		goless.WithSqueezeBlankLines(squeeze),
 		goless.WithText(programText()),
 		goless.WithTheme(preset.Theme),
-		goless.WithVisualization(programVisualization(hidden)),
+		goless.WithVisualization(programVisualization(markers)),
 		goless.WithHyperlinkHandler(programHyperlinkHandler(liveLinks)),
 		goless.WithCommandHandler(commandHandler),
 		goless.WithChrome(chrome),
@@ -2189,17 +2202,4 @@ func programChrome(name, title string, base goless.Chrome) (goless.Chrome, error
 		BottomRight: frame.BottomRight,
 	}
 	return chrome, nil
-}
-
-func programRenderMode(name string) (goless.RenderMode, error) {
-	switch name {
-	case "literal":
-		return goless.RenderLiteral, nil
-	case "presentation":
-		return goless.RenderPresentation, nil
-	case "hybrid", "":
-		return goless.RenderHybrid, nil
-	default:
-		return goless.RenderHybrid, fmt.Errorf("unknown render mode %q; expected hybrid, literal, or presentation", name)
-	}
 }

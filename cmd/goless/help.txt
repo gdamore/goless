@@ -9,32 +9,32 @@
   F4                  cycle themes
 
 [1;4mNavigation[0m
-  ↓                   move forward by a screen step
-  ↑                   move backward by a screen step
+  ↓                        move forward by a screen step
+  ↑                        move backward by a screen step
   Shift+↓ e j Enter ^E ^N  move one line forward
   Shift+↑ k y ^Y ^K ^P     move one line backward
-  f Space PgDn ^F ^V  forward one page
-  PgUp ^B b w         backward one page
-  d ^D J              forward half page
-  u ^U K              backward half page
-  Home 0              jump to line start
-  End $               jump to far right
-  g <                 jump to top
-  G >                 jump to bottom
-  ← h                 scroll horizontally left
-  → l                 scroll horizontally right
-  H                   scroll left half screen
-  L                   scroll right half screen
-  Shift+← Shift+→     scroll horizontally by 1
-  W                   toggle wrap
-  F                   follow the end of the document
-  ^X ^C               stop following
+  f Space PgDn ^F ^V       forward one page
+  PgUp ^B b w              backward one page
+  d ^D J                   forward half page
+  u ^U K                   backward half page
+  Home 0                   jump to line start
+  End $                    jump to far right
+  g <                      jump to top
+  G >                      jump to bottom
+  ← h                      scroll horizontally left
+  → l                      scroll horizontally right
+  H                        scroll left half screen
+  L                        scroll right half screen
+  Shift+← Shift+→          scroll horizontally by 1
+  W                        toggle wrap
+  F                        follow the end of the document
+  ^X ^C                    stop following
 
 [1;4mSearch[0m
   /                   search forward
   ?                   search backward
   n N                 next/previous match
-  F2                  cycle case mode (smart/case/nocase)
+  F2                  cycle case mode (auto/case/nocase)
   F3                  cycle match mode (substring/word/regex)
 
 [1;4mSave Prompt[0m
@@ -54,18 +54,22 @@
   ↑ ↓                 recall prompt history
 
 [1;4mCommands[0m
-  :123                    jump to line 123
-  :50%                    jump to 50%
-  :set number             show line numbers
-  :set wrap               soft-wrap long lines
-  :set list               show hidden-character markers
-  :set squeeze            collapse adjacent blank lines
-  :set tabstop=[3mnum[0m        set tab width
-  :set pinlines=[3mnum[0m       pin top lines
-  :set pincols=[3mnum[0m        pin left columns
-  :set ignorecase         search without case sensitivity
-  :set smartcase          search smart-case
-  :set searchmode=[3mmode[0m    set match mode (sub|word|regex)
-  :reload                 reload current file/input
-  :save [--view] [--mono] [3mpath[0m
-  :license                show the bundled Apache license
+  :123                          jump to line 123
+  :50%                          jump to 50%
+  :number                       show line numbers
+  :nonumber                     hide line numbers
+  :wrap                         soft-wrap long lines
+  :nowrap                       disable soft wrapping
+  :markers                      show hidden-character markers
+  :nomarkers                    hide hidden-character markers
+  :squeeze                      collapse adjacent blank lines
+  :nosqueeze                    keep blank lines
+  :tabs 8                       set tab width to 8
+  :pin rows=6                   pin top 6 rows
+  :pin cols=10                  pin left 10 columns
+  :match [auto|nocase|case]     set search case-sensitivity
+  :match [sub|word|regex]       set search mode
+  :help                         show the built-in help overlay
+  :reload                       reload current file/input
+  :save [--view] [--mono] [3mpath[0m  save current file
+  :license                      show the bundled Apache license

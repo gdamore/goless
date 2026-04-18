@@ -562,7 +562,8 @@ func (v *Viewer) runCommand(text string) (commit bool, quit bool) {
 		return true, false
 	}
 
-	if v.runSetCommand(text) {
+	fields := strings.Fields(text)
+	if v.runDirectCommand(fields) {
 		return true, false
 	}
 
@@ -686,7 +687,15 @@ func parsePercentCommand(text string) (int, bool) {
 	return percent, true
 }
 
-func parseSetAssignment(text string) (name, value string, ok bool) {
+func setVisualizationEnabled(visual Visualization, enabled bool) Visualization {
+	visual.ShowTabs = enabled
+	visual.ShowNewlines = enabled
+	visual.ShowCarriageReturns = enabled
+	visual.ShowEOF = enabled
+	return visual
+}
+
+func parseCommandAssignment(text string) (name, value string, ok bool) {
 	index := strings.Index(text, "=")
 	if index < 0 {
 		return "", "", false
@@ -699,136 +708,197 @@ func parseSetAssignment(text string) (name, value string, ok bool) {
 	return name, value, true
 }
 
-func visualizationEnabled(visual Visualization) bool {
-	return visual.ShowTabs || visual.ShowNewlines || visual.ShowCarriageReturns || visual.ShowEOF
+func parseSearchCaseModeValue(value string) (SearchCaseMode, bool) {
+	switch value {
+	case "auto", "smart":
+		return SearchSmartCase, true
+	case "case", "sensitive":
+		return SearchCaseSensitive, true
+	case "nocase", "insensitive":
+		return SearchCaseInsensitive, true
+	default:
+		return 0, false
+	}
 }
 
-func setVisualizationEnabled(visual Visualization, enabled bool) Visualization {
-	visual.ShowTabs = enabled
-	visual.ShowNewlines = enabled
-	visual.ShowCarriageReturns = enabled
-	visual.ShowEOF = enabled
-	return visual
+func parseSearchModeValue(value string) (SearchMode, bool) {
+	switch value {
+	case "sub", "substring":
+		return SearchSubstring, true
+	case "word", "wholeword":
+		return SearchWholeWord, true
+	case "regex":
+		return SearchRegex, true
+	default:
+		return 0, false
+	}
 }
 
-func (v *Viewer) runSetCommand(text string) bool {
-	fields := strings.Fields(text)
-	if len(fields) == 0 || fields[0] != "set" {
+func (v *Viewer) runMatchCommand(args []string) bool {
+	if len(args) == 0 {
 		return false
 	}
 
-	setText := strings.TrimSpace(strings.TrimPrefix(text, "set"))
-	if setText == "" {
-		return false
-	}
+	caseMode := v.SearchCaseMode()
+	mode := v.SearchMode()
+	caseSet := false
+	modeSet := false
 
-	if name, value, ok := parseSetAssignment(setText); ok {
-		switch name {
-		case "searchcase":
-			var mode SearchCaseMode
-			switch value {
-			case "smart":
-				mode = SearchSmartCase
-			case "case", "sensitive":
-				mode = SearchCaseSensitive
-			case "nocase", "insensitive":
-				mode = SearchCaseInsensitive
-			default:
-				v.setTransientMessage(v.text.CommandUnknown(text))
-				return true
+	for _, arg := range args {
+		if name, value, ok := parseCommandAssignment(arg); ok {
+			switch name {
+			case "case":
+				parsed, ok := parseSearchCaseModeValue(value)
+				if !ok {
+					return false
+				}
+				caseMode = parsed
+				caseSet = true
+				continue
+			case "mode":
+				parsed, ok := parseSearchModeValue(value)
+				if !ok {
+					return false
+				}
+				mode = parsed
+				modeSet = true
+				continue
 			}
-			v.SetSearchCaseMode(mode)
-			v.setMessage("")
-			return true
-		case "searchmode":
-			var mode SearchMode
-			switch value {
-			case "sub", "substring":
-				mode = SearchSubstring
-			case "word", "wholeword":
-				mode = SearchWholeWord
-			case "regex":
-				mode = SearchRegex
-			default:
-				v.setTransientMessage(v.text.CommandUnknown(text))
-				return true
-			}
-			v.SetSearchMode(mode)
-			v.setMessage("")
-			return true
-		case "tabstop":
-			width, err := strconv.Atoi(value)
-			if err != nil || width <= 0 {
-				v.setTransientMessage(v.text.CommandUnknown(text))
-				return true
-			}
-			v.SetTabWidth(width)
-			v.setMessage("")
-			return true
-		case "pinlines":
-			count, err := strconv.Atoi(value)
-			if err != nil || count < 0 {
-				v.setTransientMessage(v.text.CommandUnknown(text))
-				return true
-			}
-			v.SetHeaderLines(count)
-			v.setMessage("")
-			return true
-		case "pincols":
-			count, err := strconv.Atoi(value)
-			if err != nil || count < 0 {
-				v.setTransientMessage(v.text.CommandUnknown(text))
-				return true
-			}
-			v.SetHeaderColumns(count)
-			v.setMessage("")
-			return true
-		default:
-			v.setTransientMessage(v.text.CommandUnknown(text))
-			return true
 		}
+		if !caseSet {
+			if parsed, ok := parseSearchCaseModeValue(arg); ok {
+				caseMode = parsed
+				caseSet = true
+				continue
+			}
+		}
+		if !modeSet {
+			if parsed, ok := parseSearchModeValue(arg); ok {
+				mode = parsed
+				modeSet = true
+				continue
+			}
+		}
+		return false
 	}
 
-	if len(fields) != 2 {
-		v.setTransientMessage(v.text.CommandUnknown(text))
+	v.SetSearchCaseMode(caseMode)
+	v.SetSearchMode(mode)
+	v.setMessage("")
+	return true
+}
+
+func (v *Viewer) runPinCommand(args []string) bool {
+	if len(args) == 0 {
 		return true
 	}
 
-	switch fields[1] {
+	lines := -1
+	columns := -1
+
+	for _, arg := range args {
+		name, value, ok := parseCommandAssignment(arg)
+		if !ok {
+			return false
+		}
+		count, err := strconv.Atoi(value)
+		if err != nil || count < 0 {
+			return false
+		}
+		switch name {
+		case "rows":
+			lines = count
+		case "cols":
+			columns = count
+		default:
+			return false
+		}
+	}
+
+	if lines < 0 && columns < 0 {
+		return false
+	}
+	if lines >= 0 {
+		v.SetHeaderLines(lines)
+	}
+	if columns >= 0 {
+		v.SetHeaderColumns(columns)
+	}
+	return true
+}
+
+func (v *Viewer) runDirectCommand(fields []string) bool {
+	if len(fields) == 0 {
+		return false
+	}
+
+	switch fields[0] {
 	case "number":
+		if len(fields) != 1 {
+			return false
+		}
 		v.SetLineNumbers(true)
 	case "nonumber":
+		if len(fields) != 1 {
+			return false
+		}
 		v.SetLineNumbers(false)
-	case "invnumber":
-		v.ToggleLineNumbers()
 	case "wrap":
+		if len(fields) != 1 {
+			return false
+		}
 		v.SetWrapMode(layout.SoftWrap)
 	case "nowrap":
+		if len(fields) != 1 {
+			return false
+		}
 		v.SetWrapMode(layout.NoWrap)
-	case "invwrap":
-		v.ToggleWrap()
-	case "list":
+	case "markers", "list":
+		if len(fields) != 1 {
+			return false
+		}
 		v.SetVisualization(setVisualizationEnabled(v.cfg.Visualization, true))
-	case "nolist":
+	case "nomarkers", "nolist":
+		if len(fields) != 1 {
+			return false
+		}
 		v.SetVisualization(setVisualizationEnabled(v.cfg.Visualization, false))
-	case "invlist":
-		v.SetVisualization(setVisualizationEnabled(v.cfg.Visualization, !visualizationEnabled(v.cfg.Visualization)))
 	case "squeeze":
+		if len(fields) != 1 {
+			return false
+		}
 		v.SetSqueezeBlankLines(true)
 	case "nosqueeze":
-		v.SetSqueezeBlankLines(false)
-	case "invsqueeze":
-		v.SetSqueezeBlankLines(!v.SqueezeBlankLines())
-	case "ignorecase":
-		v.SetSearchCaseMode(SearchCaseInsensitive)
-	case "noignorecase":
-		v.SetSearchCaseMode(SearchCaseSensitive)
-	case "smartcase":
-		v.SetSearchCaseMode(SearchSmartCase)
-	case "nosmartcase":
-		if v.SearchCaseMode() == SearchSmartCase {
-			v.SetSearchCaseMode(SearchCaseInsensitive)
+		if len(fields) != 1 {
+			return false
 		}
+		v.SetSqueezeBlankLines(false)
+	case "tabs":
+		if len(fields) != 2 {
+			return false
+		}
+		width, err := strconv.Atoi(fields[1])
+		if err != nil || width <= 0 {
+			return false
+		}
+		v.SetTabWidth(width)
+	case "pin":
+		if !v.runPinCommand(fields[1:]) {
+			return false
+		}
+	case "match", "search":
+		if len(fields) == 1 {
+			v.setTransientMessage("match requires a case or mode argument")
+			return true
+		}
+		if !v.runMatchCommand(fields[1:]) {
+			return false
+		}
+	case "help":
+		if len(fields) != 1 {
+			return false
+		}
+		v.ShowInformation(v.text.HelpTitle, v.text.HelpBody)
 	default:
 		return false
 	}
