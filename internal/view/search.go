@@ -715,19 +715,17 @@ func parseRangeList(value string) ([]layout.Range, bool) {
 
 	parts := strings.Split(value, ",")
 	ranges := make([]layout.Range, 0, len(parts))
-	singlePrefix := len(parts) == 1
-	for _, part := range parts {
-		rng, ok := parseRangeSpec(part, singlePrefix)
+	for i, part := range parts {
+		rng, ok := parseRangeSpec(part, len(parts) == 1 && i == 0)
 		if !ok {
 			return nil, false
 		}
 		ranges = append(ranges, rng)
-		singlePrefix = false
 	}
 	return layout.NormalizeRanges(ranges), true
 }
 
-func parseRangeSpec(text string, prefixCount bool) (layout.Range, bool) {
+func parseRangeSpec(text string, treatAsPrefix bool) (layout.Range, bool) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return layout.Range{}, false
@@ -756,7 +754,7 @@ func parseRangeSpec(text string, prefixCount bool) (layout.Range, bool) {
 	if err != nil || count < 0 {
 		return layout.Range{}, false
 	}
-	if prefixCount {
+	if treatAsPrefix {
 		return layout.Range{Start: 0, End: count}, true
 	}
 	if count == 0 {
