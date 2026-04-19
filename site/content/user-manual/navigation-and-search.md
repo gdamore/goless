@@ -33,6 +33,35 @@ position. Leave it off when you are comparing aligned text or reading tables.
 Search should behave like a terminal pager, not a text editor: predictable,
 directional, and easy to repeat without leaving the screen.
 
+## Commands
+
+- `q` / `Esc` quit.
+- `r` / `Ctrl-L` repaint the screen.
+- `F1` shows the built-in help overlay.
+- `F4` cycles visual themes.
+- `F5` toggles hidden-character markers.
+- `s` opens the standalone save prompt.
+- `v` opens the current file in `$EDITOR` at the current line.
+- `:number` / `:nonumber` show or hide line numbers.
+- `:wrap` / `:nowrap` toggle soft wrapping.
+- `:markers` / `:nomarkers` show or hide hidden-character markers.
+- `:squeeze` / `:nosqueeze` collapse or keep adjacent blank lines.
+- `:tabs <n>` sets tab width.
+- `:pin [rows=<n>] [cols=<n>]` pins the top rows and/or left columns.
+- `:match [auto|nocase|case] [sub|word|regex]` controls search case and matching.
+- `:reload` reloads the current file or input.
+- `:save`, `:write`, and `:w` save the current content set or the visible viewport.
+- `:next` / `:prev` move through a multi-file session.
+- `:first`, `:last`, `:x`, and `:file` control which file is active.
+- `=` or `Ctrl-G` show the current file or session status.
+- `:license` shows the bundled Apache license.
+- `:Q` quits.
+- `:help` shows the built-in help overlay.
+
+The standalone save prompt uses the same save command. `F2` toggles file versus
+viewport scope, and `F3` toggles ANSI versus plain output while you are editing
+the prompt.
+
 ## Recording Slot
 
 This page is also where the first terminal demo should live once you have a

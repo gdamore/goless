@@ -16,8 +16,8 @@ understand the status line.
 
 The current sections are organized like this:
 
-- `Getting Started` covers launch modes, config, and the first screen.
-- `Navigation and Search` covers movement, paging, wrap mode, and search.
+- `Getting Started` covers launch modes, config, common flags, and the first screen.
+- `Navigation and Search` covers movement, paging, commands, wrap mode, and search.
 - `Media and Demos` reserves space for screenshots and terminal recordings.
 
 When you share Asciinema recordings, they should land naturally in the

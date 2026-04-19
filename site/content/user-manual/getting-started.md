@@ -28,6 +28,31 @@ When `stdout` is redirected or piped, `goless` falls back to pass-through mode.
 In that case it writes the selected input unchanged instead of opening the
 full-screen UI.
 
+## Common Flags
+
+Run `goless --help` for the full list. The most useful flags are:
+
+- `-?`, `-h`, or `--help` to print usage and exit
+- `--version` to print the program version
+- `--license` to print the bundled Apache license
+- `--default-config` to print the built-in JSON config
+- `-e` / `--quit-at-eof` to quit on the first forward command at EOF
+- `-E` / `--QUIT-AT-EOF` to quit when EOF is already visible on screen
+- `-F` to quit immediately if the entire input fits on one screen
+- `-N` to show line numbers
+- `-R` and `-S` as less-compatibility no-ops
+- `-i` for smart-case search and `-I` for case-insensitive search
+- `--markers` / `--no-markers` to show or hide hidden-character markers
+- `--literal` / `--no-literal` to show escape sequences literally or interpret supported escapes
+- `--live-links` to enable live OSC 8 hyperlinks
+- `--mouse` / `--no-mouse` to capture or ignore mouse button and wheel events
+- `--secure` to disable standalone commands that launch external programs
+- `-config path` to load a specific JSON config file
+- `-theme dark|light|plain|pretty`
+- `-chrome auto|none|single|rounded`
+- `-x n` to set tab width
+- `-s` / `-squeeze` to collapse repeated blank lines
+
 ## First Screen
 
 When you open a regular file in the full-screen UI, the first screen should
