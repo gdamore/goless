@@ -37,6 +37,15 @@ func TestDarkPresetUsesSolarizedDarkDefaults(t *testing.T) {
 	if !DarkPreset.Chrome.HeaderStyle.HasBold() {
 		t.Fatal("DarkPreset.Chrome.HeaderStyle should be bold")
 	}
+	if got, want := DarkPreset.Chrome.PinnedRowGlyph, "▷"; got != want {
+		t.Fatalf("DarkPreset.Chrome.PinnedRowGlyph = %q, want %q", got, want)
+	}
+	if got, want := DarkPreset.Chrome.PinnedColumnGlyph, "△"; got != want {
+		t.Fatalf("DarkPreset.Chrome.PinnedColumnGlyph = %q, want %q", got, want)
+	}
+	if !DarkPreset.Chrome.PinnedStyle.HasBold() {
+		t.Fatal("DarkPreset.Chrome.PinnedStyle should be bold")
+	}
 	if got, want := DarkPreset.Chrome.PromptStyle.GetBackground(), DarkPreset.Theme.DefaultBG; got != want {
 		t.Fatalf("DarkPreset.Chrome.PromptStyle background = %v, want %v", got, want)
 	}
@@ -67,6 +76,15 @@ func TestLightPresetUsesSolarizedLightDefaults(t *testing.T) {
 	if !LightPreset.Chrome.HeaderStyle.HasBold() {
 		t.Fatal("LightPreset.Chrome.HeaderStyle should be bold")
 	}
+	if got, want := LightPreset.Chrome.PinnedRowGlyph, "▷"; got != want {
+		t.Fatalf("LightPreset.Chrome.PinnedRowGlyph = %q, want %q", got, want)
+	}
+	if got, want := LightPreset.Chrome.PinnedColumnGlyph, "△"; got != want {
+		t.Fatalf("LightPreset.Chrome.PinnedColumnGlyph = %q, want %q", got, want)
+	}
+	if !LightPreset.Chrome.PinnedStyle.HasBold() {
+		t.Fatal("LightPreset.Chrome.PinnedStyle should be bold")
+	}
 }
 
 func TestPlainPresetUsesMonochromePalette(t *testing.T) {
@@ -84,6 +102,12 @@ func TestPlainPresetUsesMonochromePalette(t *testing.T) {
 	}
 	if !PlainPreset.Chrome.HeaderStyle.HasDim() {
 		t.Fatal("PlainPreset.Chrome.HeaderStyle should be dim")
+	}
+	if PlainPreset.Chrome.RestylePinned == nil {
+		t.Fatal("PlainPreset.Chrome.RestylePinned should be set")
+	}
+	if !PlainPreset.Chrome.PinnedStyle.HasBold() {
+		t.Fatal("PlainPreset.Chrome.PinnedStyle should be bold")
 	}
 }
 
@@ -108,5 +132,14 @@ func TestPrettyPresetUsesRoundedDecorativeChrome(t *testing.T) {
 	}
 	if !PrettyPreset.Chrome.HeaderStyle.HasBold() {
 		t.Fatal("PrettyPreset.Chrome.HeaderStyle should be bold")
+	}
+	if got, want := PrettyPreset.Chrome.PinnedRowGlyph, "▷"; got != want {
+		t.Fatalf("PrettyPreset.Chrome.PinnedRowGlyph = %q, want %q", got, want)
+	}
+	if got, want := PrettyPreset.Chrome.PinnedColumnGlyph, "△"; got != want {
+		t.Fatalf("PrettyPreset.Chrome.PinnedColumnGlyph = %q, want %q", got, want)
+	}
+	if !PrettyPreset.Chrome.PinnedStyle.HasBold() {
+		t.Fatal("PrettyPreset.Chrome.PinnedStyle should be bold")
 	}
 }

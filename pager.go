@@ -26,6 +26,9 @@ const (
 	SoftWrap WrapMode = WrapMode(layout.SoftWrap)
 )
 
+// Range identifies a half-open interval used for sticky row and column spans.
+type Range = layout.Range
+
 // Config is a compatibility construction bundle for Pager.
 //
 // Prefer passing explicit Option values to New. Config remains accepted by New
@@ -39,6 +42,8 @@ type Config struct {
 	LineNumbers       bool                        // LineNumbers enables an adaptive line-number gutter.
 	HeaderLines       int                         // HeaderLines pins the first N logical lines at the top of the viewport.
 	HeaderColumns     int                         // HeaderColumns pins the first N display columns at the left edge of the viewport.
+	PinnedRows        []Range                     // PinnedRows marks sticky zero-based logical line ranges that stay visible when scrolling.
+	PinnedColumns     []Range                     // PinnedColumns marks sticky zero-based display column ranges that stay visible when scrolling.
 	Theme             Theme                       // Theme remaps content default colors and ANSI 0-15 without affecting chrome.
 	Visualization     Visualization               // Visualization overlays optional markers for tabs, line endings, carriage returns, and EOF.
 	HyperlinkHandler  HyperlinkHandler            // HyperlinkHandler controls how parsed OSC 8 hyperlink spans are rendered.
@@ -144,6 +149,8 @@ func newPagerFromConfig(cfg Config) *Pager {
 			LineNumbers:       cfg.LineNumbers,
 			HeaderLines:       cfg.HeaderLines,
 			HeaderColumns:     cfg.HeaderColumns,
+			PinnedRows:        cfg.PinnedRows,
+			PinnedColumns:     cfg.PinnedColumns,
 			Theme:             toInternalTheme(cfg.Theme),
 			Visualization:     toInternalVisualization(cfg.Visualization),
 			HyperlinkHandler:  toInternalHyperlinkHandler(cfg.HyperlinkHandler),
@@ -313,6 +320,56 @@ func (p *Pager) SetHeaderColumns(count int) {
 // HeaderColumns reports how many leading display columns are fixed at the left edge of the viewport.
 func (p *Pager) HeaderColumns() int {
 	return p.viewer.HeaderColumns()
+}
+
+// SetPinnedRows updates the sticky logical line ranges rendered within the scrolling body.
+func (p *Pager) SetPinnedRows(ranges ...Range) {
+	p.viewer.SetPinnedRows(ranges...)
+}
+
+// PinnedRows reports the sticky logical line ranges rendered within the scrolling body.
+func (p *Pager) PinnedRows() []Range {
+	return p.viewer.PinnedRows()
+}
+
+// ClearPinnedRows removes all sticky logical line ranges.
+func (p *Pager) ClearPinnedRows() {
+	p.viewer.ClearPinnedRows()
+}
+
+// UnpinRows removes the given sticky logical line ranges.
+func (p *Pager) UnpinRows(ranges ...Range) {
+	p.viewer.UnpinRows(ranges...)
+}
+
+// SetPinnedColumns updates the sticky display column ranges rendered within the scrolling body.
+func (p *Pager) SetPinnedColumns(ranges ...Range) {
+	p.viewer.SetPinnedColumns(ranges...)
+}
+
+// PinnedColumns reports the sticky display column ranges rendered within the scrolling body.
+func (p *Pager) PinnedColumns() []Range {
+	return p.viewer.PinnedColumns()
+}
+
+// ClearPinnedColumns removes all sticky display column ranges.
+func (p *Pager) ClearPinnedColumns() {
+	p.viewer.ClearPinnedColumns()
+}
+
+// UnpinColumns removes the given sticky display column ranges.
+func (p *Pager) UnpinColumns(ranges ...Range) {
+	p.viewer.UnpinColumns(ranges...)
+}
+
+// ClearPins removes all fixed and sticky pinned row and column ranges.
+func (p *Pager) ClearPins() {
+	p.viewer.ClearPins()
+}
+
+// Unpin clears all fixed and sticky pinned row and column ranges.
+func (p *Pager) Unpin() {
+	p.ClearPins()
 }
 
 // SetVisualization updates how hidden structure markers are drawn.
@@ -950,6 +1007,11 @@ func toInternalChrome(chrome Chrome) iview.Chrome {
 		StatusHelpKeyStyle: chrome.StatusHelpKeyStyle,
 		LineNumberStyle:    chrome.LineNumberStyle,
 		HeaderStyle:        chrome.HeaderStyle,
+		PinnedRowGlyph:     chrome.PinnedRowGlyph,
+		PinnedColumnGlyph:  chrome.PinnedColumnGlyph,
+		PinnedGlyph:        chrome.PinnedGlyph,
+		PinnedStyle:        chrome.PinnedStyle,
+		RestylePinned:      chrome.RestylePinned,
 		PromptStyle:        chrome.PromptStyle,
 		PromptErrorStyle:   chrome.PromptErrorStyle,
 		Frame: iview.Frame{

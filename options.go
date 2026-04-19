@@ -142,6 +142,32 @@ func WithHeaderColumns(count int) RuntimeOption {
 	}
 }
 
+// WithPinnedRows updates the sticky logical line ranges rendered within the scrolling body.
+func WithPinnedRows(ranges ...Range) RuntimeOption {
+	dup := append([]Range(nil), ranges...)
+	return runtimeOptionFunc{
+		optionFunc: func(cfg *Config) {
+			cfg.PinnedRows = append([]Range(nil), dup...)
+		},
+		runtime: func(p *Pager) {
+			p.viewer.SetPinnedRows(dup...)
+		},
+	}
+}
+
+// WithPinnedColumns updates the sticky display column ranges rendered within the scrolling body.
+func WithPinnedColumns(ranges ...Range) RuntimeOption {
+	dup := append([]Range(nil), ranges...)
+	return runtimeOptionFunc{
+		optionFunc: func(cfg *Config) {
+			cfg.PinnedColumns = append([]Range(nil), dup...)
+		},
+		runtime: func(p *Pager) {
+			p.viewer.SetPinnedColumns(dup...)
+		},
+	}
+}
+
 // WithTheme remaps content default colors and ANSI 0-15 without affecting chrome.
 func WithTheme(theme Theme) RuntimeOption {
 	return runtimeOptionFunc{
