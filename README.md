@@ -447,7 +447,9 @@ The default key group is intentionally less-like. Common bindings include:
 - `:squeeze`                             collapse adjacent blank lines
 - `:nosqueeze`                           keep blank lines
 - `:tabs <n>`                           set tab width
-- `:pin [rows=<n>] [cols=<n>]`          pin the top rows and/or left columns
+- `:pin [rows=<n>|<start>-<end>] [cols=<n>|<start>-<end>]` pin fixed prefixes or sticky ranges
+- `:unpin`                              clear all fixed and sticky pinning
+- `:unpin [rows=<n>|<start>-<end>] [cols=<n>|<start>-<end>]` remove sticky spans
 - `:match [auto|nocase|case] [sub|word|regex]`  control search case and matching
 - `:help`                               show the built-in help overlay
 - `F` to enable follow mode

@@ -299,6 +299,9 @@ func TestDemoChromeUsesPresetAndOverrides(t *testing.T) {
 	if got, want := chrome.PinnedRowGlyph, "▷"; got != want {
 		t.Fatalf("programChrome(single).PinnedRowGlyph = %q, want %q", got, want)
 	}
+	if got, want := chrome.PinnedColumnGlyph, "△"; got != want {
+		t.Fatalf("programChrome(single).PinnedColumnGlyph = %q, want %q", got, want)
+	}
 
 	base := goless.PrettyPreset.Chrome
 	base.StatusHelpKeyStyle = tcell.StyleDefault.Foreground(color.Red).Bold(true)

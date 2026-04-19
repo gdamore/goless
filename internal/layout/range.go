@@ -116,5 +116,8 @@ func SubtractRanges(base []Range, remove []Range) []Range {
 			result = append(result, Range{Start: curStart, End: curEnd})
 		}
 	}
+	if len(result) == 0 {
+		return nil
+	}
 	return result
 }

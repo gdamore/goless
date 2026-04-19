@@ -934,6 +934,55 @@ func TestUnpinPrefixRanges(t *testing.T) {
 	}
 }
 
+func TestUnpinOverlappingPrefixRanges(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("header\none\ntwo\nthree\nfour\nfive\nsix\nseven\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	runViewerCommand(v, "pin rows=5 cols=5")
+	runViewerCommand(v, "unpin rows=1-2 rows=1-3 cols=1-2 cols=1-4")
+
+	if got, want := v.HeaderLines(), 2; got != want {
+		t.Fatalf("HeaderLines after overlapping unpin = %d, want %d", got, want)
+	}
+	if got, want := v.HeaderColumns(), 1; got != want {
+		t.Fatalf("HeaderColumns after overlapping unpin = %d, want %d", got, want)
+	}
+}
+
+func TestClearPinsRelayoutsAndPreservesAnchor(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefg\nhijklmn\nopqrstu\nvwxyz12\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true, HeaderColumns: 2})
+	v.SetSize(6, 3)
+	v.ScrollDown(1)
+
+	beforeAnchor := v.firstVisibleAnchor()
+	beforeWidth := v.layout.Config.Width
+	if got, want := beforeWidth, 4; got != want {
+		t.Fatalf("layout width before clear pins = %d, want %d", got, want)
+	}
+
+	v.ClearPins()
+
+	if got, want := v.layout.Config.Width, 6; got != want {
+		t.Fatalf("layout width after clear pins = %d, want %d", got, want)
+	}
+	if got := v.firstVisibleAnchor().LineIndex; got != beforeAnchor.LineIndex {
+		t.Fatalf("firstVisibleAnchor line after clear pins = %d, want %d", got, beforeAnchor.LineIndex)
+	}
+	if got, want := v.HeaderColumns(), 0; got != want {
+		t.Fatalf("HeaderColumns after clear pins = %d, want %d", got, want)
+	}
+}
+
 func TestDisplayCommands(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ttwo\n")); err != nil {
