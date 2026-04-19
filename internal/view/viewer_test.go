@@ -964,6 +964,63 @@ func TestMatchCommandWithoutArgumentsShowsHelpfulMessage(t *testing.T) {
 	}
 }
 
+func TestSearchCommandIsRejected(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	runViewerCommand(v, "search")
+
+	if got, want := v.message, "unknown command: search"; got != want {
+		t.Fatalf("message after search = %q, want %q", got, want)
+	}
+	if got, want := v.mode, modeNormal; got != want {
+		t.Fatalf("mode after search = %v, want %v", got, want)
+	}
+}
+
+func TestMatchCommandAssignmentSyntax(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("Alpha\nalpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	runViewerCommand(v, "match case=nocase mode=regex")
+
+	if got, want := v.SearchCaseMode(), SearchCaseInsensitive; got != want {
+		t.Fatalf("SearchCaseMode after assignment syntax = %v, want %v", got, want)
+	}
+	if got, want := v.SearchMode(), SearchRegex; got != want {
+		t.Fatalf("SearchMode after assignment syntax = %v, want %v", got, want)
+	}
+}
+
+func TestMatchCommandInvalidAssignmentFallsThrough(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("Alpha\nalpha\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	runViewerCommand(v, "match case=maybe")
+
+	if got, want := v.message, "unknown command: match case=maybe"; got != want {
+		t.Fatalf("message after invalid match assignment = %q, want %q", got, want)
+	}
+	if got, want := v.SearchCaseMode(), SearchSmartCase; got != want {
+		t.Fatalf("SearchCaseMode after invalid match assignment = %v, want %v", got, want)
+	}
+}
+
 func TestKeyBindingMatchesRequireExactNoModifierByDefault(t *testing.T) {
 	binding := keyBinding{
 		key:    tcell.KeyRune,

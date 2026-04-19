@@ -886,7 +886,7 @@ func (v *Viewer) runDirectCommand(fields []string) bool {
 		if !v.runPinCommand(fields[1:]) {
 			return false
 		}
-	case "match", "search":
+	case "match":
 		if len(fields) == 1 {
 			v.setTransientMessage("match requires a case or mode argument")
 			return true
