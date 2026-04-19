@@ -187,6 +187,8 @@ The current exported `Pager` API is controller-oriented.
   `SearchForwardWithCase`, `SearchBackwardWithCase`, `SetSearchCaseMode`,
   `SearchCaseMode`, `SetSearchMode`, `SearchMode`, `CycleSearchCaseMode`,
   `CycleSearchMode`, `SearchState`, `ClearSearch`
+- Pinning: `SetHeaderLines`, `SetHeaderColumns`, `SetPinnedRows`,
+  `SetPinnedColumns`, `Unpin`, `ClearPins`
 - View state: `Position`
   `Position.Row` and `Position.Column` are 1-based logical coordinates when
   content is present, so `(1,1)` is the start of the first logical line
@@ -204,6 +206,8 @@ Common options are:
 - `LineNumbers`: enable an adaptive line-number gutter
 - `HeaderLines`: pin the first N logical lines at the top of the viewport
 - `HeaderColumns`: pin the first N display columns at the left edge of the viewport
+- `PinnedRows`: sticky logical line ranges that remain visible when scrolling
+- `PinnedColumns`: sticky display column ranges that remain visible when scrolling
 - `Theme`: remap content default colors and ANSI 0-15 without affecting chrome
 - `Visualization`: show tabs, line endings, carriage returns, and EOF with pager-added markers
 - `HyperlinkHandler`: inspect OSC 8 links, decide whether they go live,
@@ -215,11 +219,15 @@ Common options are:
 - `Chrome`: optional frame/title styling plus title alignment and status/prompt style slots; frame glyphs are rendered exactly as configured, including intentional empty strings
 - `Chrome.LineNumberStyle`: optional style for the adaptive line-number gutter
 - `Chrome.HeaderStyle`: optional style for fixed header rows and columns
+- `Chrome.PinnedRowGlyph` / `Chrome.PinnedColumnGlyph`: optional single-column markers used in the chrome to indicate pinned rows and columns
+- `Chrome.PinnedGlyph`: legacy fallback marker used when the row/column-specific glyphs are unset
+- `Chrome.PinnedStyle`: optional style overlay used for the pin markers themselves
+- `Chrome.RestylePinned`: optional callback that transforms the style used for pinned cells
 - `Text`: override help text, status text, prompt text, and UI strings
 
 Runtime-safe `With...` options can be applied either through `Pager.Configure`
 or through the existing convenience setters such as `SetTheme`, `SetChrome`,
-and `SetHeaderLines`.
+`SetHeaderLines`, and `Unpin`.
 
 For OSC 8 specifically:
 
@@ -250,7 +258,11 @@ The built-in pager UI exposes search mode controls directly:
 - `:markers` / `:nomarkers` control hidden-character markers
 - `:squeeze` / `:nosqueeze` control adjacent blank-line collapsing
 - `:tabs <n>` sets tab width
-- `:pin [rows=<n>] [cols=<n>]` pins the top rows and/or left columns
+- `:pin [rows=<n>|<start>-<end>] [cols=<n>|<start>-<end>]` pins fixed prefixes or sticky ranges
+- `:pin rows=<n>` / `:pin cols=<n>` keep the existing prefix behavior
+- `:pin rows=<start>-<end>` / `:pin cols=<start>-<end>` add sticky spans using 1-based endpoints
+- `:unpin` clears all fixed and sticky pinning
+- `:unpin [rows=<n>|<start>-<end>] [cols=<n>|<start>-<end>]` removes sticky spans
 - `:match [auto|nocase|case] [sub|word|regex]` controls search case and matching
 - `:help` opens the built-in help overlay
 - invalid regexes stay in the search prompt and are marked visibly until fixed

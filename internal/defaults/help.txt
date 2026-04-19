@@ -56,7 +56,9 @@
   :squeeze                collapse adjacent blank lines
   :nosqueeze              keep blank lines
   :tabs [3mnum[0m              set tab width
-  :pin [rows=[3mnum[0m] [cols=[3mnum[0m]  pin top rows and/or left columns
+  :pin [rows=[3mnum[0m|[3mstart[0m-[3mend[0m] [cols=[3mnum[0m|[3mstart[0m-[3mend[0m]  pin prefixes or sticky ranges
+  :unpin                    clear all pinning
+  :unpin [rows=[3mnum[0m|[3mstart[0m-[3mend[0m] [cols=[3mnum[0m|[3mstart[0m-[3mend[0m]  remove sticky ranges
   :match [auto|nocase|case] [sub|word|regex]  control search case and matching
   :help                   show the built-in help overlay
   :reload                 reload current file/input

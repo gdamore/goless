@@ -1270,6 +1270,29 @@ func TestPagerHeaderColumns(t *testing.T) {
 	}
 }
 
+func TestPagerUnpinClearsAllPinning(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetHeaderLines(2)
+	pager.SetHeaderColumns(3)
+	pager.SetPinnedRows(Range{Start: 4, End: 6})
+	pager.SetPinnedColumns(Range{Start: 2, End: 5})
+
+	pager.Unpin()
+
+	if got, want := pager.HeaderLines(), 0; got != want {
+		t.Fatalf("HeaderLines() after Unpin = %d, want %d", got, want)
+	}
+	if got, want := pager.HeaderColumns(), 0; got != want {
+		t.Fatalf("HeaderColumns() after Unpin = %d, want %d", got, want)
+	}
+	if got := pager.PinnedRows(); len(got) != 0 {
+		t.Fatalf("PinnedRows() after Unpin = %+v, want empty", got)
+	}
+	if got := pager.PinnedColumns(); len(got) != 0 {
+		t.Fatalf("PinnedColumns() after Unpin = %+v, want empty", got)
+	}
+}
+
 func TestPagerJumpToLineUsesSourceLinesWhenSqueezed(t *testing.T) {
 	pager := New(Config{
 		TabWidth:          4,
