@@ -78,8 +78,11 @@ var DarkPreset = Preset{
 		PinnedRowGlyph:    "▷",
 		PinnedColumnGlyph: "△",
 		PinnedStyle:       tcell.StyleDefault.Bold(true),
-		PromptStyle:       tcell.StyleDefault.Foreground(solarizedBase3).Background(solarizedBase03),
-		PromptErrorStyle:  tcell.StyleDefault.Foreground(solarizedRed).Background(solarizedBase03).Bold(true),
+		RestylePinned: func(style tcell.Style) tcell.Style {
+			return style.Background(solarizedBase02)
+		},
+		PromptStyle:      tcell.StyleDefault.Foreground(solarizedBase3).Background(solarizedBase03),
+		PromptErrorStyle: tcell.StyleDefault.Foreground(solarizedRed).Background(solarizedBase03).Bold(true),
 	},
 }
 
@@ -119,8 +122,11 @@ var LightPreset = Preset{
 		PinnedRowGlyph:    "▷",
 		PinnedColumnGlyph: "△",
 		PinnedStyle:       tcell.StyleDefault.Bold(true),
-		PromptStyle:       tcell.StyleDefault.Foreground(solarizedBase02).Background(solarizedBase2),
-		PromptErrorStyle:  tcell.StyleDefault.Foreground(solarizedRed).Background(solarizedBase2).Bold(true),
+		RestylePinned: func(style tcell.Style) tcell.Style {
+			return style.Background(solarizedBase2)
+		},
+		PromptStyle:      tcell.StyleDefault.Foreground(solarizedBase02).Background(solarizedBase2),
+		PromptErrorStyle: tcell.StyleDefault.Foreground(solarizedRed).Background(solarizedBase2).Bold(true),
 	},
 }
 
@@ -156,7 +162,7 @@ var PlainPreset = Preset{
 		HeaderStyle:        tcell.StyleDefault.Reverse(true).Dim(true),
 		PinnedStyle:        tcell.StyleDefault.Bold(true),
 		RestylePinned: func(style tcell.Style) tcell.Style {
-			return style.Reverse(true)
+			return style.Dim(true).Reverse(true)
 		},
 		PromptStyle:      tcell.StyleDefault.Reverse(true),
 		PromptErrorStyle: tcell.StyleDefault.Reverse(true).Bold(true),
@@ -177,8 +183,11 @@ var PrettyPreset = Preset{
 		PinnedRowGlyph:    "▷",
 		PinnedColumnGlyph: "△",
 		PinnedStyle:       tcell.StyleDefault.Bold(true),
-		PromptStyle:       tcell.StyleDefault.Foreground(solarizedBase3).Background(prettyBlue),
-		PromptErrorStyle:  tcell.StyleDefault.Foreground(solarizedRed).Background(prettyBlue).Bold(true),
+		RestylePinned: func(style tcell.Style) tcell.Style {
+			return style.Foreground(solarizedMagenta)
+		},
+		PromptStyle:      tcell.StyleDefault.Foreground(solarizedBase3).Background(prettyBlue),
+		PromptErrorStyle: tcell.StyleDefault.Foreground(solarizedRed).Background(prettyBlue).Bold(true),
 	},
 }
 

@@ -4979,6 +4979,39 @@ func TestPinnedColumnsStayVisible(t *testing.T) {
 	}
 }
 
+func TestPinnedColumnBackgroundExtendsPastLineEnd(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("ab\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		PinnedColumns: []layout.Range{
+			{Start: 1, End: 5},
+		},
+		Chrome: Chrome{
+			RestylePinned: func(style tcell.Style) tcell.Style {
+				return style.Reverse(true)
+			},
+		},
+	})
+	v.SetSize(8, 2)
+
+	_, screen := newMockScreen(t, 8, 2)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got := cellRune(screen, 3, 0); got != ' ' {
+		t.Fatalf("pinned trailing cell rune = %q, want space", got)
+	}
+	_, style, _ := screen.Get(3, 0)
+	if !style.HasReverse() {
+		t.Fatal("pinned trailing cell should be restyled past the end of the line")
+	}
+}
+
 func TestPinnedCellsRestyleAndShowChromeIndicators(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("abcdef\nuvwxyz\nmnopqr\nstuvwx\n")); err != nil {
@@ -5082,8 +5115,20 @@ func TestPinnedRowIndicatorTracksPinnedOverlayPosition(t *testing.T) {
 	defer screen.Fini()
 	v.Draw(screen)
 
-	if got := cellRune(screen, 1, 1); got != '!' {
+	if got := cellRune(screen, 0, 1); got != '!' {
 		t.Fatalf("pinned row glyph at overlay position = %q, want %q", got, '!')
+	}
+	_, pinStyle, _ := screen.Get(0, 1)
+	if !pinStyle.HasBold() {
+		t.Fatal("pinned row glyph should be bold")
+	}
+
+	if got := cellRune(screen, 1, 1); got < '0' || got > '9' {
+		t.Fatalf("pinned row number at overlay position = %q, want a digit", got)
+	}
+	_, numberStyle, _ := screen.Get(1, 1)
+	if numberStyle.HasBold() {
+		t.Fatal("pinned row number should keep the normal line-number style")
 	}
 }
 

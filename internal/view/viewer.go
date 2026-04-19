@@ -1261,25 +1261,22 @@ func (v *Viewer) drawPinnedRowIndicator(screen tcell.Screen, y, rowIndex int, ro
 		return
 	}
 
+	if v.cfg.Chrome.Frame.enabled() {
+		screen.PutStrStyled(0, y, pin, v.pinnedChromeStyle(v.cfg.Chrome.BorderStyle))
+		return
+	}
+
 	if v.cfg.LineNumbers {
 		gutterX, _, gutterWidth, _ := v.gutterRect()
 		if gutterWidth <= 0 {
 			return
 		}
 
-		label := pin
+		screen.PutStrStyled(gutterX, y, pin, v.pinnedChromeStyle(v.cfg.Chrome.LineNumberStyle))
 		if v.shouldShowLineNumber(rowIndex) && gutterWidth > 1 {
-			label += padRightToWidth(fmt.Sprintf("%*d", gutterWidth-1, v.sourceLineIndex(row.LineIndex)+1), gutterWidth-1)
-		} else if gutterWidth > 1 {
-			label += padRightToWidth("", gutterWidth-1)
+			label := padRightToWidth(fmt.Sprintf("%*d", gutterWidth-1, v.sourceLineIndex(row.LineIndex)+1), gutterWidth-1)
+			screen.PutStrStyled(gutterX+1, y, label, applyChromeStyle(v.rowBaseStyle(false), v.cfg.Chrome.LineNumberStyle))
 		}
-		rowTextStyle := applyChromeStyle(v.rowBaseStyle(false), v.cfg.Chrome.LineNumberStyle)
-		screen.PutStrStyled(gutterX, y, label, v.pinnedChromeStyle(rowTextStyle))
-		return
-	}
-
-	if v.cfg.Chrome.Frame.enabled() {
-		screen.PutStrStyled(0, y, pin, v.pinnedChromeStyle(v.cfg.Chrome.BorderStyle))
 	}
 }
 
@@ -1304,28 +1301,38 @@ func (v *Viewer) drawPinnedColumnRange(screen tcell.Screen, bodyX, y int, row la
 	if band.End <= band.Start || maxWidth <= 0 {
 		return
 	}
+
+	requestedStart := band.Start
+	requestedEnd := band.End
+
 	headerWidth := v.headerColumnWidth(v.rawContentWidth())
-	if band.End <= headerWidth {
+	if requestedEnd <= headerWidth {
 		return
 	}
-	if band.Start < headerWidth {
-		band.Start = headerWidth
+	if requestedStart < headerWidth {
+		requestedStart = headerWidth
 	}
-	if band.Start < 0 {
-		band.Start = 0
+	if requestedStart < 0 {
+		requestedStart = 0
 	}
-	if band.End > v.maxContentColumns() {
-		band.End = v.maxContentColumns()
-	}
-	if band.End <= band.Start {
+	if requestedEnd <= requestedStart {
 		return
 	}
 
-	naturalLeft := band.Start - headerWidth
+	visibleEnd := requestedEnd
+	if visibleEnd > v.maxContentColumns() {
+		visibleEnd = v.maxContentColumns()
+	}
+	if visibleEnd <= requestedStart {
+		return
+	}
+
+	naturalLeft := requestedStart - headerWidth
 	if v.cfg.WrapMode == layout.NoWrap {
 		naturalLeft -= max(v.colOffset, 0)
 	}
-	maxLeft := max(maxWidth-band.Length(), 0)
+	spanLength := requestedEnd - requestedStart
+	maxLeft := max(maxWidth-spanLength, 0)
 	if naturalLeft < 0 {
 		naturalLeft = 0
 	}
@@ -1335,26 +1342,34 @@ func (v *Viewer) drawPinnedColumnRange(screen tcell.Screen, bodyX, y int, row la
 
 	info := v.layout.Lines[row.LineIndex]
 	screenX := naturalLeft
+	pinnedStyle := v.rowBaseStyle(header)
+	if pinned {
+		pinnedStyle = v.restylePinned(pinnedStyle)
+	}
+	fillWidth := min(spanLength, max(maxWidth-screenX, 0))
+	if fillWidth > 0 {
+		screen.PutStrStyled(bodyX+screenX, y, strings.Repeat(" ", fillWidth), pinnedStyle)
+	}
 	for i := range info.GraphemeCellStarts {
 		sourceStart := info.GraphemeCellStarts[i]
 		sourceEnd := info.GraphemeCellEnds[i]
-		if sourceEnd <= band.Start || sourceStart >= band.End {
+		if sourceEnd <= requestedStart || sourceStart >= visibleEnd {
 			continue
 		}
 
-		visibleStart := max(sourceStart, band.Start)
-		visibleEnd := min(sourceEnd, band.End)
+		visibleStart := max(sourceStart, requestedStart)
+		clippedEnd := min(sourceEnd, visibleEnd)
 		segment := layout.VisualSegment{
 			LogicalGraphemeIndex: i,
 			SourceCellStart:      sourceStart,
 			SourceCellEnd:        sourceEnd,
-			RenderedCellFrom:     screenX + (visibleStart - band.Start),
-			RenderedCellTo:       screenX + (visibleEnd - band.Start),
+			RenderedCellFrom:     screenX + (visibleStart - requestedStart),
+			RenderedCellTo:       screenX + (clippedEnd - requestedStart),
 		}
 		grapheme := line.Graphemes[i]
-		if visibleStart > sourceStart || visibleEnd < sourceEnd {
+		if visibleStart > sourceStart || clippedEnd < sourceEnd {
 			if grapheme.Text == "\t" {
-				segment.Display = strings.Repeat(" ", max(visibleEnd-visibleStart, 0))
+				segment.Display = strings.Repeat(" ", max(clippedEnd-visibleStart, 0))
 			} else {
 				segment.Display = ">"
 				segment.RenderedCellTo = segment.RenderedCellFrom + 1
