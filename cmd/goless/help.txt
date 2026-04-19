@@ -68,12 +68,12 @@
   :nosqueeze                    keep blank lines
   :tabs 8                       set tab width to 8
   :pin rows=6                   pin top 6 rows
-  :pin rows=2-4                 pin sticky row range 2 through 4
+  :pin rows=2-4,8,10-12         pin sticky row ranges 2 through 4, 8, and 10 through 12
   :pin cols=10                  pin left 10 columns
-  :pin cols=5-12                pin sticky column range 5 through 12
+  :pin cols=5-12,20,30-32       pin sticky column ranges 5 through 12, 20, and 30 through 32
   :unpin                        clear all pinning
-  :unpin rows=2-4               remove sticky row range 2 through 4
-  :unpin cols=5-12              remove sticky column range 5 through 12
+  :unpin rows=2-4,8             remove sticky row ranges 2 through 4 and 8
+  :unpin cols=5-12,20           remove sticky column ranges 5 through 12 and 20
   :match [auto|nocase|case]     set search case-sensitivity
   :match [sub|word|regex]       set search mode
   :help                         show the built-in help overlay
