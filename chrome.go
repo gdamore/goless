@@ -71,7 +71,7 @@ type Chrome struct {
 	// and pinned columns when the more specific glyphs are not set.
 	PinnedGlyph string
 	// PinnedStyle controls the style used for pin indicators in the chrome.
-	// A nil or zero value uses a bold overlay.
+	// The zero value uses a bold overlay.
 	PinnedStyle tcell.Style
 	// RestylePinned transforms the style used for cells that belong to pinned rows or columns.
 	// A nil function leaves the cell style unchanged.

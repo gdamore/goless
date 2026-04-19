@@ -295,10 +295,19 @@ func (v *Viewer) ClearPins() {
 		len(v.cfg.PinnedRows) == 0 && len(v.cfg.PinnedColumns) == 0 {
 		return
 	}
+	v.ensureLayout()
+	anchor := v.firstVisibleAnchor()
 	v.cfg.HeaderLines = 0
 	v.cfg.HeaderColumns = 0
 	v.cfg.PinnedRows = nil
 	v.cfg.PinnedColumns = nil
+	v.relayout()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+		return
+	}
+	v.restoreAnchor(anchor)
 }
 
 // SetVisualization updates how hidden structure markers are drawn.
@@ -563,7 +572,7 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 			break
 		}
 		row := v.layout.Rows[rowIndex]
-		v.drawHeaderColumns(screen, bodyY+y, row, header, lineHyperlinks)
+		v.drawHeaderColumns(screen, bodyY+y, row, lineHyperlinks)
 		v.drawRow(screen, bodyX, bodyY+y, row, header, header, lineHyperlinks)
 		v.drawPinnedColumnsForRow(screen, bodyX, bodyY+y, row, header, true, lineHyperlinks)
 	}
@@ -1197,7 +1206,7 @@ func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow
 	v.drawTrailingMarkers(screen, baseX, y, row, line, rowStyle, header)
 }
 
-func (v *Viewer) drawHeaderColumns(screen tcell.Screen, y int, row layout.VisualRow, header bool, lineHyperlinks map[int]rowHyperlinks) {
+func (v *Viewer) drawHeaderColumns(screen tcell.Screen, y int, row layout.VisualRow, lineHyperlinks map[int]rowHyperlinks) {
 	baseX, _, width, _ := v.headerColumnRect()
 	if width <= 0 || row.LineIndex < 0 || row.LineIndex >= len(v.lines) {
 		return
@@ -1247,7 +1256,7 @@ func (v *Viewer) drawPinnedRows(screen tcell.Screen, bodyX, bodyY int, lineHyper
 				continue
 			}
 			row := v.layout.Rows[rowIndex]
-			v.drawHeaderColumns(screen, y, row, false, lineHyperlinks)
+			v.drawHeaderColumns(screen, y, row, lineHyperlinks)
 			v.drawRow(screen, bodyX, y, row, false, true, lineHyperlinks)
 			v.drawPinnedColumnsForRow(screen, bodyX, y, row, false, true, lineHyperlinks)
 			v.drawPinnedRowIndicator(screen, y, rowIndex, row)
@@ -1955,15 +1964,6 @@ func (v *Viewer) pinnedColumnGlyph() string {
 		return glyph
 	}
 	return truncateToWidth(v.cfg.Chrome.PinnedGlyph, 1)
-}
-
-func (v *Viewer) layoutRowPinned(rowIndex int) bool {
-	for _, band := range v.pinnedRowBands() {
-		if rowIndex >= band.Start && rowIndex < band.End {
-			return true
-		}
-	}
-	return false
 }
 
 func (v *Viewer) hasPinnedColumns() bool {

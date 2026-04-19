@@ -937,6 +937,7 @@ func (v *Viewer) runUnpinCommand(args []string) bool {
 	}
 
 	if rowRangesSet {
+		rowRanges = layout.NormalizeRanges(rowRanges)
 		for _, r := range rowRanges {
 			if r.Start == 0 {
 				remove := r.End
@@ -949,6 +950,7 @@ func (v *Viewer) runUnpinCommand(args []string) bool {
 		v.UnpinRows(rowRanges...)
 	}
 	if colRangesSet {
+		colRanges = layout.NormalizeRanges(colRanges)
 		for _, r := range colRanges {
 			if r.Start == 0 {
 				remove := r.End
