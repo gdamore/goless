@@ -331,6 +331,7 @@ selected input to `stdout` unchanged.
 Program flags:
 
 - `-?` or `--help` to print usage and exit
+- `--version` to print the program version and exit
 - `-e` or `--quit-at-eof` to quit on the first forward command at EOF
 - `-E` or `--QUIT-AT-EOF` to quit when EOF is already visible on screen
 - `-F` to quit immediately when the current input fits on one screen
@@ -349,9 +350,9 @@ Program flags:
 - `-theme dark|light|plain|pretty`
 - `-chrome auto|none|single|rounded`
 - `--markers` / `--no-markers` to show or hide hidden-character markers
-- `--live-links`
+- `--live-links` to enable live OSC 8 hyperlinks in the standalone program
 - `--literal` / `--no-literal` to show escape sequences literally or interpret supported escapes
-- `-s` or `-squeeze` to collapse repeated blank lines in the current view
+- `-s` or `--squeeze` to collapse repeated blank lines in the current view
 - `-title text`
 - optional `+line` or `+/pattern` startup directive before paths
 - `-` as an explicit stdin path

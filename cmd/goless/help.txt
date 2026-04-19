@@ -7,6 +7,7 @@
   s                   save to a file
   v                   edit current file using $EDITOR
   F4                  cycle themes
+  F5                  toggle hidden-character markers
 
 [1;4mNavigation[0m
   ↓                        move forward by a screen step
@@ -56,6 +57,7 @@
 [1;4mCommands[0m
   :123                          jump to line 123
   :50%                          jump to 50%
+  = ^G                          show current file/session status
   :number                       show line numbers
   :nonumber                     hide line numbers
   :wrap                         soft-wrap long lines
@@ -70,6 +72,12 @@
   :match [auto|nocase|case]     set search case-sensitivity
   :match [sub|word|regex]       set search mode
   :help                         show the built-in help overlay
+  :next                         next file in a multi-file session
+  :prev                         previous file in a multi-file session
+  :first                        first file in a multi-file session
+  :last                         last file in a multi-file session
+  :file                         show current file/session label
   :reload                       reload current file/input
-  :save [--view] [--mono] [3mpath[0m  save current file
+  :save/:write/:w [--view] [--mono] [3mpath[0m  save current content or viewport
   :license                      show the bundled Apache license
+  :Q                            quit
