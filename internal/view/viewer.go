@@ -40,6 +40,17 @@ type Config struct {
 	Text              Text
 }
 
+type pinnedBandPlacement struct {
+	band  layout.Range
+	start int
+}
+
+type pinnedColumnPlacement struct {
+	band  layout.Range
+	start int
+	width int
+}
+
 // Viewer is a minimal document viewer built on the model and layout packages.
 type Viewer struct {
 	doc           *model.Document
@@ -1131,6 +1142,41 @@ func (v *Viewer) pinnedRowBands() []layout.Range {
 	return bands
 }
 
+func (v *Viewer) pinnedRowPlacements() []pinnedBandPlacement {
+	bands := v.pinnedRowBands()
+	if len(bands) == 0 {
+		return nil
+	}
+
+	scrollTop := v.scrollableRowStartIndex() + v.rowOffset
+	scrollHeight := v.scrollBodyHeight()
+	if scrollHeight <= 0 {
+		return nil
+	}
+
+	placements := make([]pinnedBandPlacement, 0, len(bands))
+	cursor := 0
+	for _, band := range bands {
+		top := band.Start - scrollTop
+		if top < 0 {
+			top = 0
+		}
+		maxTop := max(scrollHeight-band.Length(), 0)
+		if top > maxTop {
+			top = maxTop
+		}
+		if top < cursor {
+			top = cursor
+		}
+		if top >= scrollHeight {
+			continue
+		}
+		placements = append(placements, pinnedBandPlacement{band: band, start: top})
+		cursor = top + band.Length()
+	}
+	return placements
+}
+
 func (v *Viewer) layoutRangeForLineRange(lineRange layout.Range) (layout.Range, bool) {
 	lineRange = lineRange.Normalize()
 	if lineRange.Empty() || len(v.layout.Rows) == 0 {
@@ -1223,32 +1269,24 @@ func (v *Viewer) drawHeaderColumns(screen tcell.Screen, y int, row layout.Visual
 }
 
 func (v *Viewer) drawPinnedRows(screen tcell.Screen, bodyX, bodyY int, lineHyperlinks map[int]rowHyperlinks) {
-	bands := v.pinnedRowBands()
-	if len(bands) == 0 {
+	placements := v.pinnedRowPlacements()
+	if len(placements) == 0 {
 		return
 	}
 
-	scrollTop := v.scrollableRowStartIndex() + v.rowOffset
 	scrollHeight := v.scrollBodyHeight()
 	if scrollHeight <= 0 {
 		return
 	}
 
 	baseY := bodyY + v.visibleHeaderRowCount()
-	for _, band := range bands {
+	for _, placement := range placements {
+		band := placement.band
 		if band.End <= band.Start {
 			continue
 		}
-		top := band.Start - scrollTop
-		maxTop := max(scrollHeight-band.Length(), 0)
-		if top < 0 {
-			top = 0
-		}
-		if top > maxTop {
-			top = maxTop
-		}
 		for rowIndex := band.Start; rowIndex < band.End; rowIndex++ {
-			y := baseY + top + (rowIndex - band.Start)
+			y := baseY + placement.start + (rowIndex - band.Start)
 			if y < baseY || y >= baseY+scrollHeight {
 				continue
 			}
@@ -1290,7 +1328,8 @@ func (v *Viewer) drawPinnedRowIndicator(screen tcell.Screen, y, rowIndex int, ro
 }
 
 func (v *Viewer) drawPinnedColumnsForRow(screen tcell.Screen, bodyX, y int, row layout.VisualRow, header, pinned bool, lineHyperlinks map[int]rowHyperlinks) {
-	if len(v.cfg.PinnedColumns) == 0 || row.LineIndex < 0 || row.LineIndex >= len(v.lines) {
+	placements := v.pinnedColumnPlacements()
+	if len(placements) == 0 || row.LineIndex < 0 || row.LineIndex >= len(v.lines) {
 		return
 	}
 
@@ -1301,12 +1340,12 @@ func (v *Viewer) drawPinnedColumnsForRow(screen tcell.Screen, bodyX, y int, row 
 		return
 	}
 
-	for _, band := range v.cfg.PinnedColumns {
-		v.drawPinnedColumnRange(screen, bodyX, y, row, line, hyperlinks, band, header, pinned, width)
+	for _, placement := range placements {
+		v.drawPinnedColumnRange(screen, bodyX, y, row, line, hyperlinks, placement.band, placement.start, header, pinned, width)
 	}
 }
 
-func (v *Viewer) drawPinnedColumnRange(screen tcell.Screen, bodyX, y int, row layout.VisualRow, line model.Line, hyperlinks rowHyperlinks, band layout.Range, header, pinned bool, maxWidth int) {
+func (v *Viewer) drawPinnedColumnRange(screen tcell.Screen, bodyX, y int, row layout.VisualRow, line model.Line, hyperlinks rowHyperlinks, band layout.Range, screenX int, header, pinned bool, maxWidth int) {
 	if band.End <= band.Start || maxWidth <= 0 {
 		return
 	}
@@ -1336,21 +1375,15 @@ func (v *Viewer) drawPinnedColumnRange(screen tcell.Screen, bodyX, y int, row la
 		return
 	}
 
-	naturalLeft := requestedStart - headerWidth
-	if v.cfg.WrapMode == layout.NoWrap {
-		naturalLeft -= max(v.colOffset, 0)
+	if screenX < 0 {
+		screenX = 0
 	}
-	spanLength := requestedEnd - requestedStart
-	maxLeft := max(maxWidth-spanLength, 0)
-	if naturalLeft < 0 {
-		naturalLeft = 0
-	}
-	if naturalLeft > maxLeft {
-		naturalLeft = maxLeft
+	if screenX >= maxWidth {
+		return
 	}
 
 	info := v.layout.Lines[row.LineIndex]
-	screenX := naturalLeft
+	spanLength := requestedEnd - requestedStart
 	pinnedStyle := v.rowBaseStyle(header)
 	if pinned {
 		pinnedStyle = v.restylePinned(pinnedStyle)
@@ -1753,16 +1786,12 @@ func (v *Viewer) drawFramePinnedIndicators(screen tcell.Screen, bottomY int) {
 		return
 	}
 	pinStyle := v.pinnedChromeStyle(v.cfg.Chrome.BorderStyle)
-	for _, band := range v.cfg.PinnedColumns {
-		x, width, ok := v.pinnedColumnChromeSpan(band)
-		if !ok {
-			continue
-		}
-		drawRepeatedGlyph(screen, contentX+x, bottomY, colGlyph, width, pinStyle)
+	for _, placement := range v.pinnedColumnPlacements() {
+		drawRepeatedGlyph(screen, contentX+placement.start, bottomY, colGlyph, placement.width, pinStyle)
 	}
 }
 
-func (v *Viewer) pinnedColumnChromeSpan(band layout.Range) (int, int, bool) {
+func (v *Viewer) pinnedColumnNaturalSpan(band layout.Range) (int, int, bool) {
 	if band.End <= band.Start {
 		return 0, 0, false
 	}
@@ -1796,12 +1825,53 @@ func (v *Viewer) pinnedColumnChromeSpan(band layout.Range) (int, int, bool) {
 	if maxWidth <= 0 {
 		return 0, 0, false
 	}
-	spanWidth := end - start
-	maxLeft := max(maxWidth-spanWidth, 0)
-	if naturalLeft > maxLeft {
-		naturalLeft = maxLeft
+	if naturalLeft < 0 {
+		naturalLeft = 0
 	}
-	return naturalLeft, min(spanWidth, maxWidth-naturalLeft), true
+	return naturalLeft, band.Length(), true
+}
+
+func (v *Viewer) pinnedColumnPlacements() []pinnedColumnPlacement {
+	if len(v.cfg.PinnedColumns) == 0 {
+		return nil
+	}
+
+	width := v.contentWidth()
+	if width <= 0 {
+		return nil
+	}
+
+	placements := make([]pinnedColumnPlacement, 0, len(v.cfg.PinnedColumns))
+	cursor := 0
+	for _, band := range v.cfg.PinnedColumns {
+		start, spanWidth, ok := v.pinnedColumnNaturalSpan(band)
+		if !ok {
+			continue
+		}
+		maxStart := max(width-spanWidth, 0)
+		if start > maxStart {
+			start = maxStart
+		}
+		if start < cursor {
+			start = cursor
+		}
+		if start >= width {
+			continue
+		}
+		if spanWidth > width-start {
+			spanWidth = width - start
+		}
+		if spanWidth <= 0 {
+			continue
+		}
+		placements = append(placements, pinnedColumnPlacement{
+			band:  band,
+			start: start,
+			width: spanWidth,
+		})
+		cursor = start + band.Length()
+	}
+	return placements
 }
 
 func (v *Viewer) drawStatus(screen tcell.Screen, y int) {

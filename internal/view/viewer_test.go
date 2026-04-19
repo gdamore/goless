@@ -907,6 +907,59 @@ func TestPinMultipleStickyRangesCommand(t *testing.T) {
 	}
 }
 
+func TestPinnedColumnsStackWithoutOverwriting(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("12345678901234567890\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(8, 2)
+	v.SetPinnedColumns(
+		layout.Range{Start: 0, End: 4},
+		layout.Range{Start: 9, End: 20},
+	)
+
+	_, screen := newMockScreen(t, 8, 2)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got, want := screenRowString(screen, 0, 8), "12340123"; got != want {
+		t.Fatalf("stacked pinned columns = %q, want %q", got, want)
+	}
+}
+
+func TestPinnedRowsStackWithoutOverwriting(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6\nrow7\nrow8\nrow9\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(8, 5)
+	v.SetPinnedRows(
+		layout.Range{Start: 1, End: 4},
+		layout.Range{Start: 5, End: 10},
+	)
+
+	_, screen := newMockScreen(t, 8, 5)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got := screenRowString(screen, 1, 8); !strings.HasPrefix(got, "row1") {
+		t.Fatalf("stacked pinned row 1 = %q, want prefix %q", got, "row1")
+	}
+	if got := screenRowString(screen, 2, 8); !strings.HasPrefix(got, "row2") {
+		t.Fatalf("stacked pinned row 2 = %q, want prefix %q", got, "row2")
+	}
+	if got := screenRowString(screen, 3, 8); !strings.HasPrefix(got, "row3") {
+		t.Fatalf("stacked pinned row 3 = %q, want prefix %q", got, "row3")
+	}
+	if got := screenRowString(screen, 4, 8); !strings.HasPrefix(got, "row5") {
+		t.Fatalf("stacked pinned row 4 = %q, want prefix %q", got, "row5")
+	}
+}
+
 func TestUnpinRangeCommand(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\n")); err != nil {
