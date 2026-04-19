@@ -866,6 +866,47 @@ func TestPinRangeCommand(t *testing.T) {
 	}
 }
 
+func TestPinMultipleStickyRangesCommand(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	runViewerCommand(v, "pin rows=2,4-5 cols=1-5,10,20-25")
+
+	gotRows := v.PinnedRows()
+	wantRows := []layout.Range{
+		{Start: 1, End: 2},
+		{Start: 3, End: 5},
+	}
+	if len(gotRows) != len(wantRows) {
+		t.Fatalf("PinnedRows after multi-range pin = %+v, want %+v", gotRows, wantRows)
+	}
+	for i, want := range wantRows {
+		if gotRows[i] != want {
+			t.Fatalf("PinnedRows[%d] after multi-range pin = %+v, want %+v", i, gotRows[i], want)
+		}
+	}
+
+	gotCols := v.PinnedColumns()
+	wantCols := []layout.Range{
+		{Start: 0, End: 5},
+		{Start: 9, End: 10},
+		{Start: 19, End: 25},
+	}
+	if len(gotCols) != len(wantCols) {
+		t.Fatalf("PinnedColumns after multi-range pin = %+v, want %+v", gotCols, wantCols)
+	}
+	for i, want := range wantCols {
+		if gotCols[i] != want {
+			t.Fatalf("PinnedColumns[%d] after multi-range pin = %+v, want %+v", i, gotCols[i], want)
+		}
+	}
+}
+
 func TestUnpinRangeCommand(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\n")); err != nil {

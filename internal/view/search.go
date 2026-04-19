@@ -715,17 +715,19 @@ func parseRangeList(value string) ([]layout.Range, bool) {
 
 	parts := strings.Split(value, ",")
 	ranges := make([]layout.Range, 0, len(parts))
+	singlePrefix := len(parts) == 1
 	for _, part := range parts {
-		rng, ok := parseRangeSpec(part)
+		rng, ok := parseRangeSpec(part, singlePrefix)
 		if !ok {
 			return nil, false
 		}
 		ranges = append(ranges, rng)
+		singlePrefix = false
 	}
 	return layout.NormalizeRanges(ranges), true
 }
 
-func parseRangeSpec(text string) (layout.Range, bool) {
+func parseRangeSpec(text string, prefixCount bool) (layout.Range, bool) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return layout.Range{}, false
@@ -754,7 +756,13 @@ func parseRangeSpec(text string) (layout.Range, bool) {
 	if err != nil || count < 0 {
 		return layout.Range{}, false
 	}
-	return layout.Range{Start: 0, End: count}, true
+	if prefixCount {
+		return layout.Range{Start: 0, End: count}, true
+	}
+	if count == 0 {
+		return layout.Range{}, false
+	}
+	return layout.Range{Start: count - 1, End: count}, true
 }
 
 func parseSearchCaseModeValue(value string) (SearchCaseMode, bool) {

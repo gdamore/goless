@@ -258,11 +258,11 @@ The built-in pager UI exposes search mode controls directly:
 - `:markers` / `:nomarkers` control hidden-character markers
 - `:squeeze` / `:nosqueeze` control adjacent blank-line collapsing
 - `:tabs <n>` sets tab width
-- `:pin [rows=<n>|<start>-<end>] [cols=<n>|<start>-<end>]` pins fixed prefixes or sticky ranges
+- `:pin [rows=<n>|<start>-<end>[,...]] [cols=<n>|<start>-<end>[,...]]` pins fixed prefixes or sticky ranges
 - `:pin rows=<n>` / `:pin cols=<n>` keep the existing prefix behavior
-- `:pin rows=<start>-<end>` / `:pin cols=<start>-<end>` add sticky spans using 1-based endpoints
+- `:pin rows=<start>-<end>[,...]` / `:pin cols=<start>-<end>[,...]` add one or more sticky spans using 1-based endpoints
 - `:unpin` clears all fixed and sticky pinning
-- `:unpin [rows=<n>|<start>-<end>] [cols=<n>|<start>-<end>]` removes sticky spans
+- `:unpin [rows=<n>|<start>-<end>[,...]] [cols=<n>|<start>-<end>[,...]]` removes sticky spans
 - `:match [auto|nocase|case] [sub|word|regex]` controls search case and matching
 - `:help` opens the built-in help overlay
 - invalid regexes stay in the search prompt and are marked visibly until fixed
@@ -447,9 +447,9 @@ The default key group is intentionally less-like. Common bindings include:
 - `:squeeze`                             collapse adjacent blank lines
 - `:nosqueeze`                           keep blank lines
 - `:tabs <n>`                           set tab width
-- `:pin [rows=<n>|<start>-<end>] [cols=<n>|<start>-<end>]` pin fixed prefixes or sticky ranges
+- `:pin [rows=<n>|<start>-<end>[,...]] [cols=<n>|<start>-<end>[,...]]` pin fixed prefixes or sticky ranges
 - `:unpin`                              clear all fixed and sticky pinning
-- `:unpin [rows=<n>|<start>-<end>] [cols=<n>|<start>-<end>]` remove sticky spans
+- `:unpin [rows=<n>|<start>-<end>[,...]] [cols=<n>|<start>-<end>[,...]]` remove sticky spans
 - `:match [auto|nocase|case] [sub|word|regex]`  control search case and matching
 - `:help`                               show the built-in help overlay
 - `F` to enable follow mode
