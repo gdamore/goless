@@ -1021,6 +1021,32 @@ func TestMatchCommandInvalidAssignmentFallsThrough(t *testing.T) {
 	}
 }
 
+func TestMatchCommandPreservesRegexDiagnostics(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("alpha[\nbeta\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 2)
+
+	if !v.SearchForward("[") {
+		t.Fatal("SearchForward([) = false, want true in literal mode")
+	}
+	if v.message == "" {
+		t.Fatal("search message = empty, want literal search status")
+	}
+
+	runViewerCommand(v, "match regex")
+
+	if got, want := v.SearchMode(), SearchRegex; got != want {
+		t.Fatalf("SearchMode after match regex = %v, want %v", got, want)
+	}
+	if got := v.message; !strings.Contains(got, "regex:error") {
+		t.Fatalf("message after match regex = %q, want regex diagnostic", got)
+	}
+}
+
 func TestKeyBindingMatchesRequireExactNoModifierByDefault(t *testing.T) {
 	binding := keyBinding{
 		key:    tcell.KeyRune,

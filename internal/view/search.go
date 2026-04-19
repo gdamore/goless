@@ -784,7 +784,6 @@ func (v *Viewer) runMatchCommand(args []string) bool {
 
 	v.SetSearchCaseMode(caseMode)
 	v.SetSearchMode(mode)
-	v.setMessage("")
 	return true
 }
 
@@ -832,6 +831,7 @@ func (v *Viewer) runDirectCommand(fields []string) bool {
 		return false
 	}
 
+	preserveMessage := false
 	switch fields[0] {
 	case "number":
 		if len(fields) != 1 {
@@ -891,9 +891,11 @@ func (v *Viewer) runDirectCommand(fields []string) bool {
 			v.setTransientMessage("match requires a case or mode argument")
 			return true
 		}
+		prevMessage := v.message
 		if !v.runMatchCommand(fields[1:]) {
 			return false
 		}
+		preserveMessage = v.message != prevMessage
 	case "help":
 		if len(fields) != 1 {
 			return false
@@ -903,7 +905,9 @@ func (v *Viewer) runDirectCommand(fields []string) bool {
 		return false
 	}
 
-	v.setMessage("")
+	if !preserveMessage {
+		v.setMessage("")
+	}
 	return true
 }
 
