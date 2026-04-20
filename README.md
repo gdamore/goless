@@ -50,7 +50,7 @@ hugo server --source site
 - Parses OSC 8 hyperlinks in `RenderHybrid` and `RenderPresentation`, with embedder-controlled live link policy
 - Sanitizes unsupported escape/control sequences instead of letting them affect
   the host terminal
-- Tracks Unicode grapheme clusters with `uniseg`
+- Tracks Unicode grapheme clusters with `displaywidth`
 - Supports both horizontal scrolling and soft wrap
 - Supports forward and reverse literal search with repeat-search
 - Supports line jumps, follow mode, help overlay, and a status bar

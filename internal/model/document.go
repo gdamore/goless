@@ -8,8 +8,8 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"github.com/clipperhouse/displaywidth"
 	"github.com/gdamore/goless/internal/ansi"
-	"github.com/rivo/uniseg"
 )
 
 // StyleRun applies a style to a half-open rune range within a line.
@@ -196,11 +196,9 @@ func segmentGraphemes(text string) []Grapheme {
 	graphemes := make([]Grapheme, 0, utf8.RuneCountInString(text))
 	byteStart := 0
 	runeStart := 0
-	state := -1
-	rest := text
-
-	for rest != "" {
-		cluster, next, width, newState := uniseg.FirstGraphemeClusterInString(rest, state)
+	gr := displaywidth.StringGraphemes(text)
+	for gr.Next() {
+		cluster := gr.Value()
 		runes := utf8.RuneCountInString(cluster)
 		graphemes = append(graphemes, Grapheme{
 			Text:      cluster,
@@ -208,12 +206,10 @@ func segmentGraphemes(text string) []Grapheme {
 			ByteEnd:   byteStart + len(cluster),
 			RuneStart: runeStart,
 			RuneEnd:   runeStart + runes,
-			CellWidth: width,
+			CellWidth: gr.Width(),
 		})
 		byteStart += len(cluster)
 		runeStart += runes
-		rest = next
-		state = newState
 	}
 
 	return graphemes

@@ -58,7 +58,7 @@ The library should:
 
 ### Unicode
 
-- Use `github.com/rivo/uniseg` for grapheme segmentation.
+- Use `github.com/clipperhouse/displaywidth` for grapheme segmentation.
 - Preserve combining marks and zero-width joiner sequences as single grapheme clusters.
 - Handle wide-cell graphemes correctly when computing screen positions.
 - Never split a grapheme cluster during wrapping, highlighting, or horizontal scrolling.
@@ -330,7 +330,7 @@ Handling rules:
 - Malformed or unterminated sequences must not leak raw control effects to the terminal.
 - OSC 8 and similar sequences must be fully consumed and neutralized.
 - Invalid UTF-8 subsequences must be handled deliberately and must not desynchronize the escape parser.
-- Unicode grapheme processing with `uniseg` occurs after byte-stream decoding and sanitization, not inside the escape state machine.
+- Unicode grapheme processing with `displaywidth` occurs after byte-stream decoding and sanitization, not inside the escape state machine.
 
 Replacement policy for controls:
 
@@ -453,7 +453,7 @@ internal packages is reasonable.
 
 - Initialize Go module.
 - Add package skeleton.
-- Add dependency on `tcell` and `uniseg`.
+- Add dependency on `tcell` and `displaywidth`.
 - Add a tiny demo that opens a screen and renders plain text.
 - Add CI for `go test`.
 
@@ -468,7 +468,7 @@ internal packages is reasonable.
 ### Milestone 3: Unicode-Aware Document Model
 
 - Build logical lines from sanitized parsed content.
-- Integrate `uniseg`.
+- Integrate `displaywidth`.
 - Track grapheme widths and line boundaries.
 - Add tests for combining marks, emoji, ZWJ sequences, and East Asian wide text.
 
