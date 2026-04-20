@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/clipperhouse/displaywidth"
 	"github.com/gdamore/goless/internal/ansi"
 	"github.com/gdamore/goless/internal/layout"
 	"github.com/gdamore/goless/internal/model"
 	"github.com/gdamore/tcell/v3"
 	"github.com/gdamore/tcell/v3/color"
-	"github.com/rivo/uniseg"
 )
 
 // Config controls viewer behavior.
@@ -2504,25 +2504,7 @@ func truncateToWidth(s string, width int) string {
 	if width <= 0 {
 		return ""
 	}
-	if stringWidth(s) <= width {
-		return s
-	}
-
-	var (
-		builder strings.Builder
-		total   int
-	)
-	gr := uniseg.NewGraphemes(s)
-	for gr.Next() {
-		cluster := gr.Str()
-		clusterWidth := uniseg.StringWidth(cluster)
-		if total+clusterWidth > width {
-			break
-		}
-		builder.WriteString(cluster)
-		total += clusterWidth
-	}
-	return builder.String()
+	return displaywidth.TruncateString(s, width, "")
 }
 
 func trimLeftToWidth(s string, skip int) string {
@@ -2530,22 +2512,37 @@ func trimLeftToWidth(s string, skip int) string {
 		return s
 	}
 
-	gr := uniseg.NewGraphemes(s)
+	gr := displaywidth.StringGraphemes(s)
 	consumed := 0
 	for gr.Next() {
-		cluster := gr.Str()
-		clusterWidth := uniseg.StringWidth(cluster)
+		clusterWidth := gr.Width()
 		if consumed+clusterWidth > skip {
 			hidden := skip - consumed
-			start, end := gr.Positions()
 			if hidden == 0 {
-				return s[start:]
+				return graphemeSuffix(&gr)
 			}
-			return strings.Repeat(" ", max(clusterWidth-hidden, 0)) + s[end:]
+			return strings.Repeat(" ", max(clusterWidth-hidden, 0)) + graphemeRemainder(&gr)
 		}
 		consumed += clusterWidth
 	}
 	return ""
+}
+
+func graphemeSuffix(gr *displaywidth.Graphemes[string]) string {
+	var builder strings.Builder
+	builder.WriteString(gr.Value())
+	for gr.Next() {
+		builder.WriteString(gr.Value())
+	}
+	return builder.String()
+}
+
+func graphemeRemainder(gr *displaywidth.Graphemes[string]) string {
+	var builder strings.Builder
+	for gr.Next() {
+		builder.WriteString(gr.Value())
+	}
+	return builder.String()
 }
 
 func frameLine(width int, left, fill, right string) string {
@@ -2591,7 +2588,7 @@ func padRightToWidth(s string, width int) string {
 }
 
 func stringWidth(s string) int {
-	return uniseg.StringWidth(s)
+	return displaywidth.String(s)
 }
 
 func padMarkerGlyph(glyph string, width int) string {

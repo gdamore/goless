@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/rivo/uniseg"
+	"github.com/clipperhouse/displaywidth"
 )
 
 type lineEditor struct {
@@ -219,10 +219,10 @@ func splitGraphemes(text string) []string {
 		return nil
 	}
 
-	gr := uniseg.NewGraphemes(text)
+	gr := displaywidth.StringGraphemes(text)
 	clusters := make([]string, 0, len(text))
 	for gr.Next() {
-		clusters = append(clusters, gr.Str())
+		clusters = append(clusters, gr.Value())
 	}
 	return clusters
 }
