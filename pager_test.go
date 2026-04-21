@@ -1224,6 +1224,44 @@ func TestPagerConfigureAppliesRuntimeOptions(t *testing.T) {
 	}
 }
 
+func TestPagerPinnedRangeOptionsCopyAndApply(t *testing.T) {
+	constructorRows := []Range{{Start: 1, End: 3}}
+	constructorCols := []Range{{Start: 2, End: 5}}
+
+	pager := New(
+		Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true},
+		WithPinnedRows(constructorRows...),
+		WithPinnedColumns(constructorCols...),
+	)
+
+	constructorRows[0] = Range{Start: 9, End: 11}
+	constructorCols[0] = Range{Start: 12, End: 15}
+
+	if got, want := pager.PinnedRows(), []Range{{Start: 1, End: 3}}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("PinnedRows() after New = %+v, want %+v", got, want)
+	}
+	if got, want := pager.PinnedColumns(), []Range{{Start: 2, End: 5}}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("PinnedColumns() after New = %+v, want %+v", got, want)
+	}
+
+	runtimeRows := []Range{{Start: 4, End: 6}}
+	runtimeCols := []Range{{Start: 7, End: 9}}
+	pager.Configure(
+		WithPinnedRows(runtimeRows...),
+		WithPinnedColumns(runtimeCols...),
+	)
+
+	runtimeRows[0] = Range{Start: 10, End: 12}
+	runtimeCols[0] = Range{Start: 13, End: 16}
+
+	if got, want := pager.PinnedRows(), []Range{{Start: 4, End: 6}}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("PinnedRows() after Configure = %+v, want %+v", got, want)
+	}
+	if got, want := pager.PinnedColumns(), []Range{{Start: 7, End: 9}}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("PinnedColumns() after Configure = %+v, want %+v", got, want)
+	}
+}
+
 func TestPagerSqueezeBlankLines(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	if pager.SqueezeBlankLines() {
