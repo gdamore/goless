@@ -61,6 +61,21 @@ type Chrome struct {
 	LineNumberStyle tcell.Style
 	// HeaderStyle controls the style used when drawing fixed header rows and columns.
 	HeaderStyle tcell.Style
+	// PinnedRowGlyph is the single-column marker drawn in chrome for pinned rows.
+	// An empty string falls back to PinnedGlyph, and then disables the marker.
+	PinnedRowGlyph string
+	// PinnedColumnGlyph is the single-column marker drawn in chrome for pinned columns.
+	// An empty string falls back to PinnedGlyph, and then disables the marker.
+	PinnedColumnGlyph string
+	// PinnedGlyph is the legacy single-column marker used for both pinned rows
+	// and pinned columns when the more specific glyphs are not set.
+	PinnedGlyph string
+	// PinnedStyle controls the style used for pin indicators in the chrome.
+	// The zero value uses a bold overlay.
+	PinnedStyle tcell.Style
+	// RestylePinned transforms the style used for cells that belong to pinned rows or columns.
+	// A nil function leaves the cell style unchanged.
+	RestylePinned func(tcell.Style) tcell.Style
 	// PromptStyle controls the style used when drawing the prompt line.
 	PromptStyle tcell.Style
 	// PromptErrorStyle controls the style used for prompt-side error text.

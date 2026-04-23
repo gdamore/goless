@@ -279,6 +279,12 @@ func TestDemoChromeUsesPresetAndOverrides(t *testing.T) {
 	if got, want := chrome.Frame.TopLeft, "╭"; got != want {
 		t.Fatalf("programChrome(auto).Frame.TopLeft = %q, want %q", got, want)
 	}
+	if got, want := chrome.PinnedRowGlyph, "▷"; got != want {
+		t.Fatalf("programChrome(auto).PinnedRowGlyph = %q, want %q", got, want)
+	}
+	if got, want := chrome.PinnedColumnGlyph, "△"; got != want {
+		t.Fatalf("programChrome(auto).PinnedColumnGlyph = %q, want %q", got, want)
+	}
 
 	chrome, err = programChrome("single", "Demo", goless.PrettyPreset.Chrome)
 	if err != nil {
@@ -289,6 +295,12 @@ func TestDemoChromeUsesPresetAndOverrides(t *testing.T) {
 	}
 	if got, want := chrome.Title, "Demo"; got != want {
 		t.Fatalf("programChrome(single).Title = %q, want %q", got, want)
+	}
+	if got, want := chrome.PinnedRowGlyph, "▷"; got != want {
+		t.Fatalf("programChrome(single).PinnedRowGlyph = %q, want %q", got, want)
+	}
+	if got, want := chrome.PinnedColumnGlyph, "△"; got != want {
+		t.Fatalf("programChrome(single).PinnedColumnGlyph = %q, want %q", got, want)
 	}
 
 	base := goless.PrettyPreset.Chrome

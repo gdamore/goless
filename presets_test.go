@@ -6,6 +6,7 @@ package goless
 import (
 	"testing"
 
+	"github.com/gdamore/tcell/v3"
 	tcolor "github.com/gdamore/tcell/v3/color"
 )
 
@@ -37,6 +38,25 @@ func TestDarkPresetUsesSolarizedDarkDefaults(t *testing.T) {
 	if !DarkPreset.Chrome.HeaderStyle.HasBold() {
 		t.Fatal("DarkPreset.Chrome.HeaderStyle should be bold")
 	}
+	if got, want := DarkPreset.Chrome.PinnedRowGlyph, "▷"; got != want {
+		t.Fatalf("DarkPreset.Chrome.PinnedRowGlyph = %q, want %q", got, want)
+	}
+	if got, want := DarkPreset.Chrome.PinnedColumnGlyph, "△"; got != want {
+		t.Fatalf("DarkPreset.Chrome.PinnedColumnGlyph = %q, want %q", got, want)
+	}
+	if !DarkPreset.Chrome.PinnedStyle.HasBold() {
+		t.Fatal("DarkPreset.Chrome.PinnedStyle should be bold")
+	}
+	if DarkPreset.Chrome.RestylePinned == nil {
+		t.Fatal("DarkPreset.Chrome.RestylePinned should be set")
+	}
+	darkPinned := DarkPreset.Chrome.RestylePinned(tcell.StyleDefault.Foreground(tcolor.Red))
+	if got, want := darkPinned.GetBackground(), rgb(0x07, 0x36, 0x42); got != want {
+		t.Fatalf("DarkPreset.Chrome.RestylePinned background = %v, want %v", got, want)
+	}
+	if got, want := darkPinned.GetForeground(), tcolor.Red; got != want {
+		t.Fatalf("DarkPreset.Chrome.RestylePinned foreground = %v, want %v", got, want)
+	}
 	if got, want := DarkPreset.Chrome.PromptStyle.GetBackground(), DarkPreset.Theme.DefaultBG; got != want {
 		t.Fatalf("DarkPreset.Chrome.PromptStyle background = %v, want %v", got, want)
 	}
@@ -67,6 +87,25 @@ func TestLightPresetUsesSolarizedLightDefaults(t *testing.T) {
 	if !LightPreset.Chrome.HeaderStyle.HasBold() {
 		t.Fatal("LightPreset.Chrome.HeaderStyle should be bold")
 	}
+	if got, want := LightPreset.Chrome.PinnedRowGlyph, "▷"; got != want {
+		t.Fatalf("LightPreset.Chrome.PinnedRowGlyph = %q, want %q", got, want)
+	}
+	if got, want := LightPreset.Chrome.PinnedColumnGlyph, "△"; got != want {
+		t.Fatalf("LightPreset.Chrome.PinnedColumnGlyph = %q, want %q", got, want)
+	}
+	if !LightPreset.Chrome.PinnedStyle.HasBold() {
+		t.Fatal("LightPreset.Chrome.PinnedStyle should be bold")
+	}
+	if LightPreset.Chrome.RestylePinned == nil {
+		t.Fatal("LightPreset.Chrome.RestylePinned should be set")
+	}
+	lightPinned := LightPreset.Chrome.RestylePinned(tcell.StyleDefault.Foreground(tcolor.Red))
+	if got, want := lightPinned.GetBackground(), rgb(0xee, 0xe8, 0xd5); got != want {
+		t.Fatalf("LightPreset.Chrome.RestylePinned background = %v, want %v", got, want)
+	}
+	if got, want := lightPinned.GetForeground(), tcolor.Red; got != want {
+		t.Fatalf("LightPreset.Chrome.RestylePinned foreground = %v, want %v", got, want)
+	}
 }
 
 func TestPlainPresetUsesMonochromePalette(t *testing.T) {
@@ -84,6 +123,22 @@ func TestPlainPresetUsesMonochromePalette(t *testing.T) {
 	}
 	if !PlainPreset.Chrome.HeaderStyle.HasDim() {
 		t.Fatal("PlainPreset.Chrome.HeaderStyle should be dim")
+	}
+	if PlainPreset.Chrome.RestylePinned == nil {
+		t.Fatal("PlainPreset.Chrome.RestylePinned should be set")
+	}
+	if !PlainPreset.Chrome.PinnedStyle.HasBold() {
+		t.Fatal("PlainPreset.Chrome.PinnedStyle should be bold")
+	}
+	plainPinned := PlainPreset.Chrome.RestylePinned(tcell.StyleDefault.Foreground(tcolor.Red))
+	if !plainPinned.HasReverse() {
+		t.Fatal("PlainPreset.Chrome.RestylePinned should reverse the style")
+	}
+	if !plainPinned.HasDim() {
+		t.Fatal("PlainPreset.Chrome.RestylePinned should dim the style")
+	}
+	if got, want := plainPinned.GetForeground(), tcolor.Red; got != want {
+		t.Fatalf("PlainPreset.Chrome.RestylePinned foreground = %v, want %v", got, want)
 	}
 }
 
@@ -108,5 +163,24 @@ func TestPrettyPresetUsesRoundedDecorativeChrome(t *testing.T) {
 	}
 	if !PrettyPreset.Chrome.HeaderStyle.HasBold() {
 		t.Fatal("PrettyPreset.Chrome.HeaderStyle should be bold")
+	}
+	if got, want := PrettyPreset.Chrome.PinnedRowGlyph, "▷"; got != want {
+		t.Fatalf("PrettyPreset.Chrome.PinnedRowGlyph = %q, want %q", got, want)
+	}
+	if got, want := PrettyPreset.Chrome.PinnedColumnGlyph, "△"; got != want {
+		t.Fatalf("PrettyPreset.Chrome.PinnedColumnGlyph = %q, want %q", got, want)
+	}
+	if !PrettyPreset.Chrome.PinnedStyle.HasBold() {
+		t.Fatal("PrettyPreset.Chrome.PinnedStyle should be bold")
+	}
+	if PrettyPreset.Chrome.RestylePinned == nil {
+		t.Fatal("PrettyPreset.Chrome.RestylePinned should be set")
+	}
+	prettyPinned := PrettyPreset.Chrome.RestylePinned(tcell.StyleDefault.Foreground(tcolor.Red).Background(tcolor.Black))
+	if got, want := prettyPinned.GetForeground(), rgb(0xd3, 0x36, 0x82); got != want {
+		t.Fatalf("PrettyPreset.Chrome.RestylePinned foreground = %v, want %v", got, want)
+	}
+	if got, want := prettyPinned.GetBackground(), tcolor.Black; got != want {
+		t.Fatalf("PrettyPreset.Chrome.RestylePinned background = %v, want %v", got, want)
 	}
 }

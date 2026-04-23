@@ -1224,6 +1224,337 @@ func TestPagerConfigureAppliesRuntimeOptions(t *testing.T) {
 	}
 }
 
+func TestPagerConstructionAndRuntimeOptionsApply(t *testing.T) {
+	initialTheme := Theme{
+		DefaultFG: color.Green,
+		DefaultBG: color.Navy,
+	}
+	runtimeTheme := Theme{
+		DefaultFG: color.Red,
+		DefaultBG: color.Black,
+	}
+	initialChrome := Chrome{
+		Title: "initial",
+		Frame: SingleFrame(),
+	}
+	runtimeChrome := Chrome{
+		Title: "runtime",
+		Frame: RoundedFrame(),
+	}
+
+	pager := New(
+		WithRenderMode(RenderPresentation),
+		WithTabWidth(4),
+		WithSearchCaseMode(SearchCaseSensitive),
+		WithSearchMode(SearchRegex),
+		WithSqueezeBlankLines(true),
+		WithTheme(initialTheme),
+		WithVisualization(Visualization{
+			ShowTabs: true,
+			TabGlyph: ">",
+		}),
+		WithHyperlinkHandler(func(HyperlinkInfo) HyperlinkDecision {
+			return HyperlinkDecision{Live: true}
+		}),
+		WithCommandHandler(func(Command) CommandResult {
+			return CommandResult{Handled: true}
+		}),
+		WithChrome(initialChrome),
+	)
+
+	pager.SetSize(20, 4)
+	if err := pager.AppendString("A\tB\n\x1b]8;id=demo;https://example.com\aX\x1b]8;;\a\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 20, 4)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if got := pagerRowString(screen, 0, 20); !strings.HasPrefix(got, "┌") || !strings.Contains(got, "initial") {
+		t.Fatalf("top frame row after New = %q, want initial single frame title", got)
+	}
+	if got := pagerRowString(screen, 1, 20); !strings.Contains(got, "A>  B") {
+		t.Fatalf("content row after New = %q, want it to contain %q", got, "A>  B")
+	}
+	if got, want := pagerCellStyle(screen, 1, 1).GetForeground(), initialTheme.DefaultFG; got != want {
+		t.Fatalf("content fg after New = %v, want %v", got, want)
+	}
+	if got, want := pagerCellStyle(screen, 1, 1).GetBackground(), initialTheme.DefaultBG; got != want {
+		t.Fatalf("content bg after New = %v, want %v", got, want)
+	}
+	if got, url := pagerCellStyle(screen, 1, 2).GetUrl(); got != "demo" || url != "https://example.com" {
+		t.Fatalf("hyperlink after New = (%q, %q), want (%q, %q)", got, url, "demo", "https://example.com")
+	}
+	if got, want := pager.SearchCaseMode(), SearchCaseSensitive; got != want {
+		t.Fatalf("SearchCaseMode after New = %v, want %v", got, want)
+	}
+	if got, want := pager.SearchMode(), SearchRegex; got != want {
+		t.Fatalf("SearchMode after New = %v, want %v", got, want)
+	}
+	if !pager.SqueezeBlankLines() {
+		t.Fatal("SqueezeBlankLines after New = false, want true")
+	}
+	pager.Configure(
+		WithTabWidth(2),
+		WithSearchCaseMode(SearchCaseInsensitive),
+		WithSearchMode(SearchWholeWord),
+		WithSqueezeBlankLines(false),
+		WithTheme(runtimeTheme),
+		WithVisualization(Visualization{
+			ShowTabs: true,
+			TabGlyph: "·",
+		}),
+		WithHyperlinkHandler(nil),
+		WithCommandHandler(nil),
+		WithChrome(runtimeChrome),
+	)
+
+	screen.Clear()
+	pager.Draw(screen)
+	if got := pagerRowString(screen, 1, 20); !strings.Contains(got, "·") {
+		t.Fatalf("content row after Configure = %q, want it to contain %q", got, "·")
+	}
+	if got := pagerRowString(screen, 0, 20); !strings.HasPrefix(got, "╭") || !strings.Contains(got, "runtime") {
+		t.Fatalf("top frame row after Configure = %q, want runtime rounded frame title", got)
+	}
+	if got, want := pagerCellStyle(screen, 1, 1).GetForeground(), runtimeTheme.DefaultFG; got != want {
+		t.Fatalf("content fg after Configure = %v, want %v", got, want)
+	}
+	if got, want := pagerCellStyle(screen, 1, 1).GetBackground(), runtimeTheme.DefaultBG; got != want {
+		t.Fatalf("content bg after Configure = %v, want %v", got, want)
+	}
+	if got, url := pagerCellStyle(screen, 1, 2).GetUrl(); got != "" || url != "" {
+		t.Fatalf("hyperlink after Configure = (%q, %q), want empty", got, url)
+	}
+	if got, want := pager.SearchCaseMode(), SearchCaseInsensitive; got != want {
+		t.Fatalf("SearchCaseMode after Configure = %v, want %v", got, want)
+	}
+	if got, want := pager.SearchMode(), SearchWholeWord; got != want {
+		t.Fatalf("SearchMode after Configure = %v, want %v", got, want)
+	}
+	if pager.SqueezeBlankLines() {
+		t.Fatal("SqueezeBlankLines after Configure = true, want false")
+	}
+}
+
+func TestPagerShowStatusAndTextOptionsApply(t *testing.T) {
+	initialText := Text{
+		StatusLine: func(info StatusInfo) (left, right string) {
+			return "initial", ""
+		},
+	}
+	runtimeText := Text{
+		StatusLine: func(info StatusInfo) (left, right string) {
+			return "runtime", ""
+		},
+	}
+
+	pager := New(
+		WithShowStatus(true),
+		WithText(initialText),
+	)
+	pager.SetSize(80, 2)
+	if err := pager.AppendString("alpha\nbeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+
+	screen := newPagerMockScreen(t, 80, 2)
+	defer screen.Fini()
+
+	pager.Draw(screen)
+	if got := pagerRowString(screen, 1, 80); !strings.Contains(got, "initial") {
+		t.Fatalf("status row after New = %q, want initial", got)
+	}
+
+	pager.Configure(WithText(runtimeText))
+	screen.Clear()
+	pager.Draw(screen)
+	if got := pagerRowString(screen, 1, 80); !strings.Contains(got, "runtime") {
+		t.Fatalf("status row after Configure(WithText) = %q, want runtime", got)
+	}
+
+	pager.Configure(WithShowStatus(false))
+	screen.Clear()
+	pager.Draw(screen)
+	if got, want := strings.TrimRight(pagerRowString(screen, 1, 80), " "), "beta"; got != want {
+		t.Fatalf("status row after Configure(WithShowStatus(false)) = %q, want %q", got, want)
+	}
+}
+
+func TestPagerWrapperMethodsManageNavigationAndState(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetSize(8, 4)
+
+	if err := pager.AppendString("abcdefghij\nalpha\nbeta\nALPHA\nomega\nzeta\n"); err != nil {
+		t.Fatalf("AppendString failed: %v", err)
+	}
+	pager.Flush()
+	pager.Refresh()
+
+	if got, want := pager.WrapMode(), NoWrap; got != want {
+		t.Fatalf("WrapMode before ToggleWrap = %v, want %v", got, want)
+	}
+	pager.ToggleWrap()
+	if got, want := pager.WrapMode(), SoftWrap; got != want {
+		t.Fatalf("WrapMode after ToggleWrap = %v, want %v", got, want)
+	}
+	pager.ToggleWrap()
+	if got, want := pager.WrapMode(), NoWrap; got != want {
+		t.Fatalf("WrapMode after second ToggleWrap = %v, want %v", got, want)
+	}
+
+	start := pager.Position()
+	pager.ScrollDown(1)
+	if got := pager.Position().Row; got <= start.Row {
+		t.Fatalf("Position().Row after ScrollDown = %d, want > %d", got, start.Row)
+	}
+	pager.ScrollUp(1)
+	if got := pager.Position().Row; got != start.Row {
+		t.Fatalf("Position().Row after ScrollUp = %d, want %d", got, start.Row)
+	}
+
+	pager.ScrollRight(3)
+	rightColumn := pager.Position().Column
+	if rightColumn <= start.Column {
+		t.Fatalf("Position().Column after ScrollRight = %d, want > %d", rightColumn, start.Column)
+	}
+	pager.ScrollLeft(2)
+	if got := pager.Position().Column; got >= rightColumn {
+		t.Fatalf("Position().Column after ScrollLeft = %d, want < %d", got, rightColumn)
+	}
+	pager.GoLineStart()
+	if got := pager.Position().Column; got != 1 {
+		t.Fatalf("Position().Column after GoLineStart = %d, want 1", got)
+	}
+	pager.GoLineEnd()
+	if got := pager.Position().Column; got <= 1 {
+		t.Fatalf("Position().Column after GoLineEnd = %d, want > 1", got)
+	}
+
+	pager.GoTop()
+	top := pager.Position().Row
+	pager.PageDown()
+	if got := pager.Position().Row; got <= top {
+		t.Fatalf("Position().Row after PageDown = %d, want > %d", got, top)
+	}
+	pager.PageUp()
+	if got := pager.Position().Row; got != top {
+		t.Fatalf("Position().Row after PageUp = %d, want %d", got, top)
+	}
+	pager.GoBottom()
+	if !pager.EOFVisible() {
+		t.Fatal("EOFVisible after GoBottom = false, want true")
+	}
+
+	if !pager.SearchBackward("beta") {
+		t.Fatal("SearchBackward(beta) = false, want true")
+	}
+	if got, want := pager.SearchState().Query, "beta"; got != want {
+		t.Fatalf("SearchState().Query after SearchBackward = %q, want %q", got, want)
+	}
+	if pager.SearchState().Forward {
+		t.Fatal("SearchState().Forward after SearchBackward = true, want false")
+	}
+	pager.ClearSearch()
+	if got := pager.SearchState(); got.Query != "" || got.CurrentMatch != 0 {
+		t.Fatalf("SearchState() after ClearSearch = %+v, want zero state", got)
+	}
+	if !pager.SearchBackwardWithCase("ALPHA", SearchCaseInsensitive) {
+		t.Fatal("SearchBackwardWithCase(ALPHA, insensitive) = false, want true")
+	}
+	if got, want := pager.SearchState().Query, "ALPHA"; got != want {
+		t.Fatalf("SearchState().Query after SearchBackwardWithCase = %q, want %q", got, want)
+	}
+	pager.ClearSearch()
+
+	pager.GoTop()
+	if pager.EOFVisible() {
+		t.Fatal("EOFVisible after GoTop = true, want false")
+	}
+
+	pager.ShowInformation("Info", "body")
+	if !pager.ShowingInformation() {
+		t.Fatal("ShowingInformation after ShowInformation = false, want true")
+	}
+	pager.HideInformation()
+	if pager.ShowingInformation() {
+		t.Fatal("ShowingInformation after HideInformation = true, want false")
+	}
+
+	pager.SetPinnedRows(Range{Start: 1, End: 4}, Range{Start: 6, End: 8})
+	pager.UnpinRows(Range{Start: 2, End: 3})
+	if got, want := pager.PinnedRows(), []Range{
+		{Start: 1, End: 2},
+		{Start: 3, End: 4},
+		{Start: 6, End: 8},
+	}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+		t.Fatalf("PinnedRows() after UnpinRows = %+v, want %+v", got, want)
+	}
+	pager.ClearPinnedRows()
+	if got := pager.PinnedRows(); len(got) != 0 {
+		t.Fatalf("PinnedRows() after ClearPinnedRows = %+v, want empty", got)
+	}
+
+	pager.SetPinnedColumns(Range{Start: 1, End: 4}, Range{Start: 6, End: 8})
+	pager.UnpinColumns(Range{Start: 2, End: 3})
+	if got, want := pager.PinnedColumns(), []Range{
+		{Start: 1, End: 2},
+		{Start: 3, End: 4},
+		{Start: 6, End: 8},
+	}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+		t.Fatalf("PinnedColumns() after UnpinColumns = %+v, want %+v", got, want)
+	}
+	pager.ClearPinnedColumns()
+	if got := pager.PinnedColumns(); len(got) != 0 {
+		t.Fatalf("PinnedColumns() after ClearPinnedColumns = %+v, want empty", got)
+	}
+
+	pager.SetHyperlinkHandler(func(HyperlinkInfo) HyperlinkDecision {
+		return HyperlinkDecision{Live: true}
+	})
+}
+
+func TestPagerPinnedRangeOptionsCopyAndApply(t *testing.T) {
+	constructorRows := []Range{{Start: 1, End: 3}}
+	constructorCols := []Range{{Start: 2, End: 5}}
+
+	pager := New(
+		Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true},
+		WithPinnedRows(constructorRows...),
+		WithPinnedColumns(constructorCols...),
+	)
+
+	constructorRows[0] = Range{Start: 9, End: 11}
+	constructorCols[0] = Range{Start: 12, End: 15}
+
+	if got, want := pager.PinnedRows(), []Range{{Start: 1, End: 3}}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("PinnedRows() after New = %+v, want %+v", got, want)
+	}
+	if got, want := pager.PinnedColumns(), []Range{{Start: 2, End: 5}}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("PinnedColumns() after New = %+v, want %+v", got, want)
+	}
+
+	runtimeRows := []Range{{Start: 4, End: 6}}
+	runtimeCols := []Range{{Start: 7, End: 9}}
+	pager.Configure(
+		WithPinnedRows(runtimeRows...),
+		WithPinnedColumns(runtimeCols...),
+	)
+
+	runtimeRows[0] = Range{Start: 10, End: 12}
+	runtimeCols[0] = Range{Start: 13, End: 16}
+
+	if got, want := pager.PinnedRows(), []Range{{Start: 4, End: 6}}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("PinnedRows() after Configure = %+v, want %+v", got, want)
+	}
+	if got, want := pager.PinnedColumns(), []Range{{Start: 7, End: 9}}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("PinnedColumns() after Configure = %+v, want %+v", got, want)
+	}
+}
+
 func TestPagerSqueezeBlankLines(t *testing.T) {
 	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
 	if pager.SqueezeBlankLines() {
@@ -1267,6 +1598,29 @@ func TestPagerHeaderColumns(t *testing.T) {
 	pager.SetHeaderColumns(-1)
 	if got, want := pager.HeaderColumns(), 0; got != want {
 		t.Fatalf("HeaderColumns() after SetHeaderColumns(-1) = %d, want %d", got, want)
+	}
+}
+
+func TestPagerUnpinClearsAllPinning(t *testing.T) {
+	pager := New(Config{TabWidth: 4, WrapMode: NoWrap, ShowStatus: true})
+	pager.SetHeaderLines(2)
+	pager.SetHeaderColumns(3)
+	pager.SetPinnedRows(Range{Start: 4, End: 6})
+	pager.SetPinnedColumns(Range{Start: 2, End: 5})
+
+	pager.Unpin()
+
+	if got, want := pager.HeaderLines(), 0; got != want {
+		t.Fatalf("HeaderLines() after Unpin = %d, want %d", got, want)
+	}
+	if got, want := pager.HeaderColumns(), 0; got != want {
+		t.Fatalf("HeaderColumns() after Unpin = %d, want %d", got, want)
+	}
+	if got := pager.PinnedRows(); len(got) != 0 {
+		t.Fatalf("PinnedRows() after Unpin = %+v, want empty", got)
+	}
+	if got := pager.PinnedColumns(); len(got) != 0 {
+		t.Fatalf("PinnedColumns() after Unpin = %+v, want empty", got)
 	}
 }
 

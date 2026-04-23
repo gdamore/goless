@@ -708,6 +708,61 @@ func parseCommandAssignment(text string) (name, value string, ok bool) {
 	return name, value, true
 }
 
+func parseRangeList(value string) ([]layout.Range, bool) {
+	if value == "" {
+		return nil, false
+	}
+
+	parts := strings.Split(value, ",")
+	ranges := make([]layout.Range, 0, len(parts))
+	for i, part := range parts {
+		rng, ok := parseRangeSpec(part, len(parts) == 1 && i == 0)
+		if !ok {
+			return nil, false
+		}
+		ranges = append(ranges, rng)
+	}
+	return layout.NormalizeRanges(ranges), true
+}
+
+func parseRangeSpec(text string, treatAsPrefix bool) (layout.Range, bool) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return layout.Range{}, false
+	}
+
+	if strings.Contains(text, "-") {
+		parts := strings.SplitN(text, "-", 2)
+		if len(parts) != 2 {
+			return layout.Range{}, false
+		}
+		start, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+		if err != nil || start <= 0 {
+			return layout.Range{}, false
+		}
+		end, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+		if err != nil || end <= 0 {
+			return layout.Range{}, false
+		}
+		if end < start {
+			start, end = end, start
+		}
+		return layout.Range{Start: start - 1, End: end}, true
+	}
+
+	count, err := strconv.Atoi(text)
+	if err != nil || count < 0 {
+		return layout.Range{}, false
+	}
+	if treatAsPrefix {
+		return layout.Range{Start: 0, End: count}, true
+	}
+	if count == 0 {
+		return layout.Range{}, false
+	}
+	return layout.Range{Start: count - 1, End: count}, true
+}
+
 func parseSearchCaseModeValue(value string) (SearchCaseMode, bool) {
 	switch value {
 	case "auto", "smart":
@@ -794,11 +849,32 @@ func (v *Viewer) runPinCommand(args []string) bool {
 
 	lines := -1
 	columns := -1
+	rowRanges := []layout.Range(nil)
+	colRanges := []layout.Range(nil)
+	rowRangesSet := false
+	colRangesSet := false
 
 	for _, arg := range args {
 		name, value, ok := parseCommandAssignment(arg)
 		if !ok {
 			return false
+		}
+		if strings.Contains(value, ",") || strings.Contains(value, "-") {
+			ranges, ok := parseRangeList(value)
+			if !ok {
+				return false
+			}
+			switch name {
+			case "rows":
+				rowRanges = append(rowRanges, ranges...)
+				rowRangesSet = true
+			case "cols":
+				colRanges = append(colRanges, ranges...)
+				colRangesSet = true
+			default:
+				return false
+			}
+			continue
 		}
 		count, err := strconv.Atoi(value)
 		if err != nil || count < 0 {
@@ -815,7 +891,9 @@ func (v *Viewer) runPinCommand(args []string) bool {
 	}
 
 	if lines < 0 && columns < 0 {
-		return false
+		if !rowRangesSet && !colRangesSet {
+			return false
+		}
 	}
 	if lines >= 0 {
 		v.SetHeaderLines(lines)
@@ -823,7 +901,74 @@ func (v *Viewer) runPinCommand(args []string) bool {
 	if columns >= 0 {
 		v.SetHeaderColumns(columns)
 	}
+	if rowRangesSet {
+		v.SetPinnedRows(rowRanges...)
+	}
+	if colRangesSet {
+		v.SetPinnedColumns(colRanges...)
+	}
 	return true
+}
+
+func (v *Viewer) runUnpinCommand(args []string) bool {
+	if len(args) == 0 {
+		v.ClearPins()
+		return true
+	}
+
+	rowRanges := []layout.Range(nil)
+	colRanges := []layout.Range(nil)
+	rowRangesSet := false
+	colRangesSet := false
+
+	for _, arg := range args {
+		name, value, ok := parseCommandAssignment(arg)
+		if !ok {
+			return false
+		}
+		ranges, ok := parseRangeList(value)
+		if !ok {
+			return false
+		}
+		switch name {
+		case "rows":
+			rowRanges = append(rowRanges, ranges...)
+			rowRangesSet = true
+		case "cols":
+			colRanges = append(colRanges, ranges...)
+			colRangesSet = true
+		default:
+			return false
+		}
+	}
+
+	if rowRangesSet {
+		rowRanges = layout.NormalizeRanges(rowRanges)
+		for _, r := range rowRanges {
+			if r.Start == 0 {
+				remove := r.End
+				if remove > v.cfg.HeaderLines {
+					remove = v.cfg.HeaderLines
+				}
+				v.cfg.HeaderLines -= remove
+			}
+		}
+		v.UnpinRows(rowRanges...)
+	}
+	if colRangesSet {
+		colRanges = layout.NormalizeRanges(colRanges)
+		for _, r := range colRanges {
+			if r.Start == 0 {
+				remove := r.End
+				if remove > v.cfg.HeaderColumns {
+					remove = v.cfg.HeaderColumns
+				}
+				v.cfg.HeaderColumns -= remove
+			}
+		}
+		v.UnpinColumns(colRanges...)
+	}
+	return rowRangesSet || colRangesSet
 }
 
 func (v *Viewer) runDirectCommand(fields []string) bool {
@@ -884,6 +1029,10 @@ func (v *Viewer) runDirectCommand(fields []string) bool {
 		v.SetTabWidth(width)
 	case "pin":
 		if !v.runPinCommand(fields[1:]) {
+			return false
+		}
+	case "unpin":
+		if !v.runUnpinCommand(fields[1:]) {
 			return false
 		}
 	case "match":

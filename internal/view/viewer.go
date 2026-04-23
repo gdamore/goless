@@ -26,6 +26,8 @@ type Config struct {
 	LineNumbers       bool
 	HeaderLines       int
 	HeaderColumns     int
+	PinnedRows        []layout.Range
+	PinnedColumns     []layout.Range
 	Theme             Theme
 	Visualization     Visualization
 	HyperlinkHandler  HyperlinkHandler
@@ -36,6 +38,17 @@ type Config struct {
 	Chrome            Chrome
 	ShowStatus        bool
 	Text              Text
+}
+
+type pinnedBandPlacement struct {
+	band  layout.Range
+	start int
+}
+
+type pinnedColumnPlacement struct {
+	band  layout.Range
+	start int
+	width int
 }
 
 // Viewer is a minimal document viewer built on the model and layout packages.
@@ -91,6 +104,8 @@ func New(doc *model.Document, cfg Config) *Viewer {
 	cfg.Visualization = cfg.Visualization.withDefaults()
 	cfg.Chrome = cfg.Chrome.withDefaults()
 	cfg.Text = cfg.Text.withDefaults()
+	cfg.PinnedRows = layout.NormalizeRanges(cfg.PinnedRows)
+	cfg.PinnedColumns = layout.NormalizeRanges(cfg.PinnedColumns)
 	return &Viewer{
 		doc:  doc,
 		cfg:  cfg,
@@ -221,6 +236,89 @@ func (v *Viewer) SetHeaderColumns(count int) {
 // HeaderColumns reports how many leading display columns stay fixed at the left edge of the viewport.
 func (v *Viewer) HeaderColumns() int {
 	return v.cfg.HeaderColumns
+}
+
+// SetPinnedRows updates the sticky row ranges rendered within the scrolling body.
+func (v *Viewer) SetPinnedRows(ranges ...layout.Range) {
+	normalized := layout.NormalizeRanges(ranges)
+	if sameRanges(v.cfg.PinnedRows, normalized) {
+		return
+	}
+	v.cfg.PinnedRows = normalized
+}
+
+// PinnedRows reports the sticky row ranges rendered within the scrolling body.
+func (v *Viewer) PinnedRows() []layout.Range {
+	return cloneRanges(v.cfg.PinnedRows)
+}
+
+// ClearPinnedRows removes all sticky row ranges.
+func (v *Viewer) ClearPinnedRows() {
+	if len(v.cfg.PinnedRows) == 0 {
+		return
+	}
+	v.cfg.PinnedRows = nil
+}
+
+// UnpinRows removes the given sticky row ranges.
+func (v *Viewer) UnpinRows(ranges ...layout.Range) {
+	updated := layout.SubtractRanges(v.cfg.PinnedRows, ranges)
+	if sameRanges(v.cfg.PinnedRows, updated) {
+		return
+	}
+	v.cfg.PinnedRows = updated
+}
+
+// SetPinnedColumns updates the sticky column ranges rendered within the scrolling body.
+func (v *Viewer) SetPinnedColumns(ranges ...layout.Range) {
+	normalized := layout.NormalizeRanges(ranges)
+	if sameRanges(v.cfg.PinnedColumns, normalized) {
+		return
+	}
+	v.cfg.PinnedColumns = normalized
+}
+
+// PinnedColumns reports the sticky column ranges rendered within the scrolling body.
+func (v *Viewer) PinnedColumns() []layout.Range {
+	return cloneRanges(v.cfg.PinnedColumns)
+}
+
+// ClearPinnedColumns removes all sticky column ranges.
+func (v *Viewer) ClearPinnedColumns() {
+	if len(v.cfg.PinnedColumns) == 0 {
+		return
+	}
+	v.cfg.PinnedColumns = nil
+}
+
+// UnpinColumns removes the given sticky column ranges.
+func (v *Viewer) UnpinColumns(ranges ...layout.Range) {
+	updated := layout.SubtractRanges(v.cfg.PinnedColumns, ranges)
+	if sameRanges(v.cfg.PinnedColumns, updated) {
+		return
+	}
+	v.cfg.PinnedColumns = updated
+}
+
+// ClearPins removes all fixed and sticky pinned row and column ranges.
+func (v *Viewer) ClearPins() {
+	if v.cfg.HeaderLines == 0 && v.cfg.HeaderColumns == 0 &&
+		len(v.cfg.PinnedRows) == 0 && len(v.cfg.PinnedColumns) == 0 {
+		return
+	}
+	v.ensureLayout()
+	anchor := v.firstVisibleAnchor()
+	v.cfg.HeaderLines = 0
+	v.cfg.HeaderColumns = 0
+	v.cfg.PinnedRows = nil
+	v.cfg.PinnedColumns = nil
+	v.relayout()
+	if v.follow {
+		v.rowOffset = v.maxRowOffset()
+		v.clampOffsets()
+		return
+	}
+	v.restoreAnchor(anchor)
 }
 
 // SetVisualization updates how hidden structure markers are drawn.
@@ -485,9 +583,11 @@ func (v *Viewer) Draw(screen tcell.Screen) {
 			break
 		}
 		row := v.layout.Rows[rowIndex]
-		v.drawHeaderColumns(screen, bodyY+y, row, header, lineHyperlinks)
-		v.drawRow(screen, bodyX, bodyY+y, row, header, lineHyperlinks)
+		v.drawHeaderColumns(screen, bodyY+y, row, lineHyperlinks)
+		v.drawRow(screen, bodyX, bodyY+y, row, header, header, lineHyperlinks)
+		v.drawPinnedColumnsForRow(screen, bodyX, bodyY+y, row, header, true, lineHyperlinks)
 	}
+	v.drawPinnedRows(screen, bodyX, bodyY, lineHyperlinks)
 
 	if v.height > 0 {
 		switch {
@@ -1014,36 +1114,314 @@ func (v *Viewer) revealAnchor(anchor layout.Anchor) {
 	v.clampOffsets()
 }
 
-func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow, header bool, lineHyperlinks map[int]rowHyperlinks) {
+func (v *Viewer) pinnedRowBands() []layout.Range {
+	if len(v.cfg.PinnedRows) == 0 {
+		return nil
+	}
+
+	bands := make([]layout.Range, 0, len(v.cfg.PinnedRows))
+	scrollableStart := v.scrollableRowStartIndex()
+	for _, lineRange := range v.cfg.PinnedRows {
+		band, ok := v.layoutRangeForLineRange(lineRange)
+		if !ok {
+			continue
+		}
+		if band.End <= scrollableStart {
+			continue
+		}
+		if band.Start < scrollableStart {
+			band.Start = scrollableStart
+		}
+		if band.End > len(v.layout.Rows) {
+			band.End = len(v.layout.Rows)
+		}
+		if band.End > band.Start {
+			bands = append(bands, band)
+		}
+	}
+	return bands
+}
+
+func (v *Viewer) pinnedRowPlacements() []pinnedBandPlacement {
+	bands := v.pinnedRowBands()
+	if len(bands) == 0 {
+		return nil
+	}
+
+	scrollTop := v.scrollableRowStartIndex() + v.rowOffset
+	scrollHeight := v.scrollBodyHeight()
+	if scrollHeight <= 0 {
+		return nil
+	}
+
+	placements := make([]pinnedBandPlacement, 0, len(bands))
+	cursor := 0
+	for _, band := range bands {
+		top := band.Start - scrollTop
+		if top < 0 {
+			top = 0
+		}
+		maxTop := max(scrollHeight-band.Length(), 0)
+		if top > maxTop {
+			top = maxTop
+		}
+		if top < cursor {
+			top = cursor
+		}
+		if top >= scrollHeight {
+			continue
+		}
+		placements = append(placements, pinnedBandPlacement{band: band, start: top})
+		cursor = top + band.Length()
+	}
+	return placements
+}
+
+func (v *Viewer) layoutRangeForLineRange(lineRange layout.Range) (layout.Range, bool) {
+	lineRange = lineRange.Normalize()
+	if lineRange.Empty() || len(v.layout.Rows) == 0 {
+		return layout.Range{}, false
+	}
+	if lineRange.Start >= len(v.lines) {
+		return layout.Range{}, false
+	}
+	if lineRange.End > len(v.lines) {
+		lineRange.End = len(v.lines)
+	}
+
+	start := -1
+	end := -1
+	for i, row := range v.layout.Rows {
+		if row.LineIndex < lineRange.Start {
+			continue
+		}
+		if row.LineIndex >= lineRange.End {
+			if start >= 0 {
+				end = i
+			}
+			break
+		}
+		if start < 0 {
+			start = i
+		}
+	}
+	if start < 0 {
+		return layout.Range{}, false
+	}
+	if end < 0 {
+		end = len(v.layout.Rows)
+	}
+	return layout.Range{Start: start, End: end}, true
+}
+
+func cloneRanges(ranges []layout.Range) []layout.Range {
+	if len(ranges) == 0 {
+		return nil
+	}
+	dup := make([]layout.Range, len(ranges))
+	copy(dup, ranges)
+	return dup
+}
+
+func sameRanges(a, b []layout.Range) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (v *Viewer) drawRow(screen tcell.Screen, baseX, y int, row layout.VisualRow, header, pinned bool, lineHyperlinks map[int]rowHyperlinks) {
 	if row.LineIndex < 0 || row.LineIndex >= len(v.lines) {
 		return
 	}
 	line := v.lines[row.LineIndex]
 	hyperlinks := lineHyperlinks[row.LineIndex]
 	rowStyle := v.rowBaseStyle(header)
+	if pinned {
+		rowStyle = v.restylePinned(rowStyle)
+	}
 	screen.PutStrStyled(baseX, y, padRightToWidth("", v.contentWidth()), rowStyle)
 	for _, segment := range row.Segments {
-		v.drawSegment(screen, baseX, y, row, line, segment, header, hyperlinks, v.contentWidth())
+		v.drawSegment(screen, baseX, y, row, line, segment, header, pinned, hyperlinks, v.contentWidth())
 	}
 	v.drawTrailingMarkers(screen, baseX, y, row, line, rowStyle, header)
 }
 
-func (v *Viewer) drawHeaderColumns(screen tcell.Screen, y int, row layout.VisualRow, header bool, lineHyperlinks map[int]rowHyperlinks) {
+func (v *Viewer) drawHeaderColumns(screen tcell.Screen, y int, row layout.VisualRow, lineHyperlinks map[int]rowHyperlinks) {
 	baseX, _, width, _ := v.headerColumnRect()
 	if width <= 0 || row.LineIndex < 0 || row.LineIndex >= len(v.lines) {
 		return
 	}
 
 	style := v.rowBaseStyle(true)
+	style = v.restylePinned(style)
 	screen.PutStrStyled(baseX, y, padRightToWidth("", width), style)
 	line := v.lines[row.LineIndex]
 	hyperlinks := lineHyperlinks[row.LineIndex]
 	for _, segment := range v.headerColumnSegments(row, width) {
-		v.drawSegment(screen, baseX, y, row, line, segment, true, hyperlinks, width)
+		v.drawSegment(screen, baseX, y, row, line, segment, true, true, hyperlinks, width)
 	}
 }
 
-func (v *Viewer) drawSegment(screen tcell.Screen, baseX, y int, row layout.VisualRow, line model.Line, segment layout.VisualSegment, header bool, hyperlinks rowHyperlinks, maxWidth int) {
+func (v *Viewer) drawPinnedRows(screen tcell.Screen, bodyX, bodyY int, lineHyperlinks map[int]rowHyperlinks) {
+	placements := v.pinnedRowPlacements()
+	if len(placements) == 0 {
+		return
+	}
+
+	scrollHeight := v.scrollBodyHeight()
+	if scrollHeight <= 0 {
+		return
+	}
+
+	baseY := bodyY + v.visibleHeaderRowCount()
+	for _, placement := range placements {
+		band := placement.band
+		if band.End <= band.Start {
+			continue
+		}
+		for rowIndex := band.Start; rowIndex < band.End; rowIndex++ {
+			y := baseY + placement.start + (rowIndex - band.Start)
+			if y < baseY || y >= baseY+scrollHeight {
+				continue
+			}
+			if rowIndex < 0 || rowIndex >= len(v.layout.Rows) {
+				continue
+			}
+			row := v.layout.Rows[rowIndex]
+			v.drawHeaderColumns(screen, y, row, lineHyperlinks)
+			v.drawRow(screen, bodyX, y, row, false, true, lineHyperlinks)
+			v.drawPinnedColumnsForRow(screen, bodyX, y, row, false, true, lineHyperlinks)
+			v.drawPinnedRowIndicator(screen, y, rowIndex, row)
+		}
+	}
+}
+
+func (v *Viewer) drawPinnedRowIndicator(screen tcell.Screen, y, rowIndex int, row layout.VisualRow) {
+	pin := v.pinnedRowGlyph()
+	if pin == "" {
+		return
+	}
+
+	if v.cfg.Chrome.Frame.enabled() {
+		screen.PutStrStyled(0, y, pin, v.pinnedChromeStyle(v.cfg.Chrome.BorderStyle))
+		return
+	}
+
+	if v.cfg.LineNumbers {
+		gutterX, _, gutterWidth, _ := v.gutterRect()
+		if gutterWidth <= 0 {
+			return
+		}
+
+		screen.PutStrStyled(gutterX, y, pin, v.pinnedChromeStyle(v.cfg.Chrome.LineNumberStyle))
+		if v.shouldShowLineNumber(rowIndex) && gutterWidth > 1 {
+			label := padRightToWidth(fmt.Sprintf("%*d", gutterWidth-1, v.sourceLineIndex(row.LineIndex)+1), gutterWidth-1)
+			screen.PutStrStyled(gutterX+1, y, label, applyChromeStyle(v.rowBaseStyle(false), v.cfg.Chrome.LineNumberStyle))
+		}
+	}
+}
+
+func (v *Viewer) drawPinnedColumnsForRow(screen tcell.Screen, bodyX, y int, row layout.VisualRow, header, pinned bool, lineHyperlinks map[int]rowHyperlinks) {
+	placements := v.pinnedColumnPlacements()
+	if len(placements) == 0 || row.LineIndex < 0 || row.LineIndex >= len(v.lines) {
+		return
+	}
+
+	line := v.lines[row.LineIndex]
+	hyperlinks := lineHyperlinks[row.LineIndex]
+	width := v.contentWidth()
+	if width <= 0 {
+		return
+	}
+
+	for _, placement := range placements {
+		v.drawPinnedColumnRange(screen, bodyX, y, row, line, hyperlinks, placement.band, placement.start, header, pinned, width)
+	}
+}
+
+func (v *Viewer) drawPinnedColumnRange(screen tcell.Screen, bodyX, y int, row layout.VisualRow, line model.Line, hyperlinks rowHyperlinks, band layout.Range, screenX int, header, pinned bool, maxWidth int) {
+	if band.End <= band.Start || maxWidth <= 0 {
+		return
+	}
+
+	requestedStart := band.Start
+	requestedEnd := band.End
+
+	headerWidth := v.headerColumnWidth(v.rawContentWidth())
+	if requestedEnd <= headerWidth {
+		return
+	}
+	if requestedStart < headerWidth {
+		requestedStart = headerWidth
+	}
+	if requestedStart < 0 {
+		requestedStart = 0
+	}
+	if requestedEnd <= requestedStart {
+		return
+	}
+
+	visibleEnd := requestedEnd
+	if visibleEnd > v.maxContentColumns() {
+		visibleEnd = v.maxContentColumns()
+	}
+	if visibleEnd <= requestedStart {
+		return
+	}
+
+	if screenX < 0 {
+		screenX = 0
+	}
+	if screenX >= maxWidth {
+		return
+	}
+
+	info := v.layout.Lines[row.LineIndex]
+	spanLength := requestedEnd - requestedStart
+	pinnedStyle := v.rowBaseStyle(header)
+	if pinned {
+		pinnedStyle = v.restylePinned(pinnedStyle)
+	}
+	fillWidth := min(spanLength, max(maxWidth-screenX, 0))
+	if fillWidth > 0 {
+		screen.PutStrStyled(bodyX+screenX, y, strings.Repeat(" ", fillWidth), pinnedStyle)
+	}
+	for i := range info.GraphemeCellStarts {
+		sourceStart := info.GraphemeCellStarts[i]
+		sourceEnd := info.GraphemeCellEnds[i]
+		if sourceEnd <= requestedStart || sourceStart >= visibleEnd {
+			continue
+		}
+
+		visibleStart := max(sourceStart, requestedStart)
+		clippedEnd := min(sourceEnd, visibleEnd)
+		segment := layout.VisualSegment{
+			LogicalGraphemeIndex: i,
+			SourceCellStart:      sourceStart,
+			SourceCellEnd:        sourceEnd,
+			RenderedCellFrom:     screenX + (visibleStart - requestedStart),
+			RenderedCellTo:       screenX + (clippedEnd - requestedStart),
+		}
+		grapheme := line.Graphemes[i]
+		if visibleStart > sourceStart || clippedEnd < sourceEnd {
+			if grapheme.Text == "\t" {
+				segment.Display = strings.Repeat(" ", max(clippedEnd-visibleStart, 0))
+			} else {
+				segment.Display = ">"
+				segment.RenderedCellTo = segment.RenderedCellFrom + 1
+			}
+		}
+		v.drawSegment(screen, bodyX, y, row, line, segment, header, pinned, hyperlinks, maxWidth)
+	}
+}
+
+func (v *Viewer) drawSegment(screen tcell.Screen, baseX, y int, row layout.VisualRow, line model.Line, segment layout.VisualSegment, header, pinned bool, hyperlinks rowHyperlinks, maxWidth int) {
 	if segment.LogicalGraphemeIndex < 0 || segment.LogicalGraphemeIndex >= len(line.Graphemes) {
 		return
 	}
@@ -1067,21 +1445,33 @@ func (v *Viewer) drawSegment(screen tcell.Screen, baseX, y int, row layout.Visua
 	x += baseX
 
 	if display, style, ok := v.visualizedSegment(row, line, segment, grapheme, cellStyle); ok {
+		if pinned {
+			style = v.restylePinned(style)
+		}
 		screen.PutStrStyled(x, y, truncateToWidth(display, maxWidth-segment.RenderedCellFrom), style)
 		return
 	}
 
 	if segment.Display != "" {
+		if pinned {
+			cellStyle = v.restylePinned(cellStyle)
+		}
 		screen.PutStrStyled(x, y, truncateToWidth(segment.Display, maxWidth-segment.RenderedCellFrom), cellStyle)
 		return
 	}
 
 	if grapheme.Text == "\t" {
 		width := min(segment.RenderedCellTo-segment.RenderedCellFrom, maxWidth-segment.RenderedCellFrom)
+		if pinned {
+			cellStyle = v.restylePinned(cellStyle)
+		}
 		screen.PutStrStyled(x, y, strings.Repeat(" ", width), cellStyle)
 		return
 	}
 
+	if pinned {
+		cellStyle = v.restylePinned(cellStyle)
+	}
 	screen.Put(x, y, grapheme.Text, cellStyle)
 }
 
@@ -1168,6 +1558,21 @@ func (v *Viewer) resolveVisibleHyperlinks() map[int]rowHyperlinks {
 			continue
 		}
 		result[lineIndex] = v.resolveLineHyperlinks(lineIndex, v.lines[lineIndex])
+	}
+	for _, band := range v.pinnedRowBands() {
+		for rowIndex := band.Start; rowIndex < band.End; rowIndex++ {
+			if rowIndex < 0 || rowIndex >= len(v.layout.Rows) {
+				continue
+			}
+			lineIndex := v.layout.Rows[rowIndex].LineIndex
+			if lineIndex < 0 || lineIndex >= len(v.lines) {
+				continue
+			}
+			if _, ok := result[lineIndex]; ok {
+				continue
+			}
+			result[lineIndex] = v.resolveLineHyperlinks(lineIndex, v.lines[lineIndex])
+		}
 	}
 	return result
 }
@@ -1362,6 +1767,111 @@ func (v *Viewer) drawFrame(screen tcell.Screen, title string) {
 		screen.PutStrStyled(0, y, side, borderStyle)
 		screen.PutStrStyled(v.width-1, y, side, borderStyle)
 	}
+
+	v.drawFramePinnedIndicators(screen, bottomY)
+}
+
+func (v *Viewer) drawFramePinnedIndicators(screen tcell.Screen, bottomY int) {
+	if v.width <= 0 {
+		return
+	}
+	colGlyph := v.pinnedColumnGlyph()
+
+	if colGlyph == "" || !v.cfg.Chrome.Frame.enabled() {
+		return
+	}
+
+	contentX, _, contentWidth, _ := v.contentRect()
+	if contentWidth <= 0 {
+		return
+	}
+	pinStyle := v.pinnedChromeStyle(v.cfg.Chrome.BorderStyle)
+	for _, placement := range v.pinnedColumnPlacements() {
+		drawRepeatedGlyph(screen, contentX+placement.start, bottomY, colGlyph, placement.width, pinStyle)
+	}
+}
+
+func (v *Viewer) pinnedColumnNaturalSpan(band layout.Range) (int, int, bool) {
+	if band.End <= band.Start {
+		return 0, 0, false
+	}
+	headerWidth := v.headerColumnWidth(v.rawContentWidth())
+	if band.End <= headerWidth {
+		return 0, 0, false
+	}
+	start := band.Start
+	if start < headerWidth {
+		start = headerWidth
+	}
+	if start < 0 {
+		start = 0
+	}
+	end := band.End
+	if end > v.maxContentColumns() {
+		end = v.maxContentColumns()
+	}
+	if end <= start {
+		return 0, 0, false
+	}
+
+	naturalLeft := start - headerWidth
+	if v.cfg.WrapMode == layout.NoWrap {
+		naturalLeft -= max(v.colOffset, 0)
+	}
+	if naturalLeft < 0 {
+		naturalLeft = 0
+	}
+	maxWidth := v.contentWidth()
+	if maxWidth <= 0 {
+		return 0, 0, false
+	}
+	if naturalLeft < 0 {
+		naturalLeft = 0
+	}
+	return naturalLeft, band.Length(), true
+}
+
+func (v *Viewer) pinnedColumnPlacements() []pinnedColumnPlacement {
+	if len(v.cfg.PinnedColumns) == 0 {
+		return nil
+	}
+
+	width := v.contentWidth()
+	if width <= 0 {
+		return nil
+	}
+
+	placements := make([]pinnedColumnPlacement, 0, len(v.cfg.PinnedColumns))
+	cursor := 0
+	for _, band := range v.cfg.PinnedColumns {
+		start, spanWidth, ok := v.pinnedColumnNaturalSpan(band)
+		if !ok {
+			continue
+		}
+		maxStart := max(width-spanWidth, 0)
+		if start > maxStart {
+			start = maxStart
+		}
+		if start < cursor {
+			start = cursor
+		}
+		if start >= width {
+			continue
+		}
+		if spanWidth > width-start {
+			spanWidth = width - start
+		}
+		if spanWidth <= 0 {
+			continue
+		}
+		placements = append(placements, pinnedColumnPlacement{
+			band:  band,
+			start: start,
+			width: spanWidth,
+		})
+		cursor = start + band.Length()
+	}
+	return placements
 }
 
 func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
@@ -1369,6 +1879,9 @@ func (v *Viewer) drawStatus(screen tcell.Screen, y int) {
 	iconOnStyle := v.cfg.Chrome.StatusIconOnStyle
 	iconOffStyle := v.cfg.Chrome.StatusIconOffStyle
 	screen.PutStrStyled(0, y, strings.Repeat(" ", max(v.width, 0)), style)
+	if colGlyph := v.pinnedColumnGlyph(); colGlyph != "" && !v.cfg.Chrome.Frame.enabled() && v.hasPinnedColumns() {
+		screen.PutStrStyled(0, y, colGlyph, v.pinnedChromeStyle(style))
+	}
 
 	leftOverflow, rightOverflow := v.statusOverflow()
 	leftText, rightText := v.statusText()
@@ -1477,16 +1990,15 @@ func (v *Viewer) drawLineNumberGutter(screen tcell.Screen) {
 	for y := range gutterHeight {
 		rowIndex, header, ok := v.visibleLayoutRowAt(y)
 		rowFillStyle := applyChromeStyle(v.rowBaseStyle(header), v.cfg.Chrome.LineNumberStyle)
-		rowTextStyle := rowFillStyle
 		screen.PutStrStyled(gutterX, gutterY+y, blank, rowFillStyle)
 		if !ok {
 			continue
 		}
-		row := v.layout.Rows[rowIndex]
 		if !v.shouldShowLineNumber(rowIndex) {
 			continue
 		}
-		label := padRightToWidth(fmt.Sprintf("%*d", gutterWidth-1, v.sourceLineIndex(row.LineIndex)+1), gutterWidth)
+		rowTextStyle := rowFillStyle
+		label := padRightToWidth(fmt.Sprintf("%*d", gutterWidth-1, v.sourceLineIndex(v.layout.Rows[rowIndex].LineIndex)+1), gutterWidth)
 		screen.PutStrStyled(gutterX, gutterY+y, label, rowTextStyle)
 	}
 }
@@ -1497,6 +2009,42 @@ func (v *Viewer) rowBaseStyle(header bool) tcell.Style {
 		style = applyChromeStyle(style, v.cfg.Chrome.HeaderStyle)
 	}
 	return style
+}
+
+func (v *Viewer) pinnedChromeStyle(base tcell.Style) tcell.Style {
+	return applyChromeStyle(base, v.cfg.Chrome.PinnedStyle)
+}
+
+func (v *Viewer) restylePinned(style tcell.Style) tcell.Style {
+	if fn := v.cfg.Chrome.RestylePinned; fn != nil {
+		return fn(style)
+	}
+	return style
+}
+
+func (v *Viewer) pinnedRowGlyph() string {
+	if glyph := truncateToWidth(v.cfg.Chrome.PinnedRowGlyph, 1); glyph != "" {
+		return glyph
+	}
+	return truncateToWidth(v.cfg.Chrome.PinnedGlyph, 1)
+}
+
+func (v *Viewer) pinnedColumnGlyph() string {
+	if glyph := truncateToWidth(v.cfg.Chrome.PinnedColumnGlyph, 1); glyph != "" {
+		return glyph
+	}
+	return truncateToWidth(v.cfg.Chrome.PinnedGlyph, 1)
+}
+
+func (v *Viewer) hasPinnedColumns() bool {
+	return v.cfg.HeaderColumns > 0 || len(v.cfg.PinnedColumns) > 0
+}
+
+func drawRepeatedGlyph(screen tcell.Screen, x, y int, glyph string, width int, style tcell.Style) {
+	if width <= 0 || glyph == "" {
+		return
+	}
+	screen.PutStrStyled(x, y, strings.Repeat(glyph, width), style)
 }
 
 func applyChromeStyle(base, overlay tcell.Style) tcell.Style {

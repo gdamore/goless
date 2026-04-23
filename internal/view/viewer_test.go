@@ -845,6 +845,238 @@ func TestPinRowsAndColumnsCommand(t *testing.T) {
 	}
 }
 
+func TestPinRangeCommand(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	runViewerCommand(v, "pin rows=2-3 cols=4-6")
+
+	gotRows := v.PinnedRows()
+	if len(gotRows) != 1 || gotRows[0] != (layout.Range{Start: 1, End: 3}) {
+		t.Fatalf("PinnedRows after pin rows=2-3 = %+v, want [%+v]", gotRows, layout.Range{Start: 1, End: 3})
+	}
+	gotCols := v.PinnedColumns()
+	if len(gotCols) != 1 || gotCols[0] != (layout.Range{Start: 3, End: 6}) {
+		t.Fatalf("PinnedColumns after pin cols=4-6 = %+v, want [%+v]", gotCols, layout.Range{Start: 3, End: 6})
+	}
+}
+
+func TestPinMultipleStickyRangesCommand(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	runViewerCommand(v, "pin rows=2,4-5 cols=1-5,10,20-25")
+
+	gotRows := v.PinnedRows()
+	wantRows := []layout.Range{
+		{Start: 1, End: 2},
+		{Start: 3, End: 5},
+	}
+	if len(gotRows) != len(wantRows) {
+		t.Fatalf("PinnedRows after multi-range pin = %+v, want %+v", gotRows, wantRows)
+	}
+	for i, want := range wantRows {
+		if gotRows[i] != want {
+			t.Fatalf("PinnedRows[%d] after multi-range pin = %+v, want %+v", i, gotRows[i], want)
+		}
+	}
+
+	gotCols := v.PinnedColumns()
+	wantCols := []layout.Range{
+		{Start: 0, End: 5},
+		{Start: 9, End: 10},
+		{Start: 19, End: 25},
+	}
+	if len(gotCols) != len(wantCols) {
+		t.Fatalf("PinnedColumns after multi-range pin = %+v, want %+v", gotCols, wantCols)
+	}
+	for i, want := range wantCols {
+		if gotCols[i] != want {
+			t.Fatalf("PinnedColumns[%d] after multi-range pin = %+v, want %+v", i, gotCols[i], want)
+		}
+	}
+}
+
+func TestPinnedColumnsStackWithoutOverwriting(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("12345678901234567890\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(8, 2)
+	v.SetPinnedColumns(
+		layout.Range{Start: 0, End: 4},
+		layout.Range{Start: 9, End: 20},
+	)
+
+	_, screen := newMockScreen(t, 8, 2)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got, want := screenRowString(screen, 0, 8), "12340123"; got != want {
+		t.Fatalf("stacked pinned columns = %q, want %q", got, want)
+	}
+}
+
+func TestPinnedRowsStackWithoutOverwriting(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6\nrow7\nrow8\nrow9\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(8, 5)
+	v.SetPinnedRows(
+		layout.Range{Start: 1, End: 4},
+		layout.Range{Start: 5, End: 10},
+	)
+
+	_, screen := newMockScreen(t, 8, 5)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got := screenRowString(screen, 1, 8); !strings.HasPrefix(got, "row1") {
+		t.Fatalf("stacked pinned row 1 = %q, want prefix %q", got, "row1")
+	}
+	if got := screenRowString(screen, 2, 8); !strings.HasPrefix(got, "row2") {
+		t.Fatalf("stacked pinned row 2 = %q, want prefix %q", got, "row2")
+	}
+	if got := screenRowString(screen, 3, 8); !strings.HasPrefix(got, "row3") {
+		t.Fatalf("stacked pinned row 3 = %q, want prefix %q", got, "row3")
+	}
+	if got := screenRowString(screen, 4, 8); !strings.HasPrefix(got, "row5") {
+		t.Fatalf("stacked pinned row 4 = %q, want prefix %q", got, "row5")
+	}
+}
+
+func TestUnpinRangeCommand(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	runViewerCommand(v, "pin rows=2-4 cols=3-6")
+	runViewerCommand(v, "unpin rows=3-4 cols=5-6")
+
+	gotRows := v.PinnedRows()
+	if len(gotRows) != 1 || gotRows[0] != (layout.Range{Start: 1, End: 2}) {
+		t.Fatalf("PinnedRows after unpin rows=3-4 = %+v, want [%+v]", gotRows, layout.Range{Start: 1, End: 2})
+	}
+	gotCols := v.PinnedColumns()
+	if len(gotCols) != 1 || gotCols[0] != (layout.Range{Start: 2, End: 4}) {
+		t.Fatalf("PinnedColumns after unpin cols=5-6 = %+v, want [%+v]", gotCols, layout.Range{Start: 2, End: 4})
+	}
+}
+
+func TestUnpinClearsAllPinning(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("header\none\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	runViewerCommand(v, "pin rows=1 cols=2")
+	runViewerCommand(v, "unpin")
+
+	if got, want := v.HeaderLines(), 0; got != want {
+		t.Fatalf("HeaderLines after unpin = %d, want %d", got, want)
+	}
+	if got, want := v.HeaderColumns(), 0; got != want {
+		t.Fatalf("HeaderColumns after unpin = %d, want %d", got, want)
+	}
+	if got := v.PinnedRows(); len(got) != 0 {
+		t.Fatalf("PinnedRows after unpin = %+v, want empty", got)
+	}
+	if got := v.PinnedColumns(); len(got) != 0 {
+		t.Fatalf("PinnedColumns after unpin = %+v, want empty", got)
+	}
+}
+
+func TestUnpinPrefixRanges(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("header\none\ntwo\nthree\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	runViewerCommand(v, "pin rows=2 cols=3")
+	runViewerCommand(v, "unpin rows=1-2 cols=1-3")
+
+	if got, want := v.HeaderLines(), 0; got != want {
+		t.Fatalf("HeaderLines after unpin prefix = %d, want %d", got, want)
+	}
+	if got, want := v.HeaderColumns(), 0; got != want {
+		t.Fatalf("HeaderColumns after unpin prefix = %d, want %d", got, want)
+	}
+}
+
+func TestUnpinOverlappingPrefixRanges(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("header\none\ntwo\nthree\nfour\nfive\nsix\nseven\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true})
+	v.SetSize(20, 4)
+
+	runViewerCommand(v, "pin rows=5 cols=5")
+	runViewerCommand(v, "unpin rows=1-2 rows=1-3 cols=1-2 cols=1-4")
+
+	if got, want := v.HeaderLines(), 2; got != want {
+		t.Fatalf("HeaderLines after overlapping unpin = %d, want %d", got, want)
+	}
+	if got, want := v.HeaderColumns(), 1; got != want {
+		t.Fatalf("HeaderColumns after overlapping unpin = %d, want %d", got, want)
+	}
+}
+
+func TestClearPinsRelayoutsAndPreservesAnchor(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdefg\nhijklmn\nopqrstu\nvwxyz12\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap, ShowStatus: true, HeaderColumns: 2})
+	v.SetSize(6, 3)
+	v.ScrollDown(1)
+
+	beforeAnchor := v.firstVisibleAnchor()
+	beforeWidth := v.layout.Config.Width
+	if got, want := beforeWidth, 4; got != want {
+		t.Fatalf("layout width before clear pins = %d, want %d", got, want)
+	}
+
+	v.ClearPins()
+
+	if got, want := v.layout.Config.Width, 6; got != want {
+		t.Fatalf("layout width after clear pins = %d, want %d", got, want)
+	}
+	if got := v.firstVisibleAnchor().LineIndex; got != beforeAnchor.LineIndex {
+		t.Fatalf("firstVisibleAnchor line after clear pins = %d, want %d", got, beforeAnchor.LineIndex)
+	}
+	if got, want := v.HeaderColumns(), 0; got != want {
+		t.Fatalf("HeaderColumns after clear pins = %d, want %d", got, want)
+	}
+}
+
 func TestDisplayCommands(t *testing.T) {
 	doc := model.NewDocument(4)
 	if err := doc.Append([]byte("one\ttwo\n")); err != nil {
@@ -4844,6 +5076,202 @@ func TestHeaderColumnsDoNotShowClipMarkerForLeadingTab(t *testing.T) {
 
 	if got := screenRowString(screen, 0, 6); strings.Contains(got, ">") {
 		t.Fatalf("row with leading tab in fixed columns = %q, should not contain clip marker", got)
+	}
+}
+
+func TestPinnedRowsStayVisible(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("one\ntwo\nthree\nfour\nfive\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(8, 3)
+	v.SetPinnedRows(layout.Range{Start: 1, End: 3})
+	v.ScrollDown(2)
+
+	_, screen := newMockScreen(t, 8, 3)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got := screenRowString(screen, 0, 8); got != "two     " {
+		t.Fatalf("first pinned row = %q, want %q", got, "two     ")
+	}
+	if got := screenRowString(screen, 1, 8); got != "three   " {
+		t.Fatalf("second pinned row = %q, want %q", got, "three   ")
+	}
+}
+
+func TestPinnedColumnsStayVisible(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("1234567890\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{TabWidth: 4, WrapMode: layout.NoWrap})
+	v.SetSize(6, 2)
+	v.SetPinnedColumns(layout.Range{Start: 2, End: 6})
+	v.ScrollRight(5)
+
+	_, screen := newMockScreen(t, 6, 2)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got := screenRowString(screen, 0, 6); !strings.HasPrefix(got, "3456") {
+		t.Fatalf("pinned column row = %q, want it to start with %q", got, "3456")
+	}
+}
+
+func TestPinnedColumnBackgroundExtendsPastLineEnd(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("ab\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		PinnedColumns: []layout.Range{
+			{Start: 1, End: 5},
+		},
+		Chrome: Chrome{
+			RestylePinned: func(style tcell.Style) tcell.Style {
+				return style.Reverse(true)
+			},
+		},
+	})
+	v.SetSize(8, 2)
+
+	_, screen := newMockScreen(t, 8, 2)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got := cellRune(screen, 3, 0); got != ' ' {
+		t.Fatalf("pinned trailing cell rune = %q, want space", got)
+	}
+	_, style, _ := screen.Get(3, 0)
+	if !style.HasReverse() {
+		t.Fatal("pinned trailing cell should be restyled past the end of the line")
+	}
+}
+
+func TestPinnedCellsRestyleAndShowChromeIndicators(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("abcdef\nuvwxyz\nmnopqr\nstuvwx\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	pinnedStyle := func(style tcell.Style) tcell.Style {
+		return style.Reverse(true)
+	}
+
+	v := New(doc, Config{
+		TabWidth: 4,
+		WrapMode: layout.NoWrap,
+		PinnedRows: []layout.Range{
+			{Start: 1, End: 3},
+		},
+		PinnedColumns: []layout.Range{
+			{Start: 1, End: 4},
+		},
+		Chrome: Chrome{
+			Frame: Frame{
+				Horizontal:  "─",
+				Vertical:    "│",
+				TopLeft:     "┌",
+				TopRight:    "┐",
+				BottomLeft:  "└",
+				BottomRight: "┘",
+			},
+			PinnedRowGlyph:    "!",
+			PinnedColumnGlyph: "?",
+			RestylePinned:     pinnedStyle,
+		},
+	})
+	v.SetSize(8, 4)
+	v.ScrollDown(1)
+	v.ScrollRight(2)
+
+	_, screen := newMockScreen(t, 8, 4)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got := cellRune(screen, 0, 2); got != '!' {
+		t.Fatalf("frame row pin glyph = %q, want %q", got, '!')
+	}
+
+	_, pinnedRowStyle, _ := screen.Get(1, 2)
+	if !pinnedRowStyle.HasReverse() {
+		t.Fatal("pinned row cell should be restyled")
+	}
+
+	_, pinnedColStyle, _ := screen.Get(2, 1)
+	if !pinnedColStyle.HasReverse() {
+		t.Fatal("pinned column cell should be restyled")
+	}
+
+	_, rowIndicatorStyle, _ := screen.Get(0, 2)
+	if !rowIndicatorStyle.HasBold() {
+		t.Fatal("frame row pin glyph should be bold")
+	}
+
+	for _, x := range []int{2, 3, 4} {
+		if got := cellRune(screen, x, 3); got != '?' {
+			t.Fatalf("frame column pin glyph at x=%d = %q, want %q", x, got, '?')
+		}
+		_, style, _ := screen.Get(x, 3)
+		if !style.HasBold() {
+			t.Fatalf("frame column pin glyph at x=%d should be bold", x)
+		}
+	}
+}
+
+func TestPinnedRowIndicatorTracksPinnedOverlayPosition(t *testing.T) {
+	doc := model.NewDocument(4)
+	if err := doc.Append([]byte("row0\nrow1\nrow2\nrow3\nrow4\nrow5\nrow6\n")); err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	v := New(doc, Config{
+		TabWidth:    4,
+		WrapMode:    layout.NoWrap,
+		LineNumbers: true,
+		PinnedRows: []layout.Range{
+			{Start: 2, End: 3},
+		},
+		Chrome: Chrome{
+			Frame: Frame{
+				Horizontal:  "─",
+				Vertical:    "│",
+				TopLeft:     "┌",
+				TopRight:    "┐",
+				BottomLeft:  "└",
+				BottomRight: "┘",
+			},
+			PinnedRowGlyph: "!",
+		},
+	})
+	v.SetSize(10, 5)
+	v.ScrollDown(4)
+
+	_, screen := newMockScreen(t, 10, 5)
+	defer screen.Fini()
+	v.Draw(screen)
+
+	if got := cellRune(screen, 0, 1); got != '!' {
+		t.Fatalf("pinned row glyph at overlay position = %q, want %q", got, '!')
+	}
+	_, pinStyle, _ := screen.Get(0, 1)
+	if !pinStyle.HasBold() {
+		t.Fatal("pinned row glyph should be bold")
+	}
+
+	if got := cellRune(screen, 1, 1); got < '0' || got > '9' {
+		t.Fatalf("pinned row number at overlay position = %q, want a digit", got)
+	}
+	_, numberStyle, _ := screen.Get(1, 1)
+	if numberStyle.HasBold() {
+		t.Fatal("pinned row number should keep the normal line-number style")
 	}
 }
 

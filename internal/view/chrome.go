@@ -46,6 +46,11 @@ type Chrome struct {
 	StatusHelpKeyStyle tcell.Style
 	LineNumberStyle    tcell.Style
 	HeaderStyle        tcell.Style
+	PinnedRowGlyph     string
+	PinnedColumnGlyph  string
+	PinnedGlyph        string
+	PinnedStyle        tcell.Style
+	RestylePinned      func(tcell.Style) tcell.Style
 	PromptStyle        tcell.Style
 	PromptErrorStyle   tcell.Style
 }
@@ -74,6 +79,9 @@ func (c Chrome) withDefaults() Chrome {
 	}
 	if c.HeaderStyle == tcell.StyleDefault {
 		c.HeaderStyle = tcell.StyleDefault.Bold(true)
+	}
+	if c.PinnedStyle == tcell.StyleDefault {
+		c.PinnedStyle = tcell.StyleDefault.Bold(true)
 	}
 	if c.PromptStyle == tcell.StyleDefault {
 		c.PromptStyle = tcell.StyleDefault.Reverse(true)

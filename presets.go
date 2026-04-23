@@ -75,8 +75,14 @@ var DarkPreset = Preset{
 		StatusIconOnStyle: tcell.StyleDefault.Foreground(solarizedBlue).Background(solarizedBase03),
 		LineNumberStyle:   tcell.StyleDefault.Foreground(solarizedBase01).Dim(true),
 		HeaderStyle:       tcell.StyleDefault.Background(solarizedBase01).Foreground(solarizedBase03).Bold(true),
-		PromptStyle:       tcell.StyleDefault.Foreground(solarizedBase3).Background(solarizedBase03),
-		PromptErrorStyle:  tcell.StyleDefault.Foreground(solarizedRed).Background(solarizedBase03).Bold(true),
+		PinnedRowGlyph:    "▷",
+		PinnedColumnGlyph: "△",
+		PinnedStyle:       tcell.StyleDefault.Bold(true),
+		RestylePinned: func(style tcell.Style) tcell.Style {
+			return style.Background(solarizedBase02)
+		},
+		PromptStyle:      tcell.StyleDefault.Foreground(solarizedBase3).Background(solarizedBase03),
+		PromptErrorStyle: tcell.StyleDefault.Foreground(solarizedRed).Background(solarizedBase03).Bold(true),
 	},
 }
 
@@ -113,8 +119,14 @@ var LightPreset = Preset{
 		StatusIconOnStyle: tcell.StyleDefault.Foreground(solarizedBase02).Background(solarizedBase2).Dim(true),
 		LineNumberStyle:   tcell.StyleDefault.Foreground(solarizedBase1).Dim(true),
 		HeaderStyle:       tcell.StyleDefault.Background(solarizedBase1).Foreground(solarizedBase3).Bold(true),
-		PromptStyle:       tcell.StyleDefault.Foreground(solarizedBase02).Background(solarizedBase2),
-		PromptErrorStyle:  tcell.StyleDefault.Foreground(solarizedRed).Background(solarizedBase2).Bold(true),
+		PinnedRowGlyph:    "▷",
+		PinnedColumnGlyph: "△",
+		PinnedStyle:       tcell.StyleDefault.Bold(true),
+		RestylePinned: func(style tcell.Style) tcell.Style {
+			return style.Background(solarizedBase2)
+		},
+		PromptStyle:      tcell.StyleDefault.Foreground(solarizedBase02).Background(solarizedBase2),
+		PromptErrorStyle: tcell.StyleDefault.Foreground(solarizedRed).Background(solarizedBase2).Bold(true),
 	},
 }
 
@@ -148,8 +160,12 @@ var PlainPreset = Preset{
 		StatusHelpKeyStyle: tcell.StyleDefault.Reverse(true).Bold(true),
 		LineNumberStyle:    tcell.StyleDefault.Dim(true),
 		HeaderStyle:        tcell.StyleDefault.Reverse(true).Dim(true),
-		PromptStyle:        tcell.StyleDefault.Reverse(true),
-		PromptErrorStyle:   tcell.StyleDefault.Reverse(true).Bold(true),
+		PinnedStyle:        tcell.StyleDefault.Bold(true),
+		RestylePinned: func(style tcell.Style) tcell.Style {
+			return style.Dim(true).Reverse(true)
+		},
+		PromptStyle:      tcell.StyleDefault.Reverse(true),
+		PromptErrorStyle: tcell.StyleDefault.Reverse(true).Bold(true),
 	},
 }
 
@@ -157,13 +173,19 @@ var PlainPreset = Preset{
 var PrettyPreset = Preset{
 	Theme: Theme{},
 	Chrome: Chrome{
-		Frame:            RoundedFrame(),
-		TitleAlign:       TitleAlignCenter,
-		BorderStyle:      tcell.StyleDefault.Foreground(prettyBlue),
-		TitleStyle:       tcell.StyleDefault.Foreground(solarizedMagenta).Bold(true),
-		StatusStyle:      tcell.StyleDefault.Foreground(solarizedBase3).Background(prettyBlue),
-		LineNumberStyle:  tcell.StyleDefault.Foreground(prettyBlue).Dim(true),
-		HeaderStyle:      tcell.StyleDefault.Foreground(solarizedCyan).Bold(true),
+		Frame:             RoundedFrame(),
+		TitleAlign:        TitleAlignCenter,
+		BorderStyle:       tcell.StyleDefault.Foreground(prettyBlue),
+		TitleStyle:        tcell.StyleDefault.Foreground(solarizedMagenta).Bold(true),
+		StatusStyle:       tcell.StyleDefault.Foreground(solarizedBase3).Background(prettyBlue),
+		LineNumberStyle:   tcell.StyleDefault.Foreground(prettyBlue).Dim(true),
+		HeaderStyle:       tcell.StyleDefault.Foreground(solarizedCyan).Bold(true),
+		PinnedRowGlyph:    "▷",
+		PinnedColumnGlyph: "△",
+		PinnedStyle:       tcell.StyleDefault.Bold(true),
+		RestylePinned: func(style tcell.Style) tcell.Style {
+			return style.Foreground(solarizedMagenta)
+		},
 		PromptStyle:      tcell.StyleDefault.Foreground(solarizedBase3).Background(prettyBlue),
 		PromptErrorStyle: tcell.StyleDefault.Foreground(solarizedRed).Background(prettyBlue).Bold(true),
 	},
